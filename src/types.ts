@@ -1,9 +1,12 @@
 import type { Node, Edge } from '@vue-flow/core'
 
-/** A single magic-move step with code and an optional comment */
+/** A single code beat for magic-move animation with optional narration metadata */
 export interface MagicMoveStep {
   code: string
+  title?: string
   comment?: string
+  story?: string
+  speaker?: string
 }
 
 /** Props for the FlowTimeline root element */
@@ -11,6 +14,7 @@ export interface FlowTimelineProps {
   title: string
   description?: string
   direction?: 'horizontal' | 'vertical'
+  minHeight?: number
 }
 
 /** Props for trigger/entry-point nodes */
@@ -27,6 +31,7 @@ export interface CodeNodeProps {
   language?: string
   code: string
   comment?: string
+  story?: string
   magicMoveSteps?: MagicMoveStep[]
 }
 

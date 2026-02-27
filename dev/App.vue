@@ -13,6 +13,7 @@ const spec: FlowNarratorSpec = {
       props: {
         title: 'ETL Pipeline',
         description: 'Contentful CMS to DynamoDB',
+        minHeight: 620,
       },
       children: ['node-1', 'node-2', 'node-3', 'node-4', 'node-5'],
     },
@@ -32,18 +33,31 @@ const spec: FlowNarratorSpec = {
         language: 'python',
         code: 'def handler(event, context):\n    client = contentful.Client(\n        space_id=os.environ["SPACE_ID"],\n        access_token=os.environ["TOKEN"]\n    )\n    entries = client.entries({"limit": 100})\n    return {\n        "statusCode": 200,\n        "body": json.dumps(entries)\n    }',
         comment: 'Fetches raw data from Contentful CMS',
+        story: 'Dev note: this lambda is intentionally defensive because upstream schema drift is common.',
         magicMoveSteps: [
           {
             code: 'def handler(event, context):\n    client = contentful.Client(\n        space_id=os.environ["SPACE_ID"],\n        access_token=os.environ["TOKEN"]\n    )',
-            comment: 'Initialize the Contentful SDK client',
+            title: 'Boot client',
+            story: 'Dev: first we hydrate the Contentful client with runtime credentials.',
+            speaker: 'Dev',
           },
           {
             code: 'def handler(event, context):\n    client = contentful.Client(\n        space_id=os.environ["SPACE_ID"],\n        access_token=os.environ["TOKEN"]\n    )\n    entries = client.entries({"limit": 100})',
-            comment: 'Fetch up to 100 entries from the CMS',
+            title: 'Pull entries',
+            story: 'Narrator: we fetch up to 100 entries as the raw ingest payload.',
+            speaker: 'Narrator',
           },
           {
-            code: 'def handler(event, context):\n    client = contentful.Client(\n        space_id=os.environ["SPACE_ID"],\n        access_token=os.environ["TOKEN"]\n    )\n    entries = client.entries({"limit": 100})\n    return {\n        "statusCode": 200,\n        "body": json.dumps(entries)\n    }',
-            comment: 'Return full payload to Step Functions',
+            code: 'def handler(event, context):\n    client = contentful.Client(\n        space_id=os.environ["SPACE_ID"],\n        access_token=os.environ["TOKEN"]\n    )\n    entries = client.entries({"limit": 100})\n\n    telemetry.log("entries_count", len(entries))',
+            title: 'Observe payload',
+            story: 'Dev: emit lightweight telemetry before returning so we can debug spikes.',
+            speaker: 'Dev',
+          },
+          {
+            code: 'def handler(event, context):\n    client = contentful.Client(\n        space_id=os.environ["SPACE_ID"],\n        access_token=os.environ["TOKEN"]\n    )\n    entries = client.entries({"limit": 100})\n\n    telemetry.log("entries_count", len(entries))\n\n    return {\n        "statusCode": 200,\n        "body": json.dumps(entries)\n    }',
+            title: 'Return batch',
+            story: 'Narrator: the raw payload is serialized and sent forward to Step Functions.',
+            speaker: 'Narrator',
           },
         ],
       },
