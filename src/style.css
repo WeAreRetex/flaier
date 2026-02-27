@@ -1,0 +1,105 @@
+@import "tailwindcss";
+@import "@vue-flow/core/dist/style.css";
+@import "@vue-flow/core/dist/theme-default.css";
+@import "shiki-magic-move/dist/style.css";
+
+@theme {
+  --color-border: oklch(0.25 0.005 260);
+  --color-ring: oklch(0.55 0.12 270);
+  --color-background: oklch(0.098 0.005 260);
+  --color-foreground: oklch(0.93 0 0);
+  --color-card: oklch(0.145 0.006 260);
+  --color-card-foreground: oklch(0.93 0 0);
+  --color-muted: oklch(0.2 0.005 260);
+  --color-muted-foreground: oklch(0.55 0 0);
+  --color-primary: oklch(0.65 0.15 270);
+  --color-primary-foreground: oklch(1 0 0);
+}
+
+/* ── VueFlow: clean slate ──────────────────────────────────── */
+
+.vue-flow {
+  --vf-node-bg: transparent;
+  --vf-node-color: var(--color-foreground);
+  --vf-box-shadow: none;
+  background-image: radial-gradient(circle, oklch(0.22 0.005 260) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.vue-flow__node {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+/* Edges */
+.vue-flow__edge-path {
+  stroke: oklch(0.3 0.015 260) !important;
+  stroke-width: 1.5px !important;
+}
+
+.vue-flow__edge.animated path {
+  stroke-dasharray: 6 4;
+  animation: edge-flow 2s linear infinite;
+}
+
+.vue-flow__edge.selected .vue-flow__edge-path,
+.vue-flow__edge-path.active-edge {
+  stroke: oklch(0.55 0.12 270) !important;
+  stroke-width: 2px !important;
+  filter: drop-shadow(0 0 4px oklch(0.55 0.12 270 / 0.4));
+}
+
+@keyframes edge-flow {
+  to { stroke-dashoffset: -20; }
+}
+
+/* Handles: tiny and subtle */
+.vue-flow__handle {
+  width: 6px !important;
+  height: 6px !important;
+  border: 1.5px solid oklch(0.2 0.005 260) !important;
+  background: oklch(0.35 0.02 260) !important;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.vue-flow__node:hover .vue-flow__handle {
+  opacity: 1;
+}
+
+/* Background dots */
+.vue-flow__background pattern circle {
+  fill: oklch(0.2 0.005 260) !important;
+}
+
+/* ── Shiki ─────────────────────────────────────────────────── */
+
+.shiki-magic-move-container {
+  background: transparent !important;
+  font-size: 12px !important;
+  line-height: 1.65 !important;
+}
+
+.shiki-magic-move-container pre {
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* ── Node cards ────────────────────────────────────────────── */
+
+.fn-node {
+  transition: opacity 0.4s ease, filter 0.4s ease, transform 0.3s ease;
+}
+
+.fn-node[data-active="false"] {
+  opacity: 0.35;
+  filter: saturate(0.2) brightness(0.7);
+}
+
+.fn-node[data-active="true"] {
+  opacity: 1;
+  filter: none;
+}
