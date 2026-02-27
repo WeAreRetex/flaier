@@ -136,7 +136,7 @@ function handleStateChange(changes: Array<{ path: string; value: unknown }>) {
 </script>
 
 <template>
-  <div class="relative h-full w-full">
+  <div class="relative h-full w-full min-h-[320px]">
     <div v-if="loading" class="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
       Loading flow spec...
     </div>

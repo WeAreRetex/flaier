@@ -1,3 +1,5 @@
+import './style.css'
+
 export { default as FlowNarrator } from './components/FlowNarrator.vue'
 export { catalog } from './catalog'
 export { registry } from './registry'

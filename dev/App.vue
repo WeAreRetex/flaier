@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { FlowNarrator, type FlowNarratorSpec } from '../src'
-import '../src/style.css'
 
 const spec: FlowNarratorSpec = {
   root: 'timeline-1',
@@ -79,7 +78,7 @@ const spec: FlowNarratorSpec = {
 </script>
 
 <template>
-  <div class="h-screen w-screen bg-background">
+  <div style="width: 100vw; height: 100vh; display: grid; position: relative;" class="h-screen w-screen bg-background">
     <FlowNarrator :src="spec" :interval="3500" />
   </div>
 </template>

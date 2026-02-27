@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { useStateStore } from '@json-render/vue'
+import { useStateStore, useStateValue } from '@json-render/vue'
 import { VueFlow, useNodesInitialized, useVueFlow } from '@vue-flow/core'
 import {
   computed,
   getCurrentInstance,
   nextTick,
+  onMounted,
   onUnmounted,
   ref,
   watch,
@@ -81,7 +82,9 @@ const orderedNodeElements = computed<OrderedNodeElement[]>(() => {
 const totalSteps = computed(() => orderedNodeElements.value.length)
 const maxStepIndex = computed(() => Math.max(0, totalSteps.value - 1))
 
-const { get, set } = useStateStore()
+const { set } = useStateStore()
+const currentStepState = useStateValue<number>('/currentStep')
+const playingState = useStateValue<boolean>('/playing')
 
 function clampStep(value: number) {
   if (!Number.isFinite(value)) return 0
@@ -91,7 +94,7 @@ function clampStep(value: number) {
 
 const currentStep = computed<number>({
   get() {
-    return clampStep(Number(get('/currentStep') ?? 0))
+    return clampStep(Number(currentStepState.value ?? 0))
   },
   set(value: number) {
     set('/currentStep', clampStep(value))
@@ -100,7 +103,7 @@ const currentStep = computed<number>({
 
 const playing = computed<boolean>({
   get() {
-    return Boolean(get('/playing') ?? false)
+    return Boolean(playingState.value ?? false)
   },
   set(value: boolean) {
     set('/playing', value)
@@ -140,8 +143,6 @@ watch([playing, totalSteps, intervalMs], ([isPlaying, steps, interval]) => {
     playing.value = false
   }, interval)
 }, { immediate: true })
-
-onUnmounted(clearTimer)
 
 function next() {
   if (currentStep.value < totalSteps.value - 1) {
@@ -264,9 +265,33 @@ function toMagicMoveSteps(value: unknown): MagicMoveStep[] {
 
 const instance = getCurrentInstance()
 const flowId = `flow-narrator-${instance?.uid ?? 0}`
-const { fitView } = useVueFlow({ id: flowId })
+const { fitView } = useVueFlow(flowId)
 const nodesInitialized = useNodesInitialized()
 const paneReady = ref(false)
+const containerRef = ref<HTMLDivElement | null>(null)
+const containerReady = ref(false)
+let resizeObserver: ResizeObserver | null = null
+
+function updateContainerReady() {
+  const element = containerRef.value
+  containerReady.value = Boolean(element && element.clientWidth > 0 && element.clientHeight > 0)
+}
+
+onMounted(() => {
+  nextTick(() => {
+    updateContainerReady()
+
+    if (typeof ResizeObserver === 'undefined') return
+
+    resizeObserver = new ResizeObserver(() => {
+      updateContainerReady()
+    })
+
+    if (containerRef.value) {
+      resizeObserver.observe(containerRef.value)
+    }
+  })
+})
 
 function onInit() {
   paneReady.value = true
@@ -294,11 +319,23 @@ watch(currentStep, () => {
     })
   })
 })
+
+onUnmounted(() => {
+  clearTimer()
+  if (resizeObserver) {
+    resizeObserver.disconnect()
+    resizeObserver = null
+  }
+})
 </script>
 
 <template>
-  <div class="flow-narrator relative h-full w-full font-sans antialiased bg-background">
+  <div
+    ref="containerRef"
+    class="flow-narrator relative h-full w-full min-h-[320px] font-sans antialiased bg-background"
+  >
     <VueFlow
+      v-if="containerReady"
       :id="flowId"
       :nodes="nodes"
       :edges="edges"
@@ -355,6 +392,8 @@ watch(currentStep, () => {
       </template>
     </VueFlow>
 
+    <div v-else class="h-full w-full" />
+
     <div v-if="title || description" class="absolute top-4 left-4 z-20">
       <div class="rounded-lg border border-border/60 bg-card/80 px-3 py-1.5 text-xs shadow-lg backdrop-blur-md">
         <p v-if="title" class="font-medium text-foreground">{{ title }}</p>
@@ -362,18 +401,20 @@ watch(currentStep, () => {
       </div>
     </div>
 
-    <div class="absolute bottom-5 left-1/2 z-20 -translate-x-1/2">
-      <TimelineControls
-        :current-step="currentStep"
-        :total-steps="totalSteps"
-        :playing="playing"
-        :label="activeLabel"
-        :description="activeDescription"
-        @next="next"
-        @prev="prev"
-        @go-to="goTo"
-        @toggle-play="togglePlay"
-      />
+    <div class="pointer-events-none absolute inset-x-0 bottom-5 z-30 flex justify-center px-4">
+      <div class="pointer-events-auto">
+        <TimelineControls
+          :current-step="currentStep"
+          :total-steps="totalSteps"
+          :playing="playing"
+          :label="activeLabel"
+          :description="activeDescription"
+          @next="next"
+          @prev="prev"
+          @go-to="goTo"
+          @toggle-play="togglePlay"
+        />
+      </div>
     </div>
   </div>
 </template>
