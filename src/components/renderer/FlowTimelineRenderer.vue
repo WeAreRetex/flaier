@@ -101,6 +101,10 @@ function toRequiredString(value: unknown) {
   return toOptionalString(value) ?? ''
 }
 
+function toBoolean(value: unknown, fallback = false) {
+  return typeof value === 'boolean' ? value : fallback
+}
+
 function toMagicMoveSteps(value: unknown): MagicMoveStep[] {
   if (!Array.isArray(value)) return []
 
@@ -135,6 +139,63 @@ function toMagicMoveSteps(value: unknown): MagicMoveStep[] {
 function getNodeFrameCount(element: SpecElement) {
   if (element.type !== 'CodeNode') return 1
   return Math.max(1, toMagicMoveSteps(element.props.magicMoveSteps).length)
+}
+
+function getCodeNodeMaxLines(element: SpecElement) {
+  const rootCodeLines = toRequiredString(element.props.code).split('\n').length
+  const stepLines = toMagicMoveSteps(element.props.magicMoveSteps)
+    .map((step) => step.code.split('\n').length)
+
+  return Math.max(rootCodeLines, ...stepLines)
+}
+
+function getCodeNodeMaxLineLength(element: SpecElement) {
+  const variants = [
+    toRequiredString(element.props.code),
+    ...toMagicMoveSteps(element.props.magicMoveSteps).map((step) => step.code),
+  ]
+
+  return variants.reduce((max, code) => {
+    const lineMax = code
+      .split('\n')
+      .reduce((lineLengthMax, line) => Math.max(lineLengthMax, line.length), 0)
+
+    return Math.max(max, lineMax)
+  }, 0)
+}
+
+function estimateWrappedLines(text: string, charsPerLine = 48) {
+  return text
+    .split('\n')
+    .reduce((total, line) => total + Math.max(1, Math.ceil(line.length / charsPerLine)), 0)
+}
+
+function getCodeNodeWrappedLines(element: SpecElement, charsPerLine = 44) {
+  const variants = [
+    toRequiredString(element.props.code),
+    ...toMagicMoveSteps(element.props.magicMoveSteps).map((step) => step.code),
+  ]
+
+  return variants.reduce((max, code) => {
+    return Math.max(max, estimateWrappedLines(code, charsPerLine))
+  }, 1)
+}
+
+function hasCodeNodeStoryMeta(element: SpecElement) {
+  return toMagicMoveSteps(element.props.magicMoveSteps).some((step) => step.title || step.speaker)
+}
+
+function getCodeNodeStoryLines(element: SpecElement) {
+  const variants = [
+    toOptionalString(element.props.story),
+    toOptionalString(element.props.comment),
+    ...toMagicMoveSteps(element.props.magicMoveSteps).flatMap((step) => [step.story, step.comment]),
+  ]
+    .filter((value): value is string => typeof value === 'string' && value.length > 0)
+
+  if (variants.length === 0) return 0
+
+  return variants.reduce((max, current) => Math.max(max, estimateWrappedLines(current)), 1)
 }
 
 const timelineFrames = computed<TimelineFrame[]>(() => {
@@ -370,20 +431,29 @@ const containerMinHeight = computed(() => {
     return Math.floor(provided)
   }
 
-  const maxCodeLines = orderedNodeElements.value.reduce((currentMax, node) => {
-    if (node.element.type !== 'CodeNode') return currentMax
+  const node = activeNode.value ?? orderedNodeElements.value[0]
+  if (!node || node.element.type !== 'CodeNode') {
+    return 520
+  }
 
-    const rootCodeLines = toRequiredString(node.element.props.code).split('\n').length
-    const stepLines = toMagicMoveSteps(node.element.props.magicMoveSteps)
-      .map((step) => step.code.split('\n').length)
-    const localMax = Math.max(rootCodeLines, ...stepLines)
+  const autoWrapEnabled = getCodeNodeMaxLineLength(node.element) > 58
+  const wrapEnabled = toBoolean(node.element.props.wrapLongLines) || autoWrapEnabled
 
-    return Math.max(currentMax, localMax)
-  }, 0)
+  const codeLines = wrapEnabled
+    ? getCodeNodeWrappedLines(node.element)
+    : getCodeNodeMaxLines(node.element)
+  const storyLines = getCodeNodeStoryLines(node.element)
+  const storyHasMeta = hasCodeNodeStoryMeta(node.element)
 
-  if (maxCodeLines >= 22) return 680
-  if (maxCodeLines >= 14) return 600
-  return 520
+  const codeViewportHeight = wrapEnabled
+    ? Math.min(400, Math.max(190, 72 + codeLines * 16))
+    : Math.min(340, Math.max(160, 84 + codeLines * 17))
+
+  const storyViewportHeight = storyLines > 0
+    ? Math.min(220, Math.max(88, (storyHasMeta ? 56 : 34) + storyLines * 18))
+    : 0
+
+  return Math.min(880, Math.max(560, codeViewportHeight + storyViewportHeight + 300))
 })
 
 const instance = getCurrentInstance()
@@ -428,9 +498,13 @@ const viewportReady = computed(() =>
 )
 
 const hasInitialFocus = ref(false)
+const lastFocusedNodeKey = ref<string | null>(null)
 
 watch([viewportReady, activeFrame], ([ready, frame]) => {
   if (!ready || !frame) return
+
+  const shouldFocusNode = !hasInitialFocus.value || lastFocusedNodeKey.value !== frame.nodeKey
+  if (!shouldFocusNode) return
 
   nextTick(() => {
     void fitView({
@@ -441,6 +515,7 @@ watch([viewportReady, activeFrame], ([ready, frame]) => {
     })
 
     hasInitialFocus.value = true
+    lastFocusedNodeKey.value = frame.nodeKey
   })
 }, { immediate: true })
 
@@ -456,7 +531,7 @@ onUnmounted(() => {
 <template>
   <div
     ref="containerRef"
-    class="flow-narrator relative h-full w-full font-sans antialiased bg-background"
+    class="flow-narrator relative h-full w-full font-sans antialiased bg-background transition-[min-height] duration-300 ease-out"
     :style="{ minHeight: `${containerMinHeight}px` }"
   >
     <VueFlow
@@ -494,6 +569,7 @@ onUnmounted(() => {
           :code="toRequiredString(data.props.code)"
           :comment="toOptionalString(data.props.comment)"
           :story="toOptionalString(data.props.story)"
+          :wrap-long-lines="toBoolean(data.props.wrapLongLines)"
           :magic-move-steps="toMagicMoveSteps(data.props.magicMoveSteps)"
           :active="isActive(data.index)"
           :step-index="codeStepIndex(data.index)"
@@ -527,8 +603,11 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div class="pointer-events-none absolute inset-x-0 bottom-5 z-30 flex justify-center px-4">
-      <div class="pointer-events-auto">
+    <div
+      class="pointer-events-none absolute inset-x-0 bottom-2 z-30 flex justify-center px-3"
+      style="padding-bottom: max(env(safe-area-inset-bottom), 0px);"
+    >
+      <div class="pointer-events-auto w-full max-w-[980px]">
         <TimelineControls
           :current-step="currentStep"
           :total-steps="totalSteps"

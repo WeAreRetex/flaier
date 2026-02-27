@@ -32,6 +32,7 @@ export interface CodeNodeProps {
   code: string
   comment?: string
   story?: string
+  wrapLongLines?: boolean
   magicMoveSteps?: MagicMoveStep[]
 }
 

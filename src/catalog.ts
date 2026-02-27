@@ -38,6 +38,7 @@ export const catalog = defineCatalog(schema, {
         code: z.string(),
         comment: z.string().optional(),
         story: z.string().optional(),
+        wrapLongLines: z.boolean().default(false),
         magicMoveSteps: z.array(magicMoveStepSchema).optional(),
       }),
       description: 'Code block with syntax highlighting, step-by-step magic-move transitions, and optional narration/story beats',

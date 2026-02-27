@@ -31,6 +31,7 @@ const spec: FlowNarratorSpec = {
         label: 'Ingest Lambda',
         file: 'lambdas/ingest.py',
         language: 'python',
+        wrapLongLines: true,
         code: 'def handler(event, context):\n    client = contentful.Client(\n        space_id=os.environ["SPACE_ID"],\n        access_token=os.environ["TOKEN"]\n    )\n    entries = client.entries({"limit": 100})\n    return {\n        "statusCode": 200,\n        "body": json.dumps(entries)\n    }',
         comment: 'Fetches raw data from Contentful CMS',
         story: 'Dev note: this lambda is intentionally defensive because upstream schema drift is common.',
