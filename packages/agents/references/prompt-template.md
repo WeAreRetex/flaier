@@ -8,9 +8,12 @@ Generate a single `flow-narrator` flow spec JSON file.
 Requirements:
 - Output only JSON.
 - Root must be `FlowTimeline`.
-- Allowed node types: TriggerNode, CodeNode, DescriptionNode, LinkNode.
+- Allowed node types: TriggerNode, CodeNode, DecisionNode, PayloadNode, ErrorNode, DescriptionNode, LinkNode.
 - Include `state.currentStep` (number) and `state.playing` (boolean).
 - Include realistic code snippets for each CodeNode.
+- Prefer `DecisionNode` for branch points and add edge metadata in `props.transitions` (`to`, `label`, `description`, `kind`) on branching nodes.
+- Use `PayloadNode` when before/after payload snapshots help explain transformations.
+- Use `ErrorNode` for failure paths with concrete `message`, `cause`, and `mitigation`.
 - For TypeScript/TSX callouts, include twoslash markers like `// ^?`; optionally set `CodeNode.props.twoslash: true` to force twoslash mode.
 - If a CodeNode includes `magicMoveSteps`, place twoslash markers in the **final** step code (the twoslash inspection frame appears after the last transform).
 - Model branches with `children` arrays when decisions/fallbacks exist.

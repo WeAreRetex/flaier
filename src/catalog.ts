@@ -10,6 +10,22 @@ const magicMoveStepSchema = z.object({
   speaker: z.string().optional(),
 })
 
+const edgeTransitionKindSchema = z.enum([
+  'default',
+  'success',
+  'error',
+  'warning',
+  'retry',
+  'async',
+])
+
+const edgeTransitionSchema = z.object({
+  to: z.string(),
+  label: z.string().optional(),
+  description: z.string().optional(),
+  kind: edgeTransitionKindSchema.optional(),
+})
+
 export const catalog = defineCatalog(schema, {
   components: {
     FlowTimeline: {
@@ -31,6 +47,7 @@ export const catalog = defineCatalog(schema, {
         label: z.string(),
         description: z.string().optional(),
         color: z.string().default('#22c55e'),
+        transitions: z.array(edgeTransitionSchema).optional(),
       }),
       description: 'Entry point node representing a trigger (cron, webhook, event)',
     },
@@ -45,13 +62,47 @@ export const catalog = defineCatalog(schema, {
         wrapLongLines: z.boolean().default(false),
         magicMoveSteps: z.array(magicMoveStepSchema).optional(),
         twoslash: z.boolean().optional(),
+        transitions: z.array(edgeTransitionSchema).optional(),
       }),
       description: 'Code block with syntax highlighting, step-by-step magic-move transitions, optional twoslash callouts, and narration/story beats',
+    },
+    DecisionNode: {
+      props: z.object({
+        label: z.string(),
+        condition: z.string().optional(),
+        description: z.string().optional(),
+        transitions: z.array(edgeTransitionSchema).optional(),
+      }),
+      description: 'Branch decision node that explains routing criteria before fan-out paths',
+    },
+    PayloadNode: {
+      props: z.object({
+        label: z.string(),
+        payload: z.string().optional(),
+        before: z.string().optional(),
+        after: z.string().optional(),
+        format: z.enum(['json', 'yaml', 'text']).default('json'),
+        description: z.string().optional(),
+        transitions: z.array(edgeTransitionSchema).optional(),
+      }),
+      description: 'Data-focused node for payload snapshots and before/after transformations',
+    },
+    ErrorNode: {
+      props: z.object({
+        label: z.string(),
+        message: z.string(),
+        code: z.string().optional(),
+        cause: z.string().optional(),
+        mitigation: z.string().optional(),
+        transitions: z.array(edgeTransitionSchema).optional(),
+      }),
+      description: 'Failure node that captures error detail, cause, and recovery guidance',
     },
     DescriptionNode: {
       props: z.object({
         label: z.string(),
         body: z.string(),
+        transitions: z.array(edgeTransitionSchema).optional(),
       }),
       description: 'Prose/text explanation node for documenting a pipeline step',
     },
@@ -60,6 +111,7 @@ export const catalog = defineCatalog(schema, {
         label: z.string(),
         href: z.string(),
         description: z.string().optional(),
+        transitions: z.array(edgeTransitionSchema).optional(),
       }),
       description: 'Clickable reference link to a file or URL',
     },

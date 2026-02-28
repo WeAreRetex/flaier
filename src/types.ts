@@ -9,6 +9,23 @@ export interface MagicMoveStep {
   speaker?: string
 }
 
+/** Optional metadata for traversal edges between nodes */
+export type EdgeTransitionKind =
+  | 'default'
+  | 'success'
+  | 'error'
+  | 'warning'
+  | 'retry'
+  | 'async'
+
+/** Declarative edge metadata for branch labels and styling */
+export interface EdgeTransition {
+  to: string
+  label?: string
+  description?: string
+  kind?: EdgeTransitionKind
+}
+
 /** Props for the FlowTimeline root element */
 export interface FlowTimelineProps {
   title: string
@@ -26,6 +43,7 @@ export interface TriggerNodeProps {
   label: string
   description?: string
   color?: string
+  transitions?: EdgeTransition[]
 }
 
 /** Props for code block nodes */
@@ -39,12 +57,43 @@ export interface CodeNodeProps {
   wrapLongLines?: boolean
   magicMoveSteps?: MagicMoveStep[]
   twoslash?: boolean
+  transitions?: EdgeTransition[]
+}
+
+/** Props for branch/decision nodes */
+export interface DecisionNodeProps {
+  label: string
+  condition?: string
+  description?: string
+  transitions?: EdgeTransition[]
+}
+
+/** Props for payload snapshot/diff nodes */
+export interface PayloadNodeProps {
+  label: string
+  payload?: string
+  before?: string
+  after?: string
+  format?: 'json' | 'yaml' | 'text'
+  description?: string
+  transitions?: EdgeTransition[]
+}
+
+/** Props for failure/error handling nodes */
+export interface ErrorNodeProps {
+  label: string
+  message: string
+  code?: string
+  cause?: string
+  mitigation?: string
+  transitions?: EdgeTransition[]
 }
 
 /** Props for prose/description nodes */
 export interface DescriptionNodeProps {
   label: string
   body: string
+  transitions?: EdgeTransition[]
 }
 
 /** Props for link/reference nodes */
@@ -52,17 +101,28 @@ export interface LinkNodeProps {
   label: string
   href: string
   description?: string
+  transitions?: EdgeTransition[]
 }
 
 /** Union of all node prop types */
 export type AnyNodeProps =
   | TriggerNodeProps
   | CodeNodeProps
+  | DecisionNodeProps
+  | PayloadNodeProps
+  | ErrorNodeProps
   | DescriptionNodeProps
   | LinkNodeProps
 
 /** VueFlow custom node type names */
-export type FlowNodeType = 'trigger' | 'code' | 'description' | 'link'
+export type FlowNodeType =
+  | 'trigger'
+  | 'code'
+  | 'decision'
+  | 'payload'
+  | 'error'
+  | 'description'
+  | 'link'
 
 /** Data payload attached to each VueFlow node */
 export interface FlowNodeData {

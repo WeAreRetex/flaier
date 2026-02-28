@@ -5,6 +5,7 @@ interface ChoiceOption {
   id: string
   label: string
   description?: string
+  kind?: 'default' | 'success' | 'error' | 'warning' | 'retry' | 'async'
 }
 
 const props = defineProps<{
@@ -54,6 +55,23 @@ const visibleStepIndexes = computed(() => {
 const hasLeadingSteps = computed(() => dotWindow.value.start > 0)
 const hasTrailingSteps = computed(() => dotWindow.value.end < props.totalSteps - 1)
 const hasChoices = computed(() => (props.choices?.length ?? 0) > 0)
+
+function choiceKindClass(kind?: ChoiceOption['kind']) {
+  switch (kind) {
+    case 'success':
+      return 'border-emerald-500/40 bg-emerald-500/10 text-emerald-500'
+    case 'error':
+      return 'border-red-500/45 bg-red-500/10 text-red-500'
+    case 'warning':
+      return 'border-amber-500/45 bg-amber-500/10 text-amber-500'
+    case 'retry':
+      return 'border-sky-500/45 bg-sky-500/10 text-sky-500'
+    case 'async':
+      return 'border-violet-500/45 bg-violet-500/10 text-violet-500'
+    default:
+      return 'border-border/65 bg-background/70 text-muted-foreground'
+  }
+}
 </script>
 
 <template>
@@ -153,6 +171,13 @@ const hasChoices = computed(() => (props.choices?.length ?? 0) > 0)
               {{ index + 1 }}
             </span>
             <span>{{ choice.label }}</span>
+            <span
+              v-if="choice.kind"
+              class="rounded border px-1 py-0.5 text-[9px] uppercase tracking-wider"
+              :class="choiceKindClass(choice.kind)"
+            >
+              {{ choice.kind }}
+            </span>
           </span>
         </button>
       </div>

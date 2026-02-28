@@ -19,6 +19,12 @@
       "title": "Twoslash Handoff",
       "description": "Magic-move progression, then final twoslash callouts",
       "src": "./twoslash-handoff.flow.json"
+    },
+    {
+      "id": "decision-payload-error",
+      "title": "Decision, Payload, and Error Narrative",
+      "description": "Branch metadata with dedicated payload and failure nodes",
+      "src": "./decision-payload-error.flow.json"
     }
   ]
 }

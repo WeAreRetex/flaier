@@ -10,12 +10,30 @@ const FLOW_COMPONENT_TYPES = new Set([
   'FlowTimeline',
   'TriggerNode',
   'CodeNode',
+  'DecisionNode',
+  'PayloadNode',
+  'ErrorNode',
   'DescriptionNode',
   'LinkNode',
 ])
 
 const TWOSLASH_SUPPORTED_LANGUAGES = new Set(['typescript', 'ts', 'tsx'])
 const TWOSLASH_HINT_PATTERN = /(?:\^\?|\^\||@errors\b|@log\b|@warn\b|@annotate\b|@include\b)/m
+const EDGE_TRANSITION_KINDS = new Set([
+  'default',
+  'success',
+  'error',
+  'warning',
+  'retry',
+  'async',
+])
+
+interface NormalizedTransition {
+  to: string
+  label?: string
+  description?: string
+  kind?: string
+}
 
 export function validateFlowNarratorReadiness(spec: FlowSpec): FlowReadinessResult {
   const errors: string[] = []
@@ -64,9 +82,19 @@ export function validateFlowNarratorReadiness(spec: FlowSpec): FlowReadinessResu
     validateElementProps(key, element, errors, warnings)
 
     const children = normalizeChildren(key, element.children, spec.root, elementKeys, errors)
-    childrenByKey.set(key, children)
+    const transitions = normalizeTransitions(
+      key,
+      element.props.transitions,
+      spec.root,
+      elementKeys,
+      errors,
+      warnings,
+    )
+    const outgoing = mergeOutgoingTargets(children, transitions.map((transition) => transition.to))
 
-    for (const child of children) {
+    childrenByKey.set(key, outgoing)
+
+    for (const child of outgoing) {
       incomingCount.set(child, (incomingCount.get(child) ?? 0) + 1)
     }
   }
@@ -236,6 +264,39 @@ function validateElementProps(
       break
     }
 
+    case 'DecisionNode': {
+      expectRequiredString(props, 'label', key, errors)
+      expectOptionalString(props, 'condition', key, errors)
+      expectOptionalString(props, 'description', key, errors)
+      break
+    }
+
+    case 'PayloadNode': {
+      expectRequiredString(props, 'label', key, errors)
+      expectOptionalString(props, 'payload', key, errors)
+      expectOptionalString(props, 'before', key, errors)
+      expectOptionalString(props, 'after', key, errors)
+      expectOptionalString(props, 'description', key, errors)
+      expectOptionalEnum(props, 'format', ['json', 'yaml', 'text'], key, errors)
+
+      if (!isNonEmptyString(props.payload) && !isNonEmptyString(props.before) && !isNonEmptyString(props.after)) {
+        warnings.push(
+          `Element "${key}" is PayloadNode without payload content; include "payload" or a "before"/"after" snapshot.`,
+        )
+      }
+
+      break
+    }
+
+    case 'ErrorNode': {
+      expectRequiredString(props, 'label', key, errors)
+      expectRequiredString(props, 'message', key, errors)
+      expectOptionalString(props, 'code', key, errors)
+      expectOptionalString(props, 'cause', key, errors)
+      expectOptionalString(props, 'mitigation', key, errors)
+      break
+    }
+
     case 'DescriptionNode': {
       expectRequiredString(props, 'label', key, errors)
       expectRequiredString(props, 'body', key, errors)
@@ -292,6 +353,106 @@ function normalizeChildren(
   }
 
   return normalized
+}
+
+function normalizeTransitions(
+  key: string,
+  transitions: unknown,
+  rootKey: string,
+  elementKeys: Set<string>,
+  errors: string[],
+  warnings: string[],
+): NormalizedTransition[] {
+  if (transitions === undefined) {
+    return []
+  }
+
+  if (!Array.isArray(transitions)) {
+    errors.push(`Element "${key}" prop "transitions" must be an array when provided.`)
+    return []
+  }
+
+  const normalized: NormalizedTransition[] = []
+  const seenTargets = new Set<string>()
+
+  for (const [index, transition] of transitions.entries()) {
+    if (!isObject(transition)) {
+      errors.push(`Element "${key}" transitions[${index}] must be an object.`)
+      continue
+    }
+
+    const to = transition.to
+    if (!isNonEmptyString(to)) {
+      errors.push(`Element "${key}" transitions[${index}].to must be a non-empty string.`)
+      continue
+    }
+
+    if (!elementKeys.has(to)) {
+      errors.push(`Element "${key}" transitions[${index}] points to missing element "${to}".`)
+      continue
+    }
+
+    if (to === rootKey) {
+      errors.push(`Element "${key}" transitions[${index}] cannot point to root element "${rootKey}".`)
+      continue
+    }
+
+    if (seenTargets.has(to)) {
+      warnings.push(`Element "${key}" has duplicate transition metadata for target "${to}".`)
+      continue
+    }
+
+    const label = transition.label
+    if (label !== undefined && typeof label !== 'string') {
+      errors.push(`Element "${key}" transitions[${index}].label must be a string when provided.`)
+      continue
+    }
+
+    const description = transition.description
+    if (description !== undefined && typeof description !== 'string') {
+      errors.push(`Element "${key}" transitions[${index}].description must be a string when provided.`)
+      continue
+    }
+
+    const kind = transition.kind
+    if (kind !== undefined) {
+      if (typeof kind !== 'string' || !EDGE_TRANSITION_KINDS.has(kind)) {
+        errors.push(
+          `Element "${key}" transitions[${index}].kind must be one of: ${Array.from(EDGE_TRANSITION_KINDS).join(', ')}.`,
+        )
+        continue
+      }
+    }
+
+    seenTargets.add(to)
+    normalized.push({
+      to,
+      label: typeof label === 'string' ? label : undefined,
+      description: typeof description === 'string' ? description : undefined,
+      kind: typeof kind === 'string' ? kind : undefined,
+    })
+  }
+
+  if (normalized.length > 1 && normalized.some((transition) => !isNonEmptyString(transition.label))) {
+    warnings.push(
+      `Element "${key}" has multiple transitions without labels; add labels so branch choices are explicit.`,
+    )
+  }
+
+  return normalized
+}
+
+function mergeOutgoingTargets(children: string[], transitionTargets: string[]) {
+  const outgoing: string[] = []
+  const seen = new Set<string>()
+
+  for (const target of [...transitionTargets, ...children]) {
+    if (seen.has(target)) continue
+    seen.add(target)
+    outgoing.push(target)
+  }
+
+  return outgoing
 }
 
 function validateStateShape(state: unknown, errors: string[], warnings: string[]) {

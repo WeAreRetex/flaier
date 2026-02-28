@@ -51,21 +51,55 @@ Use this contract when writing `*.flow.json` for `flow-narrator`.
   - optional: `description`, `direction`, `minHeight`, `layoutEngine`, `layoutRankSep`, `layoutNodeSep`, `layoutEdgeSep`
 - `TriggerNode`:
   - required: `label`
-  - optional: `description`, `color`
+  - optional: `description`, `color`, `transitions`
 - `CodeNode`:
   - required: `label`, `code`
-  - optional: `file`, `language`, `comment`, `story`, `wrapLongLines`, `magicMoveSteps`, `twoslash`
+  - optional: `file`, `language`, `comment`, `story`, `wrapLongLines`, `magicMoveSteps`, `twoslash`, `transitions`
   - note: twoslash works with `language: "typescript"` or `"tsx"`; markers like `// ^?` auto-enable twoslash and `twoslash: true` can force it
   - note: when `magicMoveSteps` are present, twoslash renders as an inspection frame after the final step; place markers in the final step code
+- `DecisionNode`:
+  - required: `label`
+  - optional: `condition`, `description`, `transitions`
+- `PayloadNode`:
+  - required: `label`
+  - optional: `payload`, `before`, `after`, `format` (`json` | `yaml` | `text`), `description`, `transitions`
+  - note: include at least one of `payload`, `before`, or `after`
+- `ErrorNode`:
+  - required: `label`, `message`
+  - optional: `code`, `cause`, `mitigation`, `transitions`
 - `DescriptionNode`:
   - required: `label`, `body`
+  - optional: `transitions`
 - `LinkNode`:
   - required: `label`, `href`
-  - optional: `description`
+  - optional: `description`, `transitions`
+
+## Edge Metadata Contract
+
+Use `props.transitions` on any non-root node to attach edge metadata:
+
+```json
+{
+  "transitions": [
+    {
+      "to": "next-node-key",
+      "label": "Valid payload",
+      "description": "Continue with canonicalized request",
+      "kind": "success"
+    }
+  ]
+}
+```
+
+- `to` is required and must reference an existing element key.
+- optional `kind`: `default` | `success` | `error` | `warning` | `retry` | `async`.
+- Keep `children` for traversal; `transitions` enriches labels/descriptions/styles (and can define ordering).
 
 ## Branching Rules
 
 - Model branches by providing multiple children from one node.
+- Prefer `DecisionNode` for explicit branch conditions.
+- Add `props.transitions` metadata for branch labels and descriptions; branch buttons use these values when present.
 - Keep branch target labels explicit; branch buttons use target labels in the UI.
 - Avoid dangling branches; each branch path should converge or terminate intentionally.
 

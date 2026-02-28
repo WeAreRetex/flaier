@@ -159,37 +159,85 @@ function createBranchingSpec(title: string, description: string | undefined, lan
           description: 'Replace with the event that starts this flow.',
           color: '#22c55e',
         },
-        children: ['code-router'],
+        children: ['decision-route'],
       },
-      'code-router': {
+      'decision-route': {
+        type: 'DecisionNode',
+        props: {
+          label: 'Route by Input Validity',
+          condition: 'payload.isValid === true',
+          description: 'Choose success processing for valid payloads, otherwise go to error handling.',
+          transitions: [
+            {
+              to: 'payload-success',
+              label: 'Valid payload',
+              description: 'Continue with normalized payload and downstream processing.',
+              kind: 'success',
+            },
+            {
+              to: 'error-failure',
+              label: 'Validation failed',
+              description: 'Capture error details and route to fallback handling.',
+              kind: 'error',
+            },
+          ],
+        },
+        children: ['payload-success', 'error-failure'],
+      },
+      'payload-success': {
+        type: 'PayloadNode',
+        props: {
+          label: 'Normalized Payload',
+          description: 'Show how incoming payload changes after validation and normalization.',
+          format: 'json',
+          before: '{\n  "email": "USER@EXAMPLE.COM",\n  "plan": "pro",\n  "acceptedTerms": "yes"\n}',
+          after: '{\n  "email": "user@example.com",\n  "plan": "pro",\n  "acceptedTerms": true\n}',
+          transitions: [
+            {
+              to: 'code-commit',
+              label: 'Persist changes',
+              description: 'Write normalized data and continue workflow.',
+              kind: 'success',
+            },
+          ],
+        },
+        children: ['code-commit'],
+      },
+      'code-commit': {
         type: 'CodeNode',
         props: {
-          label: 'Decision Step',
+          label: 'Persist User Record',
           language,
           code: [
-            'export function decidePath(payload: unknown) {',
-            '  // TODO: return true for happy path, false for fallback path',
-            '  return Boolean(payload)',
+            'export async function persistUser(input: NormalizedUser) {',
+            '  await db.user.upsert({',
+            '    where: { email: input.email },',
+            '    create: input,',
+            '    update: input,',
+            '  })',
             '}',
           ].join('\n'),
-          comment: 'Explain the decision criteria for branching.',
-          story: 'Narrate why a request takes the success path or fallback path.',
-        },
-        children: ['path-success', 'path-fallback'],
-      },
-      'path-success': {
-        type: 'DescriptionNode',
-        props: {
-          label: 'Success Path',
-          body: 'Describe the behavior when the main path succeeds.',
+          comment: 'Persist validated input and keep writes idempotent.',
+          story: 'This step commits canonical data so downstream services consume stable shape.',
         },
         children: ['link-follow-up'],
       },
-      'path-fallback': {
-        type: 'DescriptionNode',
+      'error-failure': {
+        type: 'ErrorNode',
         props: {
-          label: 'Fallback Path',
-          body: 'Describe retries, degraded mode, alerts, or compensation logic.',
+          label: 'Input Validation Error',
+          message: 'Payload validation failed and cannot be persisted safely.',
+          code: 'VAL-422',
+          cause: 'Missing required field or incompatible type in submitted payload.',
+          mitigation: 'Return 422 response, emit audit log, and notify upstream client with field details.',
+          transitions: [
+            {
+              to: 'link-follow-up',
+              label: 'Open runbook',
+              description: 'Investigate failure rate and support resolution path.',
+              kind: 'warning',
+            },
+          ],
         },
         children: ['link-follow-up'],
       },

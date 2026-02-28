@@ -23,6 +23,7 @@ import {
 } from '../../composables/useTwoslash'
 import { useFlowNarratorRuntime } from '../../composables/useFlowNarratorRuntime'
 import type {
+  EdgeTransitionKind,
   FlowEdge,
   FlowNode,
   FlowNodeType,
@@ -31,8 +32,11 @@ import type {
 } from '../../types'
 import TimelineControls from '../controls/TimelineControls.vue'
 import CodeNodeVue from '../nodes/CodeNode.vue'
+import DecisionNodeVue from '../nodes/DecisionNode.vue'
 import DescriptionNodeVue from '../nodes/DescriptionNode.vue'
+import ErrorNodeVue from '../nodes/ErrorNode.vue'
 import LinkNodeVue from '../nodes/LinkNode.vue'
+import PayloadNodeVue from '../nodes/PayloadNode.vue'
 import TriggerNodeVue from '../nodes/TriggerNode.vue'
 
 const props = withDefaults(defineProps<{
@@ -52,6 +56,9 @@ const props = withDefaults(defineProps<{
 const TYPE_MAP: Record<string, FlowNodeType> = {
   TriggerNode: 'trigger',
   CodeNode: 'code',
+  DecisionNode: 'decision',
+  PayloadNode: 'payload',
+  ErrorNode: 'error',
   DescriptionNode: 'description',
   LinkNode: 'link',
 }
@@ -66,6 +73,15 @@ const DEFAULT_DAGRE_EDGE_SEP = 30
 const OVERVIEW_ENTER_ZOOM = 0.52
 const OVERVIEW_EXIT_ZOOM = 0.62
 const FLOW_NARRATOR_THEME_STORAGE_KEY = 'flow-narrator-ui-theme'
+const EDGE_TRANSITION_KINDS: EdgeTransitionKind[] = [
+  'default',
+  'success',
+  'error',
+  'warning',
+  'retry',
+  'async',
+]
+const EDGE_TRANSITION_KIND_SET = new Set(EDGE_TRANSITION_KINDS)
 
 interface NodeSize {
   width: number
@@ -90,6 +106,14 @@ interface BranchChoice {
   id: string
   label: string
   description?: string
+  kind?: EdgeTransitionKind
+}
+
+interface ParsedTransition {
+  to: string
+  label?: string
+  description?: string
+  kind?: EdgeTransitionKind
 }
 
 const runtime = useFlowNarratorRuntime()
@@ -254,15 +278,44 @@ const rootLinearNextByKey = computed<Record<string, string>>(() => {
   return map
 })
 
+const transitionMetaBySource = computed<Record<string, Record<string, ParsedTransition>>>(() => {
+  const map: Record<string, Record<string, ParsedTransition>> = {}
+
+  for (const node of orderedNodeElements.value) {
+    const transitions = toTransitions(node.element.props.transitions)
+      .filter((transition) => Boolean(orderedNodeByKey.value[transition.to]))
+
+    if (transitions.length === 0) continue
+
+    const byTarget: Record<string, ParsedTransition> = {}
+    for (const transition of transitions) {
+      if (byTarget[transition.to]) continue
+      byTarget[transition.to] = transition
+    }
+
+    if (Object.keys(byTarget).length > 0) {
+      map[node.key] = byTarget
+    }
+  }
+
+  return map
+})
+
 const outgoingNodeKeys = computed<Record<string, string[]>>(() => {
   const map: Record<string, string[]> = {}
 
   for (const node of orderedNodeElements.value) {
+    const transitionTargets = toTransitions(node.element.props.transitions)
+      .map((transition) => transition.to)
+      .filter((key) => Boolean(orderedNodeByKey.value[key]))
+
     const explicit = (node.element.children ?? [])
       .filter((key) => Boolean(orderedNodeByKey.value[key]))
 
-    if (explicit.length > 0) {
-      map[node.key] = explicit
+    const combined = mergeOutgoingTargets(transitionTargets, explicit)
+
+    if (combined.length > 0) {
+      map[node.key] = combined
       continue
     }
 
@@ -311,6 +364,14 @@ function toBoolean(value: unknown, fallback = false) {
 
 function toOptionalBoolean(value: unknown) {
   return typeof value === 'boolean' ? value : undefined
+}
+
+function toPayloadFormat(value: unknown): 'json' | 'yaml' | 'text' | undefined {
+  if (value === 'json' || value === 'yaml' || value === 'text') {
+    return value
+  }
+
+  return undefined
 }
 
 function codeNodeTwoslashEnabled(element: SpecElement) {
@@ -369,6 +430,53 @@ function toMagicMoveSteps(value: unknown): MagicMoveStep[] {
       story: toOptionalString(item.story),
       speaker: toOptionalString(item.speaker),
     }))
+}
+
+function toTransitionKind(value: unknown): EdgeTransitionKind | undefined {
+  if (typeof value !== 'string') return undefined
+  return EDGE_TRANSITION_KIND_SET.has(value as EdgeTransitionKind)
+    ? value as EdgeTransitionKind
+    : undefined
+}
+
+function toTransitions(value: unknown): ParsedTransition[] {
+  if (!Array.isArray(value)) return []
+
+  return value
+    .filter((item): item is Record<string, unknown> => {
+      if (!item || typeof item !== 'object') return false
+      if (!toOptionalString(item.to)) return false
+
+      const label = item.label
+      const description = item.description
+      const kind = item.kind
+
+      if (label !== undefined && typeof label !== 'string') return false
+      if (description !== undefined && typeof description !== 'string') return false
+      if (kind !== undefined && !toTransitionKind(kind)) return false
+
+      return true
+    })
+    .map((item) => ({
+      to: toRequiredString(item.to),
+      label: toOptionalString(item.label),
+      description: toOptionalString(item.description),
+      kind: toTransitionKind(item.kind),
+    }))
+}
+
+function mergeOutgoingTargets(primary: string[], secondary: string[]) {
+  const merged: string[] = []
+  const seen = new Set<string>()
+
+  for (const target of [...primary, ...secondary]) {
+    if (!target || seen.has(target)) continue
+
+    seen.add(target)
+    merged.push(target)
+  }
+
+  return merged
 }
 
 function getNodeFrameCount(element: SpecElement) {
@@ -488,6 +596,43 @@ function estimateNodeSize(node: OrderedNodeElement): NodeSize {
     return {
       width: 220,
       height: Math.min(280, Math.max(92, 46 + labelLines * 18 + descriptionLines * 15)),
+    }
+  }
+
+  if (element.type === 'DecisionNode') {
+    const labelLines = Math.max(1, estimateNodeTextLines(element.props.label, 26))
+    const conditionLines = estimateNodeTextLines(element.props.condition, 34)
+    const descriptionLines = estimateNodeTextLines(element.props.description, 34)
+
+    return {
+      width: 250,
+      height: Math.min(340, Math.max(116, 50 + labelLines * 18 + conditionLines * 16 + descriptionLines * 15)),
+    }
+  }
+
+  if (element.type === 'PayloadNode') {
+    const labelLines = Math.max(1, estimateNodeTextLines(element.props.label, 32))
+    const descriptionLines = estimateNodeTextLines(element.props.description, 34)
+    const beforeLines = estimateNodeTextLines(element.props.before, 40)
+    const afterLines = estimateNodeTextLines(element.props.after, 40)
+    const payloadLines = estimateNodeTextLines(element.props.payload, 40)
+    const bodyLines = Math.max(payloadLines, beforeLines + afterLines)
+
+    return {
+      width: 300,
+      height: Math.min(520, Math.max(150, 60 + labelLines * 18 + descriptionLines * 14 + bodyLines * 10)),
+    }
+  }
+
+  if (element.type === 'ErrorNode') {
+    const labelLines = Math.max(1, estimateNodeTextLines(element.props.label, 30))
+    const messageLines = Math.max(1, estimateNodeTextLines(element.props.message, 34))
+    const causeLines = estimateNodeTextLines(element.props.cause, 34)
+    const mitigationLines = estimateNodeTextLines(element.props.mitigation, 34)
+
+    return {
+      width: 280,
+      height: Math.min(420, Math.max(130, 58 + labelLines * 18 + messageLines * 16 + causeLines * 15 + mitigationLines * 15)),
     }
   }
 
@@ -1143,6 +1288,13 @@ const edges = computed<FlowEdge[]>(() => {
       if (!orderedNodeByKey.value[target]) continue
 
       const isActiveEdge = activeFrame.value?.nodeKey === node.key && nextPlannedNodeKey.value === target
+      const transition = transitionMetaBySource.value[node.key]?.[target]
+      const edgeClasses = [
+        isActiveEdge ? 'active-edge' : null,
+        transition?.kind ? `edge-kind-${transition.kind}` : null,
+      ].filter((value): value is string => Boolean(value))
+
+      const hasLabel = Boolean(transition?.label)
 
       result.push({
         id: `e-${node.key}-${target}`,
@@ -1150,7 +1302,21 @@ const edges = computed<FlowEdge[]>(() => {
         target,
         type: 'smoothstep',
         animated: true,
-        class: isActiveEdge ? 'active-edge' : undefined,
+        class: edgeClasses.length > 0 ? edgeClasses.join(' ') : undefined,
+        label: transition?.label,
+        labelShowBg: hasLabel,
+        labelBgPadding: hasLabel ? [6, 3] : undefined,
+        labelBgBorderRadius: hasLabel ? 6 : undefined,
+        labelBgStyle: hasLabel
+          ? { fill: 'var(--color-card)', fillOpacity: 0.92, stroke: 'var(--color-border)' }
+          : undefined,
+        labelStyle: hasLabel
+          ? {
+            fill: 'var(--color-foreground)',
+            fontSize: '10px',
+            fontWeight: 600,
+          }
+          : undefined,
       })
     }
   }
@@ -1217,6 +1383,26 @@ const activeDescription = computed(() => {
     return toOptionalString(node.element.props.body) ?? ''
   }
 
+  if (node.element.type === 'DecisionNode') {
+    return toOptionalString(node.element.props.description)
+      ?? toOptionalString(node.element.props.condition)
+      ?? ''
+  }
+
+  if (node.element.type === 'PayloadNode') {
+    return toOptionalString(node.element.props.description) ?? ''
+  }
+
+  if (node.element.type === 'ErrorNode') {
+    const message = toOptionalString(node.element.props.message)
+    const cause = toOptionalString(node.element.props.cause)
+    const mitigation = toOptionalString(node.element.props.mitigation)
+
+    return [message, cause ? `Cause: ${cause}` : '', mitigation ? `Mitigation: ${mitigation}` : '']
+      .filter((value): value is string => typeof value === 'string' && value.length > 0)
+      .join(' ')
+  }
+
   return toOptionalString(node.element.props.description) ?? ''
 })
 
@@ -1238,15 +1424,18 @@ const branchChoices = computed<BranchChoice[]>(() => {
     const target = orderedNodeByKey.value[id]
     if (!target) continue
 
-    const label = toOptionalString(target.element.props.label) ?? id
-    const description = target.element.type === 'DescriptionNode'
+    const transition = transitionMetaBySource.value[node.key]?.[id]
+
+    const targetLabel = toOptionalString(target.element.props.label) ?? id
+    const targetDescription = target.element.type === 'DescriptionNode'
       ? toOptionalString(target.element.props.body)
       : toOptionalString(target.element.props.description)
 
     result.push({
       id,
-      label,
-      description,
+      label: transition?.label ?? targetLabel,
+      description: transition?.description ?? targetDescription,
+      kind: transition?.kind,
     })
   }
 
@@ -1548,6 +1737,38 @@ onUnmounted(() => {
           :ui-theme="uiTheme"
           :active="isActive(data.key)"
           :step-index="codeStepIndex(data.key)"
+        />
+      </template>
+
+      <template #node-decision="{ data }">
+        <DecisionNodeVue
+          :label="toRequiredString(data.props.label)"
+          :condition="toOptionalString(data.props.condition)"
+          :description="toOptionalString(data.props.description)"
+          :active="isActive(data.key)"
+        />
+      </template>
+
+      <template #node-payload="{ data }">
+        <PayloadNodeVue
+          :label="toRequiredString(data.props.label)"
+          :payload="toOptionalString(data.props.payload)"
+          :before="toOptionalString(data.props.before)"
+          :after="toOptionalString(data.props.after)"
+          :format="toPayloadFormat(data.props.format)"
+          :description="toOptionalString(data.props.description)"
+          :active="isActive(data.key)"
+        />
+      </template>
+
+      <template #node-error="{ data }">
+        <ErrorNodeVue
+          :label="toRequiredString(data.props.label)"
+          :message="toRequiredString(data.props.message)"
+          :code="toOptionalString(data.props.code)"
+          :cause="toOptionalString(data.props.cause)"
+          :mitigation="toOptionalString(data.props.mitigation)"
+          :active="isActive(data.key)"
         />
       </template>
 

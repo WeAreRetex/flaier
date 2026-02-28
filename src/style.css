@@ -35,6 +35,11 @@
   --fn-edge-overview: oklch(0.42 0.03 260);
   --fn-edge-active: oklch(0.55 0.12 270);
   --fn-edge-active-glow: oklch(0.55 0.12 270 / 0.4);
+  --fn-edge-success: oklch(0.74 0.13 155);
+  --fn-edge-error: oklch(0.67 0.2 24);
+  --fn-edge-warning: oklch(0.78 0.12 92);
+  --fn-edge-retry: oklch(0.7 0.11 240);
+  --fn-edge-async: oklch(0.73 0.13 305);
   --fn-handle-border: oklch(0.2 0.005 260);
   --fn-handle-bg: oklch(0.35 0.02 260);
   --fn-inactive-filter: saturate(0.2) brightness(0.7);
@@ -81,6 +86,11 @@
   --fn-edge-overview: oklch(0.64 0.025 260);
   --fn-edge-active: oklch(0.59 0.15 250);
   --fn-edge-active-glow: oklch(0.59 0.15 250 / 0.3);
+  --fn-edge-success: oklch(0.58 0.15 155);
+  --fn-edge-error: oklch(0.61 0.2 26);
+  --fn-edge-warning: oklch(0.7 0.14 92);
+  --fn-edge-retry: oklch(0.57 0.14 240);
+  --fn-edge-async: oklch(0.6 0.16 305);
   --fn-handle-border: oklch(0.76 0.01 260);
   --fn-handle-bg: oklch(0.67 0.05 250);
   --fn-inactive-filter: saturate(0.4) brightness(0.94);
@@ -139,7 +149,44 @@
   animation: edge-flow 2s linear infinite;
 }
 
+.vue-flow__edge.edge-kind-success .vue-flow__edge-path,
+.vue-flow__edge-path.edge-kind-success {
+  stroke: var(--fn-edge-success) !important;
+}
+
+.vue-flow__edge.edge-kind-error .vue-flow__edge-path,
+.vue-flow__edge-path.edge-kind-error {
+  stroke: var(--fn-edge-error) !important;
+}
+
+.vue-flow__edge.edge-kind-warning .vue-flow__edge-path,
+.vue-flow__edge-path.edge-kind-warning {
+  stroke: var(--fn-edge-warning) !important;
+}
+
+.vue-flow__edge.edge-kind-retry .vue-flow__edge-path,
+.vue-flow__edge-path.edge-kind-retry {
+  stroke: var(--fn-edge-retry) !important;
+}
+
+.vue-flow__edge.edge-kind-async .vue-flow__edge-path,
+.vue-flow__edge-path.edge-kind-async {
+  stroke: var(--fn-edge-async) !important;
+}
+
+.vue-flow__edge-text {
+  fill: var(--color-foreground);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.vue-flow__edge-textbg {
+  fill: var(--color-card);
+  stroke: var(--color-border);
+}
+
 .vue-flow__edge.selected .vue-flow__edge-path,
+.vue-flow__edge.active-edge .vue-flow__edge-path,
 .vue-flow__edge-path.active-edge {
   stroke: var(--fn-edge-active) !important;
   stroke-width: 2px !important;

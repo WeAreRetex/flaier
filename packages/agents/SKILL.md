@@ -29,17 +29,18 @@ bun run manifest -- --dir ./flow-specs --out ./flow-specs/manifest.json
 
 1. Create a scaffold with `scaffold` (`linear` or `branching`) and realistic flow title.
 2. Replace placeholders with real node labels, code snippets, descriptions, links, and branch paths from the target codebase.
-3. Keep one `FlowTimeline` root, start from a concrete `TriggerNode`, and model choices with multiple children on one node.
-4. Validate each generated spec or full manifest with `validate`.
-5. Build or refresh `manifest.json` with `manifest` after adding/removing flow files.
+3. Keep one `FlowTimeline` root, start from a concrete `TriggerNode`, and model choices with `DecisionNode` + multiple children.
+4. Add edge metadata with `props.transitions` on branching nodes to label branch choices (`label`, `description`) and semantics (`kind`: `success`, `error`, `warning`, `retry`, `async`, `default`).
+5. Validate each generated spec or full manifest with `validate`.
+6. Build or refresh `manifest.json` with `manifest` after adding/removing flow files.
 
 ## Non-Negotiable Output Rules
 
 - Keep root element type as `FlowTimeline`.
-- Keep node types limited to `TriggerNode`, `CodeNode`, `DescriptionNode`, and `LinkNode`.
+- Keep node types limited to `TriggerNode`, `CodeNode`, `DecisionNode`, `PayloadNode`, `ErrorNode`, `DescriptionNode`, and `LinkNode`.
 - Ensure every child reference points to an existing element key.
 - Include `state.currentStep` and `state.playing`.
-- Ensure branch labels and descriptions are explicit enough for keyboard branch selection.
+- Ensure branch labels and descriptions are explicit enough for keyboard branch selection (prefer `props.transitions` metadata on branching nodes).
 
 ## Twoslash Authoring Rules (CodeNode)
 

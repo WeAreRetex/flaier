@@ -18,6 +18,9 @@ const FlowTimelineComponent: ComponentFn<typeof catalog, 'FlowTimeline'> = ({ pr
 
 const TriggerNodeComponent: ComponentFn<typeof catalog, 'TriggerNode'> = () => null
 const CodeNodeComponent: ComponentFn<typeof catalog, 'CodeNode'> = () => null
+const DecisionNodeComponent: ComponentFn<typeof catalog, 'DecisionNode'> = () => null
+const PayloadNodeComponent: ComponentFn<typeof catalog, 'PayloadNode'> = () => null
+const ErrorNodeComponent: ComponentFn<typeof catalog, 'ErrorNode'> = () => null
 const DescriptionNodeComponent: ComponentFn<typeof catalog, 'DescriptionNode'> = () => null
 const LinkNodeComponent: ComponentFn<typeof catalog, 'LinkNode'> = () => null
 
@@ -26,6 +29,9 @@ export const { registry } = defineRegistry(catalog, {
     FlowTimeline: FlowTimelineComponent,
     TriggerNode: TriggerNodeComponent,
     CodeNode: CodeNodeComponent,
+    DecisionNode: DecisionNodeComponent,
+    PayloadNode: PayloadNodeComponent,
+    ErrorNode: ErrorNodeComponent,
     DescriptionNode: DescriptionNodeComponent,
     LinkNode: LinkNodeComponent,
   },

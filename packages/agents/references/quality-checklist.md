@@ -9,10 +9,12 @@ Use this checklist before finalizing generated flow specs.
 - Keep each node focused on one responsibility.
 - Use `DescriptionNode.body` to explain side effects and state changes, not generic filler text.
 - Use realistic, minimal code snippets in `CodeNode.code`.
+- Use `PayloadNode` for data snapshots/transforms and `ErrorNode` for failure states when those concepts matter to the story.
 
 ## Interaction Quality
 
-- Ensure branch nodes have meaningful child labels (these appear in branch choices).
+- Prefer `DecisionNode` when a branch depends on a named condition.
+- Add `props.transitions` metadata for branching edges so branch choices have explicit labels/descriptions and semantics (`success`, `error`, etc.).
 - Include branch descriptions so keyboard branch selection is understandable.
 - Use `magicMoveSteps` only when step-by-step code reveal adds clarity.
 - Keep long lines manageable with `wrapLongLines` when needed.

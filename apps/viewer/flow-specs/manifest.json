@@ -17,6 +17,14 @@
       "src": "./twoslash-handoff.flow.json",
       "tags": ["sample", "twoslash"],
       "entrypoints": ["src/components/nodes/CodeNode.vue"]
+    },
+    {
+      "id": "decision-payload-error",
+      "title": "Decision, Payload, and Error Narrative",
+      "description": "Branch metadata with dedicated payload and failure nodes",
+      "src": "./decision-payload-error.flow.json",
+      "tags": ["sample", "branching"],
+      "entrypoints": ["src/components/renderer/FlowTimelineRenderer.vue"]
     }
   ]
 }
