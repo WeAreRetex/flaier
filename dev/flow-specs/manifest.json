@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "defaultFlowId": "etl-pipeline",
+  "flows": [
+    {
+      "id": "etl-pipeline",
+      "title": "ETL Pipeline",
+      "description": "Contentful CMS to DynamoDB",
+      "src": "./etl-pipeline.flow.json"
+    },
+    {
+      "id": "retry-recovery",
+      "title": "Retry and Recovery",
+      "description": "When ingest fails, move to degraded mode and replay",
+      "src": "./retry-recovery.flow.json"
+    }
+  ]
+}

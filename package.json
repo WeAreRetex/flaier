@@ -20,7 +20,8 @@
     "dev": "vite",
     "build": "BUILD_LIB=1 vite build",
     "test": "bun test",
-    "typecheck": "vue-tsc --noEmit"
+    "typecheck": "vue-tsc --noEmit",
+    "flows:manifest": "bun ./scripts/build-flow-manifest.ts"
   },
   "dependencies": {
     "@dagrejs/dagre": "^2.0.4",

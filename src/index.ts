@@ -10,6 +10,9 @@ export { useFlowNarratorRuntime } from './composables/useFlowNarratorRuntime'
 
 export type {
   FlowNarratorSpec,
+  FlowNarratorManifest,
+  FlowNarratorManifestFlow,
+  FlowNarratorFlowOption,
   FlowNarratorSource,
   FlowNarratorProps,
   FlowTimelineProps,

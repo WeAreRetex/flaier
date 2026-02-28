@@ -84,6 +84,45 @@ interface BranchChoice {
 
 const runtime = useFlowNarratorRuntime()
 const spec = computed(() => runtime.spec.value)
+const availableFlows = computed(() => runtime.flowOptions.value)
+const activeFlowId = computed(() => runtime.activeFlowId.value)
+const activeFlow = computed(() => {
+  const activeId = activeFlowId.value
+  if (!activeId) return undefined
+  return availableFlows.value.find((flow) => flow.id === activeId)
+})
+const showFlowSelector = computed(() => availableFlows.value.length > 1)
+const overlayTitle = computed(() => activeFlow.value?.title ?? props.title)
+const overlayDescription = computed(() => activeFlow.value?.description ?? props.description)
+const headerDropdownRef = ref<HTMLDivElement | null>(null)
+const headerDropdownOpen = ref(false)
+
+function toggleHeaderDropdown() {
+  if (!showFlowSelector.value) return
+  headerDropdownOpen.value = !headerDropdownOpen.value
+}
+
+function closeHeaderDropdown() {
+  headerDropdownOpen.value = false
+}
+
+function handleFlowSelect(flowId: string) {
+  if (!flowId) return
+
+  runtime.setActiveFlow(flowId)
+  headerDropdownOpen.value = false
+}
+
+watch(showFlowSelector, (show) => {
+  if (!show) {
+    headerDropdownOpen.value = false
+  }
+})
+
+watch(activeFlowId, () => {
+  headerDropdownOpen.value = false
+})
+
 const rootElement = computed(() => {
   const activeSpec = spec.value
   if (!activeSpec) return undefined
@@ -1195,6 +1234,21 @@ const containerReady = ref(false)
 const overviewMode = ref(false)
 let resizeObserver: ResizeObserver | null = null
 
+function handleDocumentPointerDown(event: PointerEvent) {
+  if (!headerDropdownOpen.value) return
+
+  const target = event.target as Node | null
+  if (!target) return
+  if (headerDropdownRef.value?.contains(target)) return
+
+  closeHeaderDropdown()
+}
+
+function handleDocumentKeydown(event: KeyboardEvent) {
+  if (event.key !== 'Escape') return
+  closeHeaderDropdown()
+}
+
 function syncOverviewModeFromZoom(zoom: number) {
   if (overviewMode.value) {
     if (zoom >= OVERVIEW_EXIT_ZOOM) {
@@ -1231,6 +1285,11 @@ function updateContainerReady() {
 }
 
 onMounted(() => {
+  if (typeof document !== 'undefined') {
+    document.addEventListener('pointerdown', handleDocumentPointerDown)
+    document.addEventListener('keydown', handleDocumentKeydown)
+  }
+
   nextTick(() => {
     updateContainerReady()
 
@@ -1281,6 +1340,12 @@ watch([viewportReady, activeFrame], ([ready, frame]) => {
 
 onUnmounted(() => {
   clearTimer()
+
+  if (typeof document !== 'undefined') {
+    document.removeEventListener('pointerdown', handleDocumentPointerDown)
+    document.removeEventListener('keydown', handleDocumentKeydown)
+  }
+
   if (resizeObserver) {
     resizeObserver.disconnect()
     resizeObserver = null
@@ -1357,10 +1422,78 @@ onUnmounted(() => {
 
     <div v-else class="h-full w-full" />
 
-    <div v-if="title || description" class="absolute top-4 left-4 z-20">
-      <div class="rounded-lg border border-border/60 bg-card/80 px-3 py-1.5 text-xs shadow-lg backdrop-blur-md">
-        <p v-if="title" class="font-medium text-foreground">{{ title }}</p>
-        <p v-if="description" class="mt-0.5 text-[11px] text-muted-foreground">{{ description }}</p>
+    <div
+      v-if="showFlowSelector || overlayTitle || overlayDescription"
+      ref="headerDropdownRef"
+      class="absolute top-4 left-4 z-20 w-[min(90vw,430px)]"
+    >
+      <div class="relative">
+        <button
+          type="button"
+          class="group w-full rounded-lg border border-border/70 bg-card/85 px-3 py-2 text-left text-xs shadow-lg backdrop-blur-md transition-colors"
+          :class="showFlowSelector ? 'cursor-pointer hover:border-primary/45' : 'cursor-default'"
+          :disabled="!showFlowSelector"
+          :aria-expanded="showFlowSelector ? headerDropdownOpen : undefined"
+          aria-haspopup="listbox"
+          @click="toggleHeaderDropdown"
+        >
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <p class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                {{ showFlowSelector ? 'Flow' : 'Narrative' }}
+              </p>
+              <p v-if="overlayTitle" class="mt-1 truncate text-sm font-medium text-foreground">
+                {{ overlayTitle }}
+              </p>
+              <p v-if="overlayDescription" class="mt-0.5 text-[11px] leading-relaxed text-muted-foreground break-words">
+                {{ overlayDescription }}
+              </p>
+            </div>
+
+            <svg
+              v-if="showFlowSelector"
+              class="mt-0.5 h-4 w-4 shrink-0 transition-all"
+              :class="headerDropdownOpen ? 'rotate-180 text-foreground' : 'text-muted-foreground group-hover:text-foreground'"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </div>
+        </button>
+
+        <div
+          v-if="showFlowSelector && headerDropdownOpen"
+          class="absolute inset-x-0 top-[calc(100%+8px)] rounded-lg border border-border/70 bg-card/95 p-1 shadow-2xl backdrop-blur-md"
+          role="listbox"
+        >
+          <button
+            v-for="flow in availableFlows"
+            :key="flow.id"
+            type="button"
+            class="w-full rounded-md px-2.5 py-2 text-left transition-colors"
+            :class="flow.id === activeFlowId ? 'bg-primary/14 text-foreground' : 'text-foreground/90 hover:bg-muted/70'"
+            @click="handleFlowSelect(flow.id)"
+          >
+            <div class="flex items-center justify-between gap-2">
+              <p class="truncate text-xs font-medium">{{ flow.title }}</p>
+              <span
+                v-if="flow.id === activeFlowId"
+                class="rounded-full border border-primary/35 bg-primary/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-primary"
+              >
+                Active
+              </span>
+            </div>
+            <p v-if="flow.description" class="mt-0.5 text-[11px] leading-relaxed text-muted-foreground break-words">
+              {{ flow.description }}
+            </p>
+          </button>
+        </div>
       </div>
     </div>
 
