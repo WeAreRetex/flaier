@@ -10,6 +10,10 @@ const FlowTimelineComponent: ComponentFn<typeof catalog, 'FlowTimeline'> = ({ pr
     description: props.description,
     direction: props.direction,
     minHeight: props.minHeight,
+    layoutEngine: props.layoutEngine,
+    layoutRankSep: props.layoutRankSep,
+    layoutNodeSep: props.layoutNodeSep,
+    layoutEdgeSep: props.layoutEdgeSep,
   })
 
 const TriggerNodeComponent: ComponentFn<typeof catalog, 'TriggerNode'> = () => null

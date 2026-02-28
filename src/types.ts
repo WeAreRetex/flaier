@@ -15,6 +15,10 @@ export interface FlowTimelineProps {
   description?: string
   direction?: 'horizontal' | 'vertical'
   minHeight?: number
+  layoutEngine?: 'dagre' | 'manual'
+  layoutRankSep?: number
+  layoutNodeSep?: number
+  layoutEdgeSep?: number
 }
 
 /** Props for trigger/entry-point nodes */

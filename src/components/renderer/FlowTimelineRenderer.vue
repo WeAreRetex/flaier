@@ -31,8 +31,13 @@ const props = withDefaults(defineProps<{
   description?: string
   direction?: 'horizontal' | 'vertical'
   minHeight?: number
+  layoutEngine?: 'dagre' | 'manual'
+  layoutRankSep?: number
+  layoutNodeSep?: number
+  layoutEdgeSep?: number
 }>(), {
   direction: 'horizontal',
+  layoutEngine: 'dagre',
 })
 
 const TYPE_MAP: Record<string, FlowNodeType> = {
@@ -42,11 +47,13 @@ const TYPE_MAP: Record<string, FlowNodeType> = {
   LinkNode: 'link',
 }
 
-const HORIZONTAL_FALLBACK_GAP = 420
-const DAGRE_RANK_SEP_HORIZONTAL = 260
-const DAGRE_NODE_SEP_HORIZONTAL = 120
-const DAGRE_RANK_SEP_VERTICAL = 220
-const DAGRE_NODE_SEP_VERTICAL = 120
+const DEFAULT_LAYOUT_ENGINE = 'dagre'
+const DEFAULT_FALLBACK_GAP = 420
+const DEFAULT_DAGRE_RANK_SEP_HORIZONTAL = 260
+const DEFAULT_DAGRE_NODE_SEP_HORIZONTAL = 120
+const DEFAULT_DAGRE_RANK_SEP_VERTICAL = 220
+const DEFAULT_DAGRE_NODE_SEP_VERTICAL = 120
+const DEFAULT_DAGRE_EDGE_SEP = 30
 
 interface NodeSize {
   width: number
@@ -162,6 +169,23 @@ const outgoingNodeKeys = computed<Record<string, string[]>>(() => {
   return map
 })
 
+const incomingNodeKeys = computed<Record<string, string[]>>(() => {
+  const map: Record<string, string[]> = {}
+
+  for (const node of orderedNodeElements.value) {
+    map[node.key] = []
+  }
+
+  for (const [source, targets] of Object.entries(outgoingNodeKeys.value)) {
+    for (const target of targets) {
+      if (!map[target]) continue
+      map[target].push(source)
+    }
+  }
+
+  return map
+})
+
 const startNodeKey = computed(() => {
   const root = rootElement.value
   if (!root?.children?.length) return undefined
@@ -179,6 +203,14 @@ function toRequiredString(value: unknown) {
 
 function toBoolean(value: unknown, fallback = false) {
   return typeof value === 'boolean' ? value : fallback
+}
+
+function toPositiveNumber(value: unknown, fallback: number, min = 1) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Math.max(min, Math.floor(value))
+  }
+
+  return fallback
 }
 
 function toMagicMoveSteps(value: unknown): MagicMoveStep[] {
@@ -509,19 +541,199 @@ function togglePlay() {
 const activeFrame = computed(() => pathFrames.value[currentStep.value])
 const nextPlannedNodeKey = computed(() => pathFrames.value[currentStep.value + 1]?.nodeKey)
 
-function createFallbackLayoutPositions(nodes: OrderedNodeElement[]) {
+const resolvedLayoutEngine = computed<'dagre' | 'manual'>(() => {
+  return props.layoutEngine === 'manual' ? 'manual' : DEFAULT_LAYOUT_ENGINE
+})
+
+const resolvedLayoutRankSep = computed(() => {
+  const fallback = props.direction === 'vertical'
+    ? DEFAULT_DAGRE_RANK_SEP_VERTICAL
+    : DEFAULT_DAGRE_RANK_SEP_HORIZONTAL
+
+  return toPositiveNumber(props.layoutRankSep, fallback, 80)
+})
+
+const resolvedLayoutNodeSep = computed(() => {
+  const fallback = props.direction === 'vertical'
+    ? DEFAULT_DAGRE_NODE_SEP_VERTICAL
+    : DEFAULT_DAGRE_NODE_SEP_HORIZONTAL
+
+  return toPositiveNumber(props.layoutNodeSep, fallback, 40)
+})
+
+const resolvedLayoutEdgeSep = computed(() => {
+  return toPositiveNumber(props.layoutEdgeSep, DEFAULT_DAGRE_EDGE_SEP, 8)
+})
+
+function createFallbackLayoutPositions(nodes: OrderedNodeElement[], rankGap = DEFAULT_FALLBACK_GAP) {
+  const mainGap = Math.max(80, rankGap)
   const positions: Record<string, { x: number; y: number }> = {}
 
   for (const node of nodes) {
     if (props.direction === 'vertical') {
-      positions[node.key] = { x: 0, y: node.index * HORIZONTAL_FALLBACK_GAP }
+      positions[node.key] = { x: 0, y: node.index * mainGap }
       continue
     }
 
-    positions[node.key] = { x: node.index * HORIZONTAL_FALLBACK_GAP, y: 0 }
+    positions[node.key] = { x: node.index * mainGap, y: 0 }
   }
 
   return positions
+}
+
+function normalizePositions(positions: Record<string, { x: number; y: number }>) {
+  if (Object.keys(positions).length === 0) {
+    return positions
+  }
+
+  let minX = Number.POSITIVE_INFINITY
+  let minY = Number.POSITIVE_INFINITY
+
+  for (const position of Object.values(positions)) {
+    minX = Math.min(minX, position.x)
+    minY = Math.min(minY, position.y)
+  }
+
+  for (const key of Object.keys(positions)) {
+    const currentPosition = positions[key]
+    if (!currentPosition) continue
+
+    positions[key] = {
+      x: currentPosition.x - minX,
+      y: currentPosition.y - minY,
+    }
+  }
+
+  return positions
+}
+
+function createManualLayoutPositions(
+  orderedNodes: OrderedNodeElement[],
+  rankGap: number,
+  laneGap: number,
+) {
+  if (orderedNodes.length === 0) return {}
+
+  const depthByKey: Record<string, number> = {}
+  for (const node of orderedNodes) {
+    depthByKey[node.key] = Number.NEGATIVE_INFINITY
+  }
+
+  const startKey = startNodeKey.value ?? orderedNodes[0]?.key
+  if (!startKey) {
+    return createFallbackLayoutPositions(orderedNodes, rankGap)
+  }
+
+  depthByKey[startKey] = 0
+
+  const queue: string[] = [startKey]
+  const maxDepth = Math.max(0, orderedNodes.length - 1)
+  let guard = 0
+  const maxIterations = Math.max(24, orderedNodes.length * orderedNodes.length)
+
+  while (queue.length > 0 && guard < maxIterations) {
+    guard += 1
+
+    const key = queue.shift()
+    if (!key) continue
+
+    const baseDepth = depthByKey[key] ?? Number.NEGATIVE_INFINITY
+    if (!Number.isFinite(baseDepth)) continue
+
+    for (const target of outgoingNodeKeys.value[key] ?? []) {
+      if (!(target in depthByKey)) continue
+
+      const candidateDepth = Math.min(maxDepth, baseDepth + 1)
+      const currentDepth = depthByKey[target] ?? Number.NEGATIVE_INFINITY
+
+      if (candidateDepth > currentDepth) {
+        depthByKey[target] = candidateDepth
+        queue.push(target)
+      }
+    }
+  }
+
+  let fallbackDepth = 0
+  for (const node of orderedNodes) {
+    if (Number.isFinite(depthByKey[node.key])) continue
+
+    depthByKey[node.key] = Math.min(maxDepth, fallbackDepth)
+    fallbackDepth += 1
+  }
+
+  const layers: Record<number, string[]> = {}
+  for (const node of orderedNodes) {
+    const depth = depthByKey[node.key] ?? 0
+    if (!layers[depth]) {
+      layers[depth] = []
+    }
+
+    layers[depth].push(node.key)
+  }
+
+  const laneByKey: Record<string, number> = {}
+  const sortedDepths = Object.keys(layers)
+    .map(Number)
+    .sort((a, b) => a - b)
+
+  for (const depth of sortedDepths) {
+    const layerKeys = [...(layers[depth] ?? [])]
+
+    layerKeys.sort((a, b) => {
+      const aParents = (incomingNodeKeys.value[a] ?? [])
+        .filter((parent) => {
+          const parentDepth = depthByKey[parent] ?? Number.NEGATIVE_INFINITY
+          return Number.isFinite(parentDepth) && parentDepth < depth
+        })
+      const bParents = (incomingNodeKeys.value[b] ?? [])
+        .filter((parent) => {
+          const parentDepth = depthByKey[parent] ?? Number.NEGATIVE_INFINITY
+          return Number.isFinite(parentDepth) && parentDepth < depth
+        })
+
+      const aAnchor = aParents.length > 0
+        ? aParents.reduce((sum, parent) => sum + (laneByKey[parent] ?? 0), 0) / aParents.length
+        : 0
+      const bAnchor = bParents.length > 0
+        ? bParents.reduce((sum, parent) => sum + (laneByKey[parent] ?? 0), 0) / bParents.length
+        : 0
+
+      if (aAnchor === bAnchor) {
+        const aIndex = orderedNodeByKey.value[a]?.index ?? 0
+        const bIndex = orderedNodeByKey.value[b]?.index ?? 0
+        return aIndex - bIndex
+      }
+
+      return aAnchor - bAnchor
+    })
+
+    const count = layerKeys.length
+    layerKeys.forEach((key, index) => {
+      laneByKey[key] = (index - (count - 1) / 2) * laneGap
+    })
+  }
+
+  const positions: Record<string, { x: number; y: number }> = {}
+
+  for (const node of orderedNodes) {
+    const depth = depthByKey[node.key] ?? 0
+    const lane = laneByKey[node.key] ?? 0
+
+    if (props.direction === 'vertical') {
+      positions[node.key] = {
+        x: Math.round(lane),
+        y: Math.round(depth * rankGap),
+      }
+      continue
+    }
+
+    positions[node.key] = {
+      x: Math.round(depth * rankGap),
+      y: Math.round(lane),
+    }
+  }
+
+  return normalizePositions(positions)
 }
 
 const nodeSizes = computed<Record<string, NodeSize>>(() => {
@@ -538,7 +750,14 @@ const layoutPositions = computed<Record<string, { x: number; y: number }>>(() =>
   const orderedNodes = orderedNodeElements.value
   if (orderedNodes.length === 0) return {}
 
-  const fallback = createFallbackLayoutPositions(orderedNodes)
+  const rankGap = resolvedLayoutRankSep.value
+  const nodeGap = resolvedLayoutNodeSep.value
+  const edgeGap = resolvedLayoutEdgeSep.value
+  const fallback = createFallbackLayoutPositions(orderedNodes, rankGap)
+
+  if (resolvedLayoutEngine.value === 'manual') {
+    return createManualLayoutPositions(orderedNodes, rankGap, nodeGap)
+  }
 
   const graph = new dagre.graphlib.Graph()
   graph.setDefaultEdgeLabel(() => ({}))
@@ -549,9 +768,9 @@ const layoutPositions = computed<Record<string, { x: number; y: number }>>(() =>
     align: 'UL',
     marginx: 36,
     marginy: 36,
-    ranksep: props.direction === 'vertical' ? DAGRE_RANK_SEP_VERTICAL : DAGRE_RANK_SEP_HORIZONTAL,
-    nodesep: props.direction === 'vertical' ? DAGRE_NODE_SEP_VERTICAL : DAGRE_NODE_SEP_HORIZONTAL,
-    edgesep: 30,
+    ranksep: rankGap,
+    nodesep: nodeGap,
+    edgesep: edgeGap,
   })
 
   for (const node of orderedNodes) {
@@ -603,35 +822,23 @@ const layoutPositions = computed<Record<string, { x: number; y: number }>>(() =>
     return fallback
   }
 
-  let minX = Number.POSITIVE_INFINITY
-  let minY = Number.POSITIVE_INFINITY
-
-  for (const position of Object.values(positions)) {
-    minX = Math.min(minX, position.x)
-    minY = Math.min(minY, position.y)
-  }
-
-  for (const key of Object.keys(positions)) {
-    const currentPosition = positions[key]
-    if (!currentPosition) continue
-
-    positions[key] = {
-      x: currentPosition.x - minX,
-      y: currentPosition.y - minY,
-    }
-  }
-
-  return positions
+  return normalizePositions(positions)
 })
 
-const nodes = computed<FlowNode[]>(() =>
-  orderedNodeElements.value.map(({ key, nodeType, element, index }) => ({
+const nodes = computed<FlowNode[]>(() => {
+  const fallbackPositions = createFallbackLayoutPositions(
+    orderedNodeElements.value,
+    resolvedLayoutRankSep.value,
+  )
+
+  return orderedNodeElements.value.map(({ key, nodeType, element, index }) => ({
     id: key,
     type: nodeType,
     position: layoutPositions.value[key]
+      ?? fallbackPositions[key]
       ?? (props.direction === 'vertical'
-        ? { x: 0, y: index * HORIZONTAL_FALLBACK_GAP }
-        : { x: index * HORIZONTAL_FALLBACK_GAP, y: 0 }),
+        ? { x: 0, y: index * DEFAULT_FALLBACK_GAP }
+        : { x: index * DEFAULT_FALLBACK_GAP, y: 0 }),
     data: {
       key,
       type: nodeType,
@@ -639,8 +846,8 @@ const nodes = computed<FlowNode[]>(() =>
       props: element.props,
       index,
     },
-  })),
-)
+  }))
+})
 
 const edges = computed<FlowEdge[]>(() => {
   const result: FlowEdge[] = []
