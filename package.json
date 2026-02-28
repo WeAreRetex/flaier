@@ -23,6 +23,7 @@
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
+    "@dagrejs/dagre": "^2.0.4",
     "@json-render/core": "latest",
     "@json-render/vue": "latest",
     "@vue-flow/core": "^1",

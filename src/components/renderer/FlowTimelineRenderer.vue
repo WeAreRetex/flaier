@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import dagre from '@dagrejs/dagre'
 import { useStateStore, useStateValue } from '@json-render/vue'
 import { VueFlow, useNodesInitialized, useVueFlow } from '@vue-flow/core'
 import {
@@ -41,9 +42,16 @@ const TYPE_MAP: Record<string, FlowNodeType> = {
   LinkNode: 'link',
 }
 
-const HORIZONTAL_LAYER_GAP = 500
-const VERTICAL_LAYER_GAP = 320
-const BRANCH_LANE_GAP = 290
+const HORIZONTAL_FALLBACK_GAP = 420
+const DAGRE_RANK_SEP_HORIZONTAL = 260
+const DAGRE_NODE_SEP_HORIZONTAL = 120
+const DAGRE_RANK_SEP_VERTICAL = 220
+const DAGRE_NODE_SEP_VERTICAL = 120
+
+interface NodeSize {
+  width: number
+  height: number
+}
 
 interface OrderedNodeElement {
   key: string
@@ -149,23 +157,6 @@ const outgoingNodeKeys = computed<Record<string, string[]>>(() => {
 
     const fallback = rootLinearNextByKey.value[node.key]
     map[node.key] = fallback ? [fallback] : []
-  }
-
-  return map
-})
-
-const incomingNodeKeys = computed<Record<string, string[]>>(() => {
-  const map: Record<string, string[]> = {}
-
-  for (const node of orderedNodeElements.value) {
-    map[node.key] = []
-  }
-
-  for (const [source, targets] of Object.entries(outgoingNodeKeys.value)) {
-    for (const target of targets) {
-      if (!map[target]) continue
-      map[target].push(source)
-    }
   }
 
   return map
@@ -281,6 +272,79 @@ function getCodeNodeStoryLines(element: SpecElement) {
   if (variants.length === 0) return 0
 
   return variants.reduce((max, current) => Math.max(max, estimateWrappedLines(current)), 1)
+}
+
+function estimateNodeTextLines(value: unknown, charsPerLine: number) {
+  const text = toOptionalString(value)
+  if (!text) return 0
+  return estimateWrappedLines(text, charsPerLine)
+}
+
+function estimateCodeNodeSize(element: SpecElement): NodeSize {
+  const autoWrapEnabled = getCodeNodeMaxLineLength(element) > 58
+  const wrapEnabled = toBoolean(element.props.wrapLongLines) || autoWrapEnabled
+
+  const codeLines = wrapEnabled
+    ? getCodeNodeWrappedLines(element)
+    : getCodeNodeMaxLines(element)
+  const storyLines = getCodeNodeStoryLines(element)
+  const storyHasMeta = hasCodeNodeStoryMeta(element)
+
+  const codeViewportHeight = wrapEnabled
+    ? Math.min(400, Math.max(190, 72 + codeLines * 16))
+    : Math.min(340, Math.max(160, 84 + codeLines * 17))
+
+  const storyViewportHeight = storyLines > 0
+    ? Math.min(220, Math.max(88, (storyHasMeta ? 56 : 34) + storyLines * 18))
+    : 0
+
+  return {
+    width: 340,
+    height: Math.min(760, Math.max(230, 42 + codeViewportHeight + storyViewportHeight + 14)),
+  }
+}
+
+function estimateNodeSize(node: OrderedNodeElement): NodeSize {
+  const { element } = node
+
+  if (element.type === 'CodeNode') {
+    return estimateCodeNodeSize(element)
+  }
+
+  if (element.type === 'TriggerNode') {
+    const labelLines = Math.max(1, estimateNodeTextLines(element.props.label, 24))
+    const descriptionLines = estimateNodeTextLines(element.props.description, 30)
+
+    return {
+      width: 220,
+      height: Math.min(280, Math.max(92, 46 + labelLines * 18 + descriptionLines * 15)),
+    }
+  }
+
+  if (element.type === 'DescriptionNode') {
+    const labelLines = Math.max(1, estimateNodeTextLines(element.props.label, 26))
+    const bodyLines = Math.max(1, estimateNodeTextLines(element.props.body, 30))
+
+    return {
+      width: 240,
+      height: Math.min(340, Math.max(110, 44 + labelLines * 18 + bodyLines * 16)),
+    }
+  }
+
+  if (element.type === 'LinkNode') {
+    const labelLines = Math.max(1, estimateNodeTextLines(element.props.label, 24))
+    const descriptionLines = estimateNodeTextLines(element.props.description, 30)
+
+    return {
+      width: 220,
+      height: Math.min(280, Math.max(90, 42 + labelLines * 18 + descriptionLines * 15)),
+    }
+  }
+
+  return {
+    width: 240,
+    height: 120,
+  }
 }
 
 const selectedBranchByNode = ref<Record<string, string>>({})
@@ -445,122 +509,115 @@ function togglePlay() {
 const activeFrame = computed(() => pathFrames.value[currentStep.value])
 const nextPlannedNodeKey = computed(() => pathFrames.value[currentStep.value + 1]?.nodeKey)
 
+function createFallbackLayoutPositions(nodes: OrderedNodeElement[]) {
+  const positions: Record<string, { x: number; y: number }> = {}
+
+  for (const node of nodes) {
+    if (props.direction === 'vertical') {
+      positions[node.key] = { x: 0, y: node.index * HORIZONTAL_FALLBACK_GAP }
+      continue
+    }
+
+    positions[node.key] = { x: node.index * HORIZONTAL_FALLBACK_GAP, y: 0 }
+  }
+
+  return positions
+}
+
+const nodeSizes = computed<Record<string, NodeSize>>(() => {
+  const sizes: Record<string, NodeSize> = {}
+
+  for (const node of orderedNodeElements.value) {
+    sizes[node.key] = estimateNodeSize(node)
+  }
+
+  return sizes
+})
+
 const layoutPositions = computed<Record<string, { x: number; y: number }>>(() => {
-  const nodes = orderedNodeElements.value
-  if (nodes.length === 0) return {}
+  const orderedNodes = orderedNodeElements.value
+  if (orderedNodes.length === 0) return {}
 
-  const depthByKey: Record<string, number> = {}
-  for (const node of nodes) {
-    depthByKey[node.key] = Number.NEGATIVE_INFINITY
+  const fallback = createFallbackLayoutPositions(orderedNodes)
+
+  const graph = new dagre.graphlib.Graph()
+  graph.setDefaultEdgeLabel(() => ({}))
+  graph.setGraph({
+    rankdir: props.direction === 'vertical' ? 'TB' : 'LR',
+    ranker: 'network-simplex',
+    acyclicer: 'greedy',
+    align: 'UL',
+    marginx: 36,
+    marginy: 36,
+    ranksep: props.direction === 'vertical' ? DAGRE_RANK_SEP_VERTICAL : DAGRE_RANK_SEP_HORIZONTAL,
+    nodesep: props.direction === 'vertical' ? DAGRE_NODE_SEP_VERTICAL : DAGRE_NODE_SEP_HORIZONTAL,
+    edgesep: 30,
+  })
+
+  for (const node of orderedNodes) {
+    const size = nodeSizes.value[node.key] ?? { width: 240, height: 120 }
+
+    graph.setNode(node.key, {
+      width: size.width,
+      height: size.height,
+    })
   }
 
-  const startKey = startNodeKey.value ?? nodes[0]?.key
-  if (!startKey) return {}
-  depthByKey[startKey] = 0
+  for (const node of orderedNodes) {
+    const targets = outgoingNodeKeys.value[node.key] ?? []
+    const preferredTarget = resolveNextNode(node.key, targets)
 
-  const queue: string[] = [startKey]
-  const maxDepth = Math.max(0, nodes.length - 1)
-  let guard = 0
-  const maxIterations = Math.max(16, nodes.length * nodes.length)
+    for (const target of targets) {
+      if (!orderedNodeByKey.value[target]) continue
 
-  while (queue.length > 0 && guard < maxIterations) {
-    guard += 1
-
-    const key = queue.shift()
-    if (!key) continue
-
-    const baseDepth = depthByKey[key] ?? Number.NEGATIVE_INFINITY
-    if (!Number.isFinite(baseDepth)) continue
-
-    for (const target of outgoingNodeKeys.value[key] ?? []) {
-      if (!(target in depthByKey)) continue
-
-      const candidateDepth = Math.min(maxDepth, baseDepth + 1)
-      const currentDepth = depthByKey[target] ?? Number.NEGATIVE_INFINITY
-      if (candidateDepth > currentDepth) {
-        depthByKey[target] = candidateDepth
-        queue.push(target)
-      }
+      graph.setEdge(node.key, target, {
+        minlen: 1,
+        weight: target === preferredTarget ? 3 : 1,
+      })
     }
   }
 
-  let fallbackDepth = 0
-  for (const node of nodes) {
-    if (Number.isFinite(depthByKey[node.key])) continue
-
-    depthByKey[node.key] = Math.min(maxDepth, fallbackDepth)
-    fallbackDepth += 1
-  }
-
-  const layers: Record<number, string[]> = {}
-  for (const node of nodes) {
-    const depth = depthByKey[node.key] ?? 0
-    if (!layers[depth]) {
-      layers[depth] = []
-    }
-
-    layers[depth].push(node.key)
-  }
-
-  const laneByKey: Record<string, number> = {}
-  const sortedDepths = Object.keys(layers)
-    .map(Number)
-    .sort((a, b) => a - b)
-
-  for (const depth of sortedDepths) {
-    const layerKeys = [...(layers[depth] ?? [])]
-
-    layerKeys.sort((a, b) => {
-      const aParents = (incomingNodeKeys.value[a] ?? [])
-        .filter((parent) => {
-          const parentDepth = depthByKey[parent] ?? Number.NEGATIVE_INFINITY
-          return Number.isFinite(parentDepth) && parentDepth < depth
-        })
-      const bParents = (incomingNodeKeys.value[b] ?? [])
-        .filter((parent) => {
-          const parentDepth = depthByKey[parent] ?? Number.NEGATIVE_INFINITY
-          return Number.isFinite(parentDepth) && parentDepth < depth
-        })
-
-      const aAnchor = aParents.length > 0
-        ? aParents.reduce((sum, parent) => sum + (laneByKey[parent] ?? 0), 0) / aParents.length
-        : 0
-      const bAnchor = bParents.length > 0
-        ? bParents.reduce((sum, parent) => sum + (laneByKey[parent] ?? 0), 0) / bParents.length
-        : 0
-
-      if (aAnchor === bAnchor) {
-        const aIndex = orderedNodeByKey.value[a]?.index ?? 0
-        const bIndex = orderedNodeByKey.value[b]?.index ?? 0
-        return aIndex - bIndex
-      }
-
-      return aAnchor - bAnchor
-    })
-
-    const count = layerKeys.length
-    layerKeys.forEach((key, index) => {
-      laneByKey[key] = (index - (count - 1) / 2) * BRANCH_LANE_GAP
-    })
+  try {
+    dagre.layout(graph)
+  } catch {
+    return fallback
   }
 
   const positions: Record<string, { x: number; y: number }> = {}
 
-  for (const node of nodes) {
-    const depth = depthByKey[node.key] ?? 0
-    const lane = laneByKey[node.key] ?? 0
-
-    if (props.direction === 'vertical') {
-      positions[node.key] = {
-        x: lane,
-        y: depth * VERTICAL_LAYER_GAP,
-      }
+  for (const node of orderedNodes) {
+    const layoutNode = graph.node(node.key)
+    if (!layoutNode || typeof layoutNode.x !== 'number' || typeof layoutNode.y !== 'number') {
       continue
     }
 
+    const size = nodeSizes.value[node.key] ?? { width: 240, height: 120 }
+
     positions[node.key] = {
-      x: depth * HORIZONTAL_LAYER_GAP,
-      y: lane,
+      x: Math.round(layoutNode.x - size.width / 2),
+      y: Math.round(layoutNode.y - size.height / 2),
+    }
+  }
+
+  if (Object.keys(positions).length === 0) {
+    return fallback
+  }
+
+  let minX = Number.POSITIVE_INFINITY
+  let minY = Number.POSITIVE_INFINITY
+
+  for (const position of Object.values(positions)) {
+    minX = Math.min(minX, position.x)
+    minY = Math.min(minY, position.y)
+  }
+
+  for (const key of Object.keys(positions)) {
+    const currentPosition = positions[key]
+    if (!currentPosition) continue
+
+    positions[key] = {
+      x: currentPosition.x - minX,
+      y: currentPosition.y - minY,
     }
   }
 
@@ -571,7 +628,10 @@ const nodes = computed<FlowNode[]>(() =>
   orderedNodeElements.value.map(({ key, nodeType, element, index }) => ({
     id: key,
     type: nodeType,
-    position: layoutPositions.value[key] ?? { x: index * HORIZONTAL_LAYER_GAP, y: 0 },
+    position: layoutPositions.value[key]
+      ?? (props.direction === 'vertical'
+        ? { x: 0, y: index * HORIZONTAL_FALLBACK_GAP }
+        : { x: index * HORIZONTAL_FALLBACK_GAP, y: 0 }),
     data: {
       key,
       type: nodeType,
