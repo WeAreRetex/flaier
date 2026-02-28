@@ -33,3 +33,21 @@ The app serves:
 ## Layer usage
 
 This package is structured as a Nuxt layer (contains `nuxt.config.ts`, `pages/`, `server/`, `app.vue`) and can be used directly as an app or extended from another Nuxt project.
+
+## MDC component (Nuxt Content / Docus)
+
+The layer ships a markdown component at `components/content/FlowNarratorMdc.vue`.
+
+Use it in `.md`/`.mdc`:
+
+```md
+::FlowNarratorMdc
+---
+src: /api/flows/manifest
+interval: 3200
+height: min(70vh, 780px)
+---
+::
+```
+
+It includes a bottom-right fullscreen toggle button. When enabled, the component teleports to `body` and renders in a fixed-position modal, so it is not clipped by docs-page layout borders.
