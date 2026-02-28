@@ -15,7 +15,7 @@ const spec: FlowNarratorSpec = {
         description: 'Contentful CMS to DynamoDB',
         minHeight: 620,
       },
-      children: ['node-1', 'node-2', 'node-3', 'node-4', 'node-5'],
+      children: ['node-1'],
     },
     'node-1': {
       type: 'TriggerNode',
@@ -24,6 +24,7 @@ const spec: FlowNarratorSpec = {
         description: 'Fires every 5 min via EventBridge',
         color: '#22c55e',
       },
+      children: ['node-2'],
     },
     'node-2': {
       type: 'CodeNode',
@@ -62,6 +63,7 @@ const spec: FlowNarratorSpec = {
           },
         ],
       },
+      children: ['node-3', 'node-6'],
     },
     'node-3': {
       type: 'CodeNode',
@@ -72,6 +74,15 @@ const spec: FlowNarratorSpec = {
         code: 'def transform(entries):\n    return [\n        {\n            "pk": e["sys"]["id"],\n            "title": e["fields"]["title"],\n            "body": e["fields"]["body"],\n            "ttl": int(time()) + 86400\n        }\n        for e in entries\n    ]',
         comment: 'Maps CMS entries to DynamoDB items with 24h TTL',
       },
+      children: ['node-4'],
+    },
+    'node-6': {
+      type: 'DescriptionNode',
+      props: {
+        label: 'Fallback Branch',
+        body: 'If Contentful is partially unavailable, we switch to a stale-cache parser and continue with degraded metadata.',
+      },
+      children: ['node-4'],
     },
     'node-4': {
       type: 'DescriptionNode',
@@ -79,6 +90,7 @@ const spec: FlowNarratorSpec = {
         label: 'Batch Write',
         body: 'Items are written to DynamoDB using batch_write_item with automatic retry. Each batch contains up to 25 items.',
       },
+      children: ['node-5'],
     },
     'node-5': {
       type: 'LinkNode',

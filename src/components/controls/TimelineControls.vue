@@ -1,12 +1,20 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
+interface ChoiceOption {
+  id: string
+  label: string
+  description?: string
+}
+
 const props = defineProps<{
   currentStep: number
   totalSteps: number
   playing: boolean
   label?: string
   description?: string
+  choices?: ChoiceOption[]
+  selectedChoiceId?: string
 }>()
 
 const emit = defineEmits<{
@@ -14,6 +22,7 @@ const emit = defineEmits<{
   prev: []
   togglePlay: []
   goTo: [step: number]
+  chooseChoice: [choiceId: string]
 }>()
 
 const MAX_VISIBLE_DOTS = 11
@@ -44,6 +53,7 @@ const visibleStepIndexes = computed(() => {
 
 const hasLeadingSteps = computed(() => dotWindow.value.start > 0)
 const hasTrailingSteps = computed(() => dotWindow.value.end < props.totalSteps - 1)
+const hasChoices = computed(() => (props.choices?.length ?? 0) > 0)
 </script>
 
 <template>
@@ -119,6 +129,31 @@ const hasTrailingSteps = computed(() => dotWindow.value.end < props.totalSteps -
         class="mt-1 max-h-[120px] overflow-auto pr-1 text-[11px] text-muted-foreground leading-relaxed whitespace-pre-wrap break-words"
       >
         {{ props.description }}
+      </p>
+    </div>
+
+    <div v-if="hasChoices" class="mt-2 border-t border-border/60 pt-2 px-1.5">
+      <p class="text-[10px] uppercase tracking-wider text-muted-foreground">Choose Next Path</p>
+
+      <div class="mt-1.5 flex flex-wrap gap-1.5">
+        <button
+          v-for="choice in props.choices"
+          :key="choice.id"
+          class="rounded-lg border px-2 py-1 text-[11px] transition-colors text-left"
+          :class="choice.id === props.selectedChoiceId
+            ? 'border-foreground/70 bg-foreground/10 text-foreground'
+            : 'border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/60'"
+          @click="emit('chooseChoice', choice.id)"
+        >
+          {{ choice.label }}
+        </button>
+      </div>
+
+      <p
+        v-if="props.selectedChoiceId"
+        class="mt-1.5 text-[10px] text-muted-foreground leading-relaxed whitespace-pre-wrap break-words"
+      >
+        {{ props.choices?.find((choice) => choice.id === props.selectedChoiceId)?.description }}
       </p>
     </div>
   </div>

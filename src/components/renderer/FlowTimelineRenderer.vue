@@ -41,8 +41,9 @@ const TYPE_MAP: Record<string, FlowNodeType> = {
   LinkNode: 'link',
 }
 
-const HORIZONTAL_NODE_GAP = 520
-const VERTICAL_NODE_GAP = 280
+const HORIZONTAL_LAYER_GAP = 500
+const VERTICAL_LAYER_GAP = 320
+const BRANCH_LANE_GAP = 290
 
 interface OrderedNodeElement {
   key: string
@@ -58,10 +59,10 @@ interface TimelineFrame {
   totalLocalSteps: number
 }
 
-interface NodeFrameRange {
-  start: number
-  end: number
-  totalLocalSteps: number
+interface BranchChoice {
+  id: string
+  label: string
+  description?: string
 }
 
 const runtime = useFlowNarratorRuntime()
@@ -79,18 +80,102 @@ const orderedNodeElements = computed<OrderedNodeElement[]>(() => {
   if (!activeSpec || !root?.children?.length) return []
 
   const result: OrderedNodeElement[] = []
+  const queue = [...root.children]
+  const seen = new Set<string>()
 
-  root.children.forEach((key) => {
+  while (queue.length > 0) {
+    const key = queue.shift()
+    if (!key || seen.has(key)) continue
+
     const element = activeSpec.elements[key]
-    if (!element) return
+    if (!element) continue
 
     const nodeType = TYPE_MAP[element.type]
-    if (!nodeType) return
+    if (!nodeType) continue
 
+    seen.add(key)
     result.push({ key, index: result.length, nodeType, element })
-  })
+
+    for (const childKey of element.children ?? []) {
+      if (!seen.has(childKey)) {
+        queue.push(childKey)
+      }
+    }
+  }
 
   return result
+})
+
+const orderedNodeByKey = computed<Record<string, OrderedNodeElement>>(() => {
+  const map: Record<string, OrderedNodeElement> = {}
+
+  for (const node of orderedNodeElements.value) {
+    map[node.key] = node
+  }
+
+  return map
+})
+
+const rootLinearNextByKey = computed<Record<string, string>>(() => {
+  const root = rootElement.value
+  if (!root?.children?.length) return {}
+  const rootChildren = root.children
+
+  const map: Record<string, string> = {}
+
+  rootChildren.forEach((key, index) => {
+    const nextKey = rootChildren[index + 1]
+    if (!nextKey) return
+
+    if (orderedNodeByKey.value[key] && orderedNodeByKey.value[nextKey]) {
+      map[key] = nextKey
+    }
+  })
+
+  return map
+})
+
+const outgoingNodeKeys = computed<Record<string, string[]>>(() => {
+  const map: Record<string, string[]> = {}
+
+  for (const node of orderedNodeElements.value) {
+    const explicit = (node.element.children ?? [])
+      .filter((key) => Boolean(orderedNodeByKey.value[key]))
+
+    if (explicit.length > 0) {
+      map[node.key] = explicit
+      continue
+    }
+
+    const fallback = rootLinearNextByKey.value[node.key]
+    map[node.key] = fallback ? [fallback] : []
+  }
+
+  return map
+})
+
+const incomingNodeKeys = computed<Record<string, string[]>>(() => {
+  const map: Record<string, string[]> = {}
+
+  for (const node of orderedNodeElements.value) {
+    map[node.key] = []
+  }
+
+  for (const [source, targets] of Object.entries(outgoingNodeKeys.value)) {
+    for (const target of targets) {
+      if (!map[target]) continue
+      map[target].push(source)
+    }
+  }
+
+  return map
+})
+
+const startNodeKey = computed(() => {
+  const root = rootElement.value
+  if (!root?.children?.length) return undefined
+
+  return root.children.find((key) => Boolean(orderedNodeByKey.value[key]))
 })
 
 function toOptionalString(value: unknown) {
@@ -198,43 +283,61 @@ function getCodeNodeStoryLines(element: SpecElement) {
   return variants.reduce((max, current) => Math.max(max, estimateWrappedLines(current)), 1)
 }
 
-const timelineFrames = computed<TimelineFrame[]>(() => {
+const selectedBranchByNode = ref<Record<string, string>>({})
+const pathFrames = ref<TimelineFrame[]>([])
+
+function createFramesForNode(nodeKey: string): TimelineFrame[] {
+  const node = orderedNodeByKey.value[nodeKey]
+  if (!node) return []
+
+  const totalLocalSteps = getNodeFrameCount(node.element)
+
+  return Array.from({ length: totalLocalSteps }, (_, localStep) => ({
+    nodeIndex: node.index,
+    nodeKey,
+    localStep,
+    totalLocalSteps,
+  }))
+}
+
+function resolveNextNode(nodeKey: string, options: string[]) {
+  const selected = selectedBranchByNode.value[nodeKey]
+  if (selected && options.includes(selected)) {
+    return selected
+  }
+
+  return options[0]
+}
+
+function buildGuidedPath(startKey: string, maxFrames = 450): TimelineFrame[] {
   const frames: TimelineFrame[] = []
+  const visitedEdges = new Map<string, number>()
+  let currentKey: string | undefined = startKey
 
-  orderedNodeElements.value.forEach((node) => {
-    const totalLocalSteps = getNodeFrameCount(node.element)
+  while (currentKey && frames.length < maxFrames) {
+    const nodeFrames = createFramesForNode(currentKey)
+    if (nodeFrames.length === 0) break
 
-    for (let localStep = 0; localStep < totalLocalSteps; localStep += 1) {
-      frames.push({
-        nodeIndex: node.index,
-        nodeKey: node.key,
-        localStep,
-        totalLocalSteps,
-      })
-    }
-  })
+    frames.push(...nodeFrames)
+
+    const options = outgoingNodeKeys.value[currentKey] ?? []
+    if (options.length === 0) break
+
+    const nextKey = resolveNextNode(currentKey, options)
+    if (!nextKey) break
+
+    const edgeKey = `${currentKey}->${nextKey}`
+    const edgeVisits = (visitedEdges.get(edgeKey) ?? 0) + 1
+    visitedEdges.set(edgeKey, edgeVisits)
+    if (edgeVisits > 2) break
+
+    currentKey = nextKey
+  }
 
   return frames
-})
+}
 
-const nodeFrameRanges = computed<Record<number, NodeFrameRange>>(() => {
-  const ranges: Record<number, NodeFrameRange> = {}
-  let cursor = 0
-
-  orderedNodeElements.value.forEach((node) => {
-    const totalLocalSteps = getNodeFrameCount(node.element)
-    ranges[node.index] = {
-      start: cursor,
-      end: cursor + totalLocalSteps - 1,
-      totalLocalSteps,
-    }
-    cursor += totalLocalSteps
-  })
-
-  return ranges
-})
-
-const totalSteps = computed(() => timelineFrames.value.length)
+const totalSteps = computed(() => pathFrames.value.length)
 const maxStepIndex = computed(() => Math.max(0, totalSteps.value - 1))
 
 const { set } = useStateStore()
@@ -265,6 +368,20 @@ const playing = computed<boolean>({
   },
 })
 
+watch([startNodeKey, orderedNodeElements], ([start]) => {
+  selectedBranchByNode.value = {}
+
+  if (!start) {
+    pathFrames.value = []
+    currentStep.value = 0
+    return
+  }
+
+  const built = buildGuidedPath(start)
+  pathFrames.value = built.length > 0 ? built : createFramesForNode(start)
+  currentStep.value = clampStep(Number(currentStepState.value ?? 0))
+}, { immediate: true })
+
 watch(totalSteps, () => {
   currentStep.value = clampStep(currentStep.value)
 })
@@ -284,26 +401,27 @@ function clearTimer() {
   }
 }
 
+function next() {
+  if (currentStep.value >= totalSteps.value - 1) {
+    return false
+  }
+
+  currentStep.value += 1
+  return true
+}
+
 watch([playing, totalSteps, intervalMs], ([isPlaying, steps, interval]) => {
   clearTimer()
 
   if (!isPlaying || steps <= 1) return
 
   timer = setInterval(() => {
-    if (currentStep.value < steps - 1) {
-      currentStep.value += 1
-      return
+    const advanced = next()
+    if (!advanced) {
+      playing.value = false
     }
-
-    playing.value = false
   }, interval)
 }, { immediate: true })
-
-function next() {
-  if (currentStep.value < totalSteps.value - 1) {
-    currentStep.value += 1
-  }
-}
 
 function prev() {
   if (currentStep.value > 0) {
@@ -324,16 +442,138 @@ function togglePlay() {
   playing.value = !playing.value
 }
 
-const activeFrame = computed(() => timelineFrames.value[currentStep.value])
+const activeFrame = computed(() => pathFrames.value[currentStep.value])
+const nextPlannedNodeKey = computed(() => pathFrames.value[currentStep.value + 1]?.nodeKey)
+
+const layoutPositions = computed<Record<string, { x: number; y: number }>>(() => {
+  const nodes = orderedNodeElements.value
+  if (nodes.length === 0) return {}
+
+  const depthByKey: Record<string, number> = {}
+  for (const node of nodes) {
+    depthByKey[node.key] = Number.NEGATIVE_INFINITY
+  }
+
+  const startKey = startNodeKey.value ?? nodes[0]?.key
+  if (!startKey) return {}
+  depthByKey[startKey] = 0
+
+  const queue: string[] = [startKey]
+  const maxDepth = Math.max(0, nodes.length - 1)
+  let guard = 0
+  const maxIterations = Math.max(16, nodes.length * nodes.length)
+
+  while (queue.length > 0 && guard < maxIterations) {
+    guard += 1
+
+    const key = queue.shift()
+    if (!key) continue
+
+    const baseDepth = depthByKey[key] ?? Number.NEGATIVE_INFINITY
+    if (!Number.isFinite(baseDepth)) continue
+
+    for (const target of outgoingNodeKeys.value[key] ?? []) {
+      if (!(target in depthByKey)) continue
+
+      const candidateDepth = Math.min(maxDepth, baseDepth + 1)
+      const currentDepth = depthByKey[target] ?? Number.NEGATIVE_INFINITY
+      if (candidateDepth > currentDepth) {
+        depthByKey[target] = candidateDepth
+        queue.push(target)
+      }
+    }
+  }
+
+  let fallbackDepth = 0
+  for (const node of nodes) {
+    if (Number.isFinite(depthByKey[node.key])) continue
+
+    depthByKey[node.key] = Math.min(maxDepth, fallbackDepth)
+    fallbackDepth += 1
+  }
+
+  const layers: Record<number, string[]> = {}
+  for (const node of nodes) {
+    const depth = depthByKey[node.key] ?? 0
+    if (!layers[depth]) {
+      layers[depth] = []
+    }
+
+    layers[depth].push(node.key)
+  }
+
+  const laneByKey: Record<string, number> = {}
+  const sortedDepths = Object.keys(layers)
+    .map(Number)
+    .sort((a, b) => a - b)
+
+  for (const depth of sortedDepths) {
+    const layerKeys = [...(layers[depth] ?? [])]
+
+    layerKeys.sort((a, b) => {
+      const aParents = (incomingNodeKeys.value[a] ?? [])
+        .filter((parent) => {
+          const parentDepth = depthByKey[parent] ?? Number.NEGATIVE_INFINITY
+          return Number.isFinite(parentDepth) && parentDepth < depth
+        })
+      const bParents = (incomingNodeKeys.value[b] ?? [])
+        .filter((parent) => {
+          const parentDepth = depthByKey[parent] ?? Number.NEGATIVE_INFINITY
+          return Number.isFinite(parentDepth) && parentDepth < depth
+        })
+
+      const aAnchor = aParents.length > 0
+        ? aParents.reduce((sum, parent) => sum + (laneByKey[parent] ?? 0), 0) / aParents.length
+        : 0
+      const bAnchor = bParents.length > 0
+        ? bParents.reduce((sum, parent) => sum + (laneByKey[parent] ?? 0), 0) / bParents.length
+        : 0
+
+      if (aAnchor === bAnchor) {
+        const aIndex = orderedNodeByKey.value[a]?.index ?? 0
+        const bIndex = orderedNodeByKey.value[b]?.index ?? 0
+        return aIndex - bIndex
+      }
+
+      return aAnchor - bAnchor
+    })
+
+    const count = layerKeys.length
+    layerKeys.forEach((key, index) => {
+      laneByKey[key] = (index - (count - 1) / 2) * BRANCH_LANE_GAP
+    })
+  }
+
+  const positions: Record<string, { x: number; y: number }> = {}
+
+  for (const node of nodes) {
+    const depth = depthByKey[node.key] ?? 0
+    const lane = laneByKey[node.key] ?? 0
+
+    if (props.direction === 'vertical') {
+      positions[node.key] = {
+        x: lane,
+        y: depth * VERTICAL_LAYER_GAP,
+      }
+      continue
+    }
+
+    positions[node.key] = {
+      x: depth * HORIZONTAL_LAYER_GAP,
+      y: lane,
+    }
+  }
+
+  return positions
+})
 
 const nodes = computed<FlowNode[]>(() =>
   orderedNodeElements.value.map(({ key, nodeType, element, index }) => ({
     id: key,
     type: nodeType,
-    position: props.direction === 'vertical'
-      ? { x: 0, y: index * VERTICAL_NODE_GAP }
-      : { x: index * HORIZONTAL_NODE_GAP, y: 0 },
+    position: layoutPositions.value[key] ?? { x: index * HORIZONTAL_LAYER_GAP, y: 0 },
     data: {
+      key,
       type: nodeType,
       elementType: element.type,
       props: element.props,
@@ -342,39 +582,50 @@ const nodes = computed<FlowNode[]>(() =>
   })),
 )
 
-const edges = computed<FlowEdge[]>(() =>
-  orderedNodeElements.value.slice(0, -1).map((entry, index) => {
-    const target = orderedNodeElements.value[index + 1]
-    return {
-      id: `e-${entry.key}-${target?.key ?? String(index)}`,
-      source: entry.key,
-      target: target?.key ?? entry.key,
-      type: 'smoothstep',
-      animated: true,
-      class: target?.index === activeFrame.value?.nodeIndex ? 'active-edge' : undefined,
-    }
-  }),
-)
+const edges = computed<FlowEdge[]>(() => {
+  const result: FlowEdge[] = []
 
-function isActive(index: number) {
-  return activeFrame.value?.nodeIndex === index
+  for (const node of orderedNodeElements.value) {
+    const targets = outgoingNodeKeys.value[node.key] ?? []
+
+    for (const target of targets) {
+      if (!orderedNodeByKey.value[target]) continue
+
+      const isActiveEdge = activeFrame.value?.nodeKey === node.key && nextPlannedNodeKey.value === target
+
+      result.push({
+        id: `e-${node.key}-${target}`,
+        source: node.key,
+        target,
+        type: 'smoothstep',
+        animated: true,
+        class: isActiveEdge ? 'active-edge' : undefined,
+      })
+    }
+  }
+
+  return result
+})
+
+function isActive(nodeKey: string) {
+  return activeFrame.value?.nodeKey === nodeKey
 }
 
-function codeStepIndex(index: number) {
-  const range = nodeFrameRanges.value[index]
-  if (!range) return 0
+function codeStepIndex(nodeKey: string) {
+  if (activeFrame.value?.nodeKey !== nodeKey) {
+    return 0
+  }
 
-  if (currentStep.value < range.start) return 0
-  if (currentStep.value > range.end) return range.totalLocalSteps - 1
-
-  return currentStep.value - range.start
+  return activeFrame.value.localStep
 }
 
 const activeNode = computed(() => {
-  const frame = activeFrame.value
-  if (!frame) return undefined
-  return orderedNodeElements.value[frame.nodeIndex]
+  const key = activeFrame.value?.nodeKey
+  if (!key) return undefined
+  return orderedNodeByKey.value[key]
 })
+
+const activeLocalStep = computed(() => activeFrame.value?.localStep ?? 0)
 
 const activeLabel = computed(() => {
   const node = activeNode.value
@@ -389,11 +640,7 @@ const activeLabel = computed(() => {
   const steps = toMagicMoveSteps(node.element.props.magicMoveSteps)
   if (steps.length === 0) return base
 
-  const localStep = activeFrame.value?.nodeIndex === node.index
-    ? activeFrame.value.localStep
-    : codeStepIndex(node.index)
-
-  const title = steps[Math.min(localStep, steps.length - 1)]?.title
+  const title = steps[Math.min(activeLocalStep.value, steps.length - 1)]?.title
   return title ? `${base} - ${title}` : base
 })
 
@@ -407,10 +654,7 @@ const activeDescription = computed(() => {
       ?? toOptionalString(node.element.props.comment)
 
     if (steps.length > 0) {
-      const localStep = activeFrame.value?.nodeIndex === node.index
-        ? activeFrame.value.localStep
-        : codeStepIndex(node.index)
-      const beat = steps[Math.min(localStep, steps.length - 1)]
+      const beat = steps[Math.min(activeLocalStep.value, steps.length - 1)]
 
       return beat?.story ?? beat?.comment ?? defaultStory ?? ''
     }
@@ -424,6 +668,71 @@ const activeDescription = computed(() => {
 
   return toOptionalString(node.element.props.description) ?? ''
 })
+
+const branchChoices = computed<BranchChoice[]>(() => {
+  const node = activeNode.value
+  const frame = activeFrame.value
+  if (!node || !frame) return []
+
+  if (frame.localStep < frame.totalLocalSteps - 1) {
+    return []
+  }
+
+  const options = outgoingNodeKeys.value[node.key] ?? []
+  if (options.length <= 1) return []
+
+  const result: BranchChoice[] = []
+
+  for (const id of options) {
+    const target = orderedNodeByKey.value[id]
+    if (!target) continue
+
+    const label = toOptionalString(target.element.props.label) ?? id
+    const description = target.element.type === 'DescriptionNode'
+      ? toOptionalString(target.element.props.body)
+      : toOptionalString(target.element.props.description)
+
+    result.push({
+      id,
+      label,
+      description,
+    })
+  }
+
+  return result
+})
+
+const selectedBranchChoiceId = computed(() => {
+  const node = activeNode.value
+  if (!node || branchChoices.value.length === 0) return undefined
+
+  const selected = selectedBranchByNode.value[node.key]
+  if (selected) return selected
+
+  return nextPlannedNodeKey.value
+})
+
+function chooseChoice(choiceId: string) {
+  const node = activeNode.value
+  if (!node) return
+
+  const options = outgoingNodeKeys.value[node.key] ?? []
+  if (!options.includes(choiceId)) return
+
+  selectedBranchByNode.value = {
+    ...selectedBranchByNode.value,
+    [node.key]: choiceId,
+  }
+
+  const prefix = pathFrames.value.slice(0, currentStep.value + 1)
+  const suffix = buildGuidedPath(choiceId)
+
+  pathFrames.value = [...prefix, ...suffix]
+
+  if (pathFrames.value.length > currentStep.value + 1) {
+    currentStep.value += 1
+  }
+}
 
 const containerMinHeight = computed(() => {
   const provided = Number(props.minHeight)
@@ -557,7 +866,7 @@ onUnmounted(() => {
           :label="toRequiredString(data.props.label)"
           :description="toOptionalString(data.props.description)"
           :color="toOptionalString(data.props.color)"
-          :active="isActive(data.index)"
+          :active="isActive(data.key)"
         />
       </template>
 
@@ -571,8 +880,8 @@ onUnmounted(() => {
           :story="toOptionalString(data.props.story)"
           :wrap-long-lines="toBoolean(data.props.wrapLongLines)"
           :magic-move-steps="toMagicMoveSteps(data.props.magicMoveSteps)"
-          :active="isActive(data.index)"
-          :step-index="codeStepIndex(data.index)"
+          :active="isActive(data.key)"
+          :step-index="codeStepIndex(data.key)"
         />
       </template>
 
@@ -580,7 +889,7 @@ onUnmounted(() => {
         <DescriptionNodeVue
           :label="toRequiredString(data.props.label)"
           :body="toRequiredString(data.props.body)"
-          :active="isActive(data.index)"
+          :active="isActive(data.key)"
         />
       </template>
 
@@ -589,7 +898,7 @@ onUnmounted(() => {
           :label="toRequiredString(data.props.label)"
           :href="toRequiredString(data.props.href)"
           :description="toOptionalString(data.props.description)"
-          :active="isActive(data.index)"
+          :active="isActive(data.key)"
         />
       </template>
     </VueFlow>
@@ -614,10 +923,13 @@ onUnmounted(() => {
           :playing="playing"
           :label="activeLabel"
           :description="activeDescription"
+          :choices="branchChoices"
+          :selected-choice-id="selectedBranchChoiceId"
           @next="next"
           @prev="prev"
           @go-to="goTo"
           @toggle-play="togglePlay"
+          @choose-choice="chooseChoice"
         />
       </div>
     </div>

@@ -61,6 +61,7 @@ export type FlowNodeType = 'trigger' | 'code' | 'description' | 'link'
 
 /** Data payload attached to each VueFlow node */
 export interface FlowNodeData {
+  key: string
   type: FlowNodeType
   elementType: string
   props: Record<string, unknown>
