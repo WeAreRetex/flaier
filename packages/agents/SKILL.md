@@ -41,6 +41,14 @@ bun run manifest -- --dir ./flow-specs --out ./flow-specs/manifest.json
 - Include `state.currentStep` and `state.playing`.
 - Ensure branch labels and descriptions are explicit enough for keyboard branch selection.
 
+## Twoslash Authoring Rules (CodeNode)
+
+- Twoslash callouts are for TypeScript/TSX snippets (`language: "typescript"`, `"ts"`, or `"tsx"`).
+- Prefer marker-based auto mode (`// ^?`, `// ^|`, `@errors`) over forcing `twoslash: true`.
+- If `magicMoveSteps` is present, place twoslash markers in the **final** step code.
+- When `magicMoveSteps` + twoslash are used together, the player includes an extra inspection frame after the last code transform.
+- Keep callouts intentional (usually 1-3 markers per node) and tied to meaningful type/error teaching moments.
+
 ## References
 
 - Read `references/spec-contract.md` for exact shape, props, and manifest rules.

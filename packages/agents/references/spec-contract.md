@@ -54,7 +54,9 @@ Use this contract when writing `*.flow.json` for `flow-narrator`.
   - optional: `description`, `color`
 - `CodeNode`:
   - required: `label`, `code`
-  - optional: `file`, `language`, `comment`, `story`, `wrapLongLines`, `magicMoveSteps`
+  - optional: `file`, `language`, `comment`, `story`, `wrapLongLines`, `magicMoveSteps`, `twoslash`
+  - note: twoslash works with `language: "typescript"` or `"tsx"`; markers like `// ^?` auto-enable twoslash and `twoslash: true` can force it
+  - note: when `magicMoveSteps` are present, twoslash renders as an inspection frame after the final step; place markers in the final step code
 - `DescriptionNode`:
   - required: `label`, `body`
 - `LinkNode`:

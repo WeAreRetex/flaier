@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 export default {
   compatibilityDate: '2025-12-01',
   devtools: { enabled: true },
+  css: ['flow-narrator/style.css'],
   nitro: {
     preset: 'node-server',
   },

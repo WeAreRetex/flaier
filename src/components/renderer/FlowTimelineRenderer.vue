@@ -12,6 +12,15 @@ import {
   watch,
 } from 'vue'
 
+import {
+  CODE_NODE_MAX_INLINE_CHARS,
+  estimateCodeNodeCharsPerLine,
+  estimateCodeNodeWidth,
+} from '../../code-node-sizing'
+import {
+  hasTwoslashHints,
+  normalizeTwoslashLanguage,
+} from '../../composables/useTwoslash'
 import { useFlowNarratorRuntime } from '../../composables/useFlowNarratorRuntime'
 import type {
   FlowEdge,
@@ -56,6 +65,7 @@ const DEFAULT_DAGRE_NODE_SEP_VERTICAL = 120
 const DEFAULT_DAGRE_EDGE_SEP = 30
 const OVERVIEW_ENTER_ZOOM = 0.52
 const OVERVIEW_EXIT_ZOOM = 0.62
+const FLOW_NARRATOR_THEME_STORAGE_KEY = 'flow-narrator-ui-theme'
 
 interface NodeSize {
   width: number
@@ -96,6 +106,55 @@ const overlayTitle = computed(() => activeFlow.value?.title ?? props.title)
 const overlayDescription = computed(() => activeFlow.value?.description ?? props.description)
 const headerDropdownRef = ref<HTMLDivElement | null>(null)
 const headerDropdownOpen = ref(false)
+const uiTheme = ref<'dark' | 'light'>('dark')
+const isLightTheme = computed(() => uiTheme.value === 'light')
+const themeToggleLabel = computed(() => {
+  return isLightTheme.value ? 'Switch to dark mode' : 'Switch to light mode'
+})
+
+function toggleTheme() {
+  uiTheme.value = isLightTheme.value ? 'dark' : 'light'
+}
+
+function normalizeTheme(value: unknown): 'dark' | 'light' | null {
+  if (value === 'dark' || value === 'light') {
+    return value
+  }
+
+  return null
+}
+
+function readStoredTheme() {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  try {
+    return normalizeTheme(window.localStorage.getItem(FLOW_NARRATOR_THEME_STORAGE_KEY))
+  } catch {
+    return null
+  }
+}
+
+function getPreferredSystemTheme(): 'dark' | 'light' {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return 'dark'
+  }
+
+  return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
+}
+
+function persistTheme(theme: 'dark' | 'light') {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  try {
+    window.localStorage.setItem(FLOW_NARRATOR_THEME_STORAGE_KEY, theme)
+  } catch {
+    // no-op when storage is unavailable
+  }
+}
 
 function toggleHeaderDropdown() {
   if (!showFlowSelector.value) return
@@ -121,6 +180,10 @@ watch(showFlowSelector, (show) => {
 
 watch(activeFlowId, () => {
   headerDropdownOpen.value = false
+})
+
+watch(uiTheme, (theme) => {
+  persistTheme(theme)
 })
 
 const rootElement = computed(() => {
@@ -246,6 +309,29 @@ function toBoolean(value: unknown, fallback = false) {
   return typeof value === 'boolean' ? value : fallback
 }
 
+function toOptionalBoolean(value: unknown) {
+  return typeof value === 'boolean' ? value : undefined
+}
+
+function codeNodeTwoslashEnabled(element: SpecElement) {
+  if (element.type !== 'CodeNode') return false
+
+  if (!normalizeTwoslashLanguage(toOptionalString(element.props.language))) {
+    return false
+  }
+
+  const requested = toOptionalBoolean(element.props.twoslash)
+  if (requested === true) return true
+  if (requested === false) return false
+
+  const variants = [
+    toRequiredString(element.props.code),
+    ...toMagicMoveSteps(element.props.magicMoveSteps).map((step) => step.code),
+  ]
+
+  return variants.some((code) => hasTwoslashHints(code))
+}
+
 function toPositiveNumber(value: unknown, fallback: number, min = 1) {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return Math.max(min, Math.floor(value))
@@ -287,7 +373,15 @@ function toMagicMoveSteps(value: unknown): MagicMoveStep[] {
 
 function getNodeFrameCount(element: SpecElement) {
   if (element.type !== 'CodeNode') return 1
-  return Math.max(1, toMagicMoveSteps(element.props.magicMoveSteps).length)
+
+  const magicMoveSteps = toMagicMoveSteps(element.props.magicMoveSteps)
+  const baseSteps = Math.max(1, magicMoveSteps.length)
+
+  if (magicMoveSteps.length > 0 && codeNodeTwoslashEnabled(element)) {
+    return baseSteps + 1
+  }
+
+  return baseSteps
 }
 
 function getCodeNodeMaxLines(element: SpecElement) {
@@ -354,11 +448,14 @@ function estimateNodeTextLines(value: unknown, charsPerLine: number) {
 }
 
 function estimateCodeNodeSize(element: SpecElement): NodeSize {
-  const autoWrapEnabled = getCodeNodeMaxLineLength(element) > 58
+  const maxLineLength = getCodeNodeMaxLineLength(element)
+  const nodeWidth = estimateCodeNodeWidth(maxLineLength)
+  const codeCharsPerLine = estimateCodeNodeCharsPerLine(nodeWidth)
+  const autoWrapEnabled = maxLineLength > CODE_NODE_MAX_INLINE_CHARS
   const wrapEnabled = toBoolean(element.props.wrapLongLines) || autoWrapEnabled
 
   const codeLines = wrapEnabled
-    ? getCodeNodeWrappedLines(element)
+    ? getCodeNodeWrappedLines(element, codeCharsPerLine)
     : getCodeNodeMaxLines(element)
   const storyLines = getCodeNodeStoryLines(element)
   const storyHasMeta = hasCodeNodeStoryMeta(element)
@@ -372,7 +469,7 @@ function estimateCodeNodeSize(element: SpecElement): NodeSize {
     : 0
 
   return {
-    width: 340,
+    width: nodeWidth,
     height: Math.min(760, Math.max(230, 42 + codeViewportHeight + storyViewportHeight + 14)),
   }
 }
@@ -1199,11 +1296,14 @@ const containerMinHeight = computed(() => {
     return 520
   }
 
-  const autoWrapEnabled = getCodeNodeMaxLineLength(node.element) > 58
+  const maxLineLength = getCodeNodeMaxLineLength(node.element)
+  const nodeWidth = estimateCodeNodeWidth(maxLineLength)
+  const codeCharsPerLine = estimateCodeNodeCharsPerLine(nodeWidth)
+  const autoWrapEnabled = maxLineLength > CODE_NODE_MAX_INLINE_CHARS
   const wrapEnabled = toBoolean(node.element.props.wrapLongLines) || autoWrapEnabled
 
   const codeLines = wrapEnabled
-    ? getCodeNodeWrappedLines(node.element)
+    ? getCodeNodeWrappedLines(node.element, codeCharsPerLine)
     : getCodeNodeMaxLines(node.element)
   const storyLines = getCodeNodeStoryLines(node.element)
   const storyHasMeta = hasCodeNodeStoryMeta(node.element)
@@ -1329,6 +1429,8 @@ function updateContainerReady() {
 }
 
 onMounted(() => {
+  uiTheme.value = readStoredTheme() ?? getPreferredSystemTheme()
+
   if (typeof document !== 'undefined') {
     document.addEventListener('pointerdown', handleDocumentPointerDown)
     document.addEventListener('keydown', handleDocumentKeydown)
@@ -1403,6 +1505,7 @@ onUnmounted(() => {
     class="flow-narrator relative h-full w-full font-sans antialiased bg-background transition-[min-height] duration-300 ease-out"
     :style="{ minHeight: `${containerMinHeight}px` }"
     :data-focus-mode="overviewMode ? 'overview' : 'focus'"
+    :data-theme="uiTheme"
   >
     <VueFlow
       v-if="containerReady"
@@ -1441,6 +1544,8 @@ onUnmounted(() => {
           :story="toOptionalString(data.props.story)"
           :wrap-long-lines="toBoolean(data.props.wrapLongLines)"
           :magic-move-steps="toMagicMoveSteps(data.props.magicMoveSteps)"
+          :twoslash="toOptionalBoolean(data.props.twoslash)"
+          :ui-theme="uiTheme"
           :active="isActive(data.key)"
           :step-index="codeStepIndex(data.key)"
         />
@@ -1539,6 +1644,52 @@ onUnmounted(() => {
           </button>
         </div>
       </div>
+    </div>
+
+    <div class="absolute top-4 right-4 z-20">
+      <button
+        type="button"
+        class="group inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-card/85 text-muted-foreground shadow-lg backdrop-blur-md transition-colors hover:text-foreground"
+        :aria-label="themeToggleLabel"
+        :title="themeToggleLabel"
+        @click="toggleTheme"
+      >
+        <svg
+          v-if="isLightTheme"
+          class="h-4 w-4"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M12 3a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0V4a1 1 0 0 1 1-1Z" />
+          <path d="M18.36 5.64a1 1 0 0 1 1.41 0l.71.71a1 1 0 0 1-1.41 1.41l-.71-.7a1 1 0 0 1 0-1.42Z" />
+          <path d="M20 11a1 1 0 1 1 0 2h-1a1 1 0 1 1 0-2h1Z" />
+          <path d="M18.36 18.36a1 1 0 0 1 0-1.41l.71-.71a1 1 0 0 1 1.41 1.41l-.7.71a1 1 0 0 1-1.42 0Z" />
+          <path d="M12 19a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0v-1a1 1 0 0 1 1-1Z" />
+          <path d="M5.64 18.36a1 1 0 0 1-1.41 0l-.71-.71a1 1 0 1 1 1.41-1.41l.71.7a1 1 0 0 1 0 1.42Z" />
+          <path d="M5 11a1 1 0 1 1 0 2H4a1 1 0 1 1 0-2h1Z" />
+          <path d="M5.64 5.64a1 1 0 0 1 0 1.41l-.71.71a1 1 0 1 1-1.41-1.41l.7-.71a1 1 0 0 1 1.42 0Z" />
+          <circle cx="12" cy="12" r="4" />
+        </svg>
+
+        <svg
+          v-else
+          class="h-4 w-4"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 1 0 9.79 9.79Z" />
+        </svg>
+      </button>
     </div>
 
     <div

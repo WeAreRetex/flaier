@@ -9,12 +9,13 @@ const highlighterRef: ShallowRef<HighlighterCore | null> = shallowRef(null)
  * Lazily created on first call; the same instance is reused across all components.
  */
 export function useShiki(
-  langs: string[] = ['typescript', 'javascript', 'python', 'json', 'bash', 'yaml', 'go', 'rust'],
+  langs: string[] = ['typescript', 'tsx', 'javascript', 'jsx', 'python', 'json', 'bash', 'yaml', 'go', 'rust'],
   theme = 'github-dark',
 ) {
   if (!highlighterPromise) {
     highlighterPromise = import('shiki').then(async ({ createHighlighter }) => {
-      const hl = await createHighlighter({ themes: [theme], langs })
+      const themes = Array.from(new Set(['github-dark', 'github-light', theme]))
+      const hl = await createHighlighter({ themes, langs })
       highlighterRef.value = hl
       return hl
     })

@@ -1,0 +1,100 @@
+{
+  "root": "timeline-1",
+  "state": {
+    "currentStep": 0,
+    "playing": false
+  },
+  "elements": {
+    "timeline-1": {
+      "type": "FlowTimeline",
+      "props": {
+        "title": "Twoslash Handoff",
+        "description": "Magic move explains the build-up, twoslash appears on the final teaching state",
+        "minHeight": 640,
+        "layoutEngine": "dagre",
+        "layoutRankSep": 300,
+        "layoutNodeSep": 180,
+        "layoutEdgeSep": 40
+      },
+      "children": [
+        "node-1"
+      ]
+    },
+    "node-1": {
+      "type": "TriggerNode",
+      "props": {
+        "label": "Checkout Webhook",
+        "description": "A raw JSON body arrives from the payments gateway",
+        "color": "#0ea5e9"
+      },
+      "children": [
+        "node-2"
+      ]
+    },
+    "node-2": {
+      "type": "CodeNode",
+      "props": {
+        "label": "Parse and Narrow",
+        "file": "apps/api/routes/webhook.ts",
+        "language": "typescript",
+        "code": "type CheckoutEvent = {\n  orderId: string\n  items: Array<{ sku: string; qty: number; unitPriceCents: number }>\n  customer: { email: string }\n}\n\nfunction isCheckoutEvent(value: unknown): value is CheckoutEvent {\n  if (!value || typeof value !== 'object') return false\n  const candidate = value as Partial<CheckoutEvent>\n  return typeof candidate.orderId === 'string' && Array.isArray(candidate.items)\n}\n\ndeclare const rawBody: string\nconst event = JSON.parse(rawBody) as unknown\nif (!isCheckoutEvent(event)) {\n  throw new Error('Invalid checkout payload')\n}\n\nconst totalCents = event.items.reduce((sum, item) => sum + item.qty * item.unitPriceCents, 0)\n//    ^?\n\nconst firstSku = event.items[0]?.sku\n//    ^?",
+        "story": "Magic move introduces the parser incrementally, then twoslash takes over once the final typed shape settles.",
+        "magicMoveSteps": [
+          {
+            "code": "declare const rawBody: string\nconst event = JSON.parse(rawBody)",
+            "title": "Raw Parse",
+            "story": "Start from the least safe version so viewers can see where type uncertainty begins.",
+            "speaker": "Narrator"
+          },
+          {
+            "code": "type CheckoutEvent = {\n  orderId: string\n  items: Array<{ sku: string; qty: number; unitPriceCents: number }>\n}\n\nfunction isCheckoutEvent(value: unknown): value is CheckoutEvent {\n  if (!value || typeof value !== 'object') return false\n  const candidate = value as Partial<CheckoutEvent>\n  return typeof candidate.orderId === 'string' && Array.isArray(candidate.items)\n}\n\ndeclare const rawBody: string\nconst event = JSON.parse(rawBody) as unknown\nif (!isCheckoutEvent(event)) {\n  throw new Error('Invalid checkout payload')\n}",
+            "title": "Runtime Guard",
+            "story": "Next we add a type predicate to narrow unknown input before using the payload.",
+            "speaker": "Dev"
+          },
+          {
+            "code": "type CheckoutEvent = {\n  orderId: string\n  items: Array<{ sku: string; qty: number; unitPriceCents: number }>\n  customer: { email: string }\n}\n\nfunction isCheckoutEvent(value: unknown): value is CheckoutEvent {\n  if (!value || typeof value !== 'object') return false\n  const candidate = value as Partial<CheckoutEvent>\n  return typeof candidate.orderId === 'string' && Array.isArray(candidate.items)\n}\n\ndeclare const rawBody: string\nconst event = JSON.parse(rawBody) as unknown\nif (!isCheckoutEvent(event)) {\n  throw new Error('Invalid checkout payload')\n}\n\nconst totalCents = event.items.reduce((sum, item) => sum + item.qty * item.unitPriceCents, 0)\n//    ^?\n\nconst firstSku = event.items[0]?.sku\n//    ^?",
+            "title": "Final Typed State",
+            "story": "After this final transform, the renderer swaps to twoslash so inline type callouts stay inspectable.",
+            "speaker": "Narrator"
+          }
+        ]
+      },
+      "children": [
+        "node-3"
+      ]
+    },
+    "node-3": {
+      "type": "DescriptionNode",
+      "props": {
+        "label": "Handoff Moment",
+        "body": "This node demonstrates the exact runtime handoff: magic-move animation first, then twoslash output after the last animation ends."
+      },
+      "children": [
+        "node-4"
+      ]
+    },
+    "node-4": {
+      "type": "CodeNode",
+      "props": {
+        "label": "Immediate Twoslash",
+        "file": "apps/api/routes/webhook.ts",
+        "language": "typescript",
+        "code": "const response = {\n  id: 'evt_123',\n  ok: true,\n  latencyMs: 142,\n}\n\ntype ApiResponse = typeof response\n//   ^?\n\nresponse.latencyMs\n//       ^?",
+        "story": "No magic steps means twoslash is rendered immediately.",
+        "wrapLongLines": false
+      },
+      "children": [
+        "node-5"
+      ]
+    },
+    "node-5": {
+      "type": "LinkNode",
+      "props": {
+        "label": "Twoslash Marker Reference",
+        "href": "https://twoslash.netlify.app/refs/notations",
+        "description": "Marker syntax for queries, errors, highlights, and annotations"
+      }
+    }
+  }
+}

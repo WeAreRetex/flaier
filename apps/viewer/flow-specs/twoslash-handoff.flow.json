@@ -1,0 +1,74 @@
+{
+  "root": "timeline",
+  "state": {
+    "currentStep": 0,
+    "playing": false
+  },
+  "elements": {
+    "timeline": {
+      "type": "FlowTimeline",
+      "props": {
+        "title": "Twoslash Handoff",
+        "description": "Magic move introduces the code, then twoslash shows inferred types on the final state.",
+        "minHeight": 620,
+        "layoutEngine": "dagre",
+        "layoutRankSep": 280,
+        "layoutNodeSep": 180
+      },
+      "children": [
+        "node-1"
+      ]
+    },
+    "node-1": {
+      "type": "TriggerNode",
+      "props": {
+        "label": "Incoming payload",
+        "description": "Webhook receives JSON from checkout service",
+        "color": "#0ea5e9"
+      },
+      "children": [
+        "node-2"
+      ]
+    },
+    "node-2": {
+      "type": "CodeNode",
+      "props": {
+        "label": "Parse + Narrow",
+        "file": "apps/api/webhook.ts",
+        "language": "typescript",
+        "code": "type CheckoutEvent = {\n  orderId: string\n  items: Array<{ sku: string; qty: number; unitPriceCents: number }>\n}\n\nfunction isCheckoutEvent(value: unknown): value is CheckoutEvent {\n  if (!value || typeof value !== 'object') return false\n  const candidate = value as Partial<CheckoutEvent>\n  return typeof candidate.orderId === 'string' && Array.isArray(candidate.items)\n}\n\ndeclare const rawBody: string\nconst event = JSON.parse(rawBody) as unknown\nif (!isCheckoutEvent(event)) throw new Error('Invalid payload')\n\nconst totalCents = event.items.reduce((sum, item) => sum + item.qty * item.unitPriceCents, 0)\n//    ^?\n\nconst firstSku = event.items[0]?.sku\n//    ^?",
+        "story": "This node animates through magic-move steps, then switches to twoslash when the final step settles.",
+        "magicMoveSteps": [
+          {
+            "code": "declare const rawBody: string\nconst event = JSON.parse(rawBody)",
+            "title": "Raw parse",
+            "story": "Start with untyped JSON so the type-safety gap is obvious.",
+            "speaker": "Narrator"
+          },
+          {
+            "code": "type CheckoutEvent = {\n  orderId: string\n  items: Array<{ sku: string; qty: number; unitPriceCents: number }>\n}\n\nfunction isCheckoutEvent(value: unknown): value is CheckoutEvent {\n  if (!value || typeof value !== 'object') return false\n  const candidate = value as Partial<CheckoutEvent>\n  return typeof candidate.orderId === 'string' && Array.isArray(candidate.items)\n}\n\ndeclare const rawBody: string\nconst event = JSON.parse(rawBody) as unknown\nif (!isCheckoutEvent(event)) throw new Error('Invalid payload')",
+            "title": "Runtime guard",
+            "story": "Add a type predicate so we can safely narrow unknown input.",
+            "speaker": "Dev"
+          },
+          {
+            "code": "type CheckoutEvent = {\n  orderId: string\n  items: Array<{ sku: string; qty: number; unitPriceCents: number }>\n}\n\nfunction isCheckoutEvent(value: unknown): value is CheckoutEvent {\n  if (!value || typeof value !== 'object') return false\n  const candidate = value as Partial<CheckoutEvent>\n  return typeof candidate.orderId === 'string' && Array.isArray(candidate.items)\n}\n\ndeclare const rawBody: string\nconst event = JSON.parse(rawBody) as unknown\nif (!isCheckoutEvent(event)) throw new Error('Invalid payload')\n\nconst totalCents = event.items.reduce((sum, item) => sum + item.qty * item.unitPriceCents, 0)\n//    ^?\n\nconst firstSku = event.items[0]?.sku\n//    ^?",
+            "title": "Final typed state",
+            "story": "After this final transform, twoslash callouts become visible.",
+            "speaker": "Narrator"
+          }
+        ]
+      },
+      "children": [
+        "node-3"
+      ]
+    },
+    "node-3": {
+      "type": "DescriptionNode",
+      "props": {
+        "label": "Expected behavior",
+        "body": "Use the timeline controls: early steps show magic move, and the last step swaps to twoslash popovers for // ^? markers."
+      }
+    }
+  }
+}

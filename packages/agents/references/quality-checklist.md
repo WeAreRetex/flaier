@@ -16,6 +16,8 @@ Use this checklist before finalizing generated flow specs.
 - Include branch descriptions so keyboard branch selection is understandable.
 - Use `magicMoveSteps` only when step-by-step code reveal adds clarity.
 - Keep long lines manageable with `wrapLongLines` when needed.
+- Use twoslash markers (for example `// ^?`) only on TypeScript/TSX snippets when inline type/error callouts improve understanding; set `twoslash: true` only when you need to force twoslash mode.
+- For CodeNodes that combine `magicMoveSteps` and twoslash, keep markers in the final step code so the post-animation twoslash inspection frame has visible callouts.
 
 ## Structural Quality
 

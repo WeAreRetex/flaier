@@ -32,9 +32,11 @@
     "@dagrejs/dagre": "^2.0.4",
     "@json-render/core": "latest",
     "@json-render/vue": "latest",
+    "@shikijs/twoslash": "^3",
     "@vue-flow/core": "^1",
     "shiki": "^3",
     "shiki-magic-move": "^0.5",
+    "twoslash-cdn": "^0.3",
     "zod": "^4.3.6"
   },
   "devDependencies": {

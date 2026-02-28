@@ -13,6 +13,12 @@
       "title": "Retry and Recovery",
       "description": "When ingest fails, move to degraded mode and replay",
       "src": "./retry-recovery.flow.json"
+    },
+    {
+      "id": "twoslash-handoff",
+      "title": "Twoslash Handoff",
+      "description": "Magic-move progression, then final twoslash callouts",
+      "src": "./twoslash-handoff.flow.json"
     }
   ]
 }

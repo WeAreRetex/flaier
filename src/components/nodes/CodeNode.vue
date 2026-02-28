@@ -1,11 +1,23 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { Handle, Position } from '@vue-flow/core'
 import { ShikiMagicMove, ShikiMagicMovePrecompiled } from 'shiki-magic-move/vue'
 import { codeToKeyedTokens, type KeyedTokensInfo } from 'shiki-magic-move/core'
 import 'shiki-magic-move/dist/style.css'
+import {
+  CODE_NODE_MAX_INLINE_CHARS,
+  estimateCodeNodeCharsPerLine,
+  estimateCodeNodeWidth,
+} from '../../code-node-sizing'
 import { useShiki } from '../../composables/useShiki'
+import {
+  hasTwoslashHints,
+  normalizeTwoslashLanguage,
+  renderTwoslashHtml,
+} from '../../composables/useTwoslash'
 import type { MagicMoveStep } from '../../types'
+
+const TWOSLASH_SWAP_DELAY_MS = 560
 
 const props = withDefaults(defineProps<{
   label: string
@@ -16,16 +28,19 @@ const props = withDefaults(defineProps<{
   story?: string
   wrapLongLines?: boolean
   magicMoveSteps?: MagicMoveStep[]
+  twoslash?: boolean
+  uiTheme?: 'dark' | 'light'
   active?: boolean
   stepIndex?: number
 }>(), {
   language: 'typescript',
   wrapLongLines: false,
+  uiTheme: 'dark',
   stepIndex: 0,
 })
 
 const { highlighter } = useShiki()
-const AUTO_WRAP_LINE_LENGTH = 58
+const isClient = typeof window !== 'undefined'
 
 const activeStep = computed(() => {
   if (!props.magicMoveSteps?.length) return undefined
@@ -61,6 +76,34 @@ const codeVariants = computed(() => {
   return variants.filter((value): value is string => typeof value === 'string' && value.length > 0)
 })
 
+const hasMagicMoveSteps = computed(() => {
+  return (props.magicMoveSteps?.length ?? 0) > 0
+})
+
+const finalCode = computed(() => {
+  if (!hasMagicMoveSteps.value) {
+    return props.code
+  }
+
+  return props.magicMoveSteps?.[props.magicMoveSteps.length - 1]?.code ?? props.code
+})
+
+const autoTwoslashEnabled = computed(() => {
+  return codeVariants.value.some((code) => hasTwoslashHints(code))
+})
+
+const twoslashRequested = computed(() => {
+  return props.twoslash ?? autoTwoslashEnabled.value
+})
+
+const twoslashLanguage = computed(() => {
+  return normalizeTwoslashLanguage(props.language)
+})
+
+const canRenderTwoslash = computed(() => {
+  return isClient && twoslashRequested.value && Boolean(twoslashLanguage.value)
+})
+
 function getMaxLineLength(code: string) {
   return code
     .split('\n')
@@ -73,8 +116,124 @@ const maxLineLength = computed(() => {
   }, 0)
 })
 
+const nodeWidth = computed(() => {
+  return estimateCodeNodeWidth(maxLineLength.value)
+})
+
+const codeCharsPerLine = computed(() => {
+  return estimateCodeNodeCharsPerLine(nodeWidth.value)
+})
+
 const shouldWrapLongLines = computed(() => {
-  return props.wrapLongLines || maxLineLength.value > AUTO_WRAP_LINE_LENGTH
+  return props.wrapLongLines || maxLineLength.value > CODE_NODE_MAX_INLINE_CHARS
+})
+
+const shikiTheme = computed(() => {
+  return props.uiTheme === 'light' ? 'github-light' : 'github-dark'
+})
+
+const twoslashShown = ref(false)
+const twoslashHtml = ref('')
+
+const showTwoslashPane = computed(() => {
+  return twoslashShown.value && twoslashHtml.value.length > 0
+})
+
+let finalSwapTimer: ReturnType<typeof setTimeout> | null = null
+let twoslashRequestId = 0
+
+function getLastMagicMoveStepIndex() {
+  return Math.max(0, (props.magicMoveSteps?.length ?? 1) - 1)
+}
+
+function clearFinalSwapTimer() {
+  if (!finalSwapTimer) return
+  clearTimeout(finalSwapTimer)
+  finalSwapTimer = null
+}
+
+function scheduleFinalSwap() {
+  if (!isClient) return
+
+  clearFinalSwapTimer()
+  finalSwapTimer = setTimeout(() => {
+    if (!canRenderTwoslash.value || !hasMagicMoveSteps.value) return
+    if (props.stepIndex >= getLastMagicMoveStepIndex()) {
+      twoslashShown.value = true
+    }
+  }, TWOSLASH_SWAP_DELAY_MS)
+}
+
+function handleMagicMoveEnd() {
+  if (!canRenderTwoslash.value || !hasMagicMoveSteps.value) return
+  if (props.stepIndex < getLastMagicMoveStepIndex()) return
+
+  clearFinalSwapTimer()
+  twoslashShown.value = true
+}
+
+watch([canRenderTwoslash, hasMagicMoveSteps], ([enabled, hasSteps]) => {
+  if (!enabled) {
+    clearFinalSwapTimer()
+    twoslashShown.value = false
+    return
+  }
+
+  if (!hasSteps) {
+    twoslashShown.value = true
+    return
+  }
+
+  if (props.stepIndex < getLastMagicMoveStepIndex()) {
+    twoslashShown.value = false
+  }
+}, { immediate: true })
+
+watch(() => props.stepIndex, (stepIndex, previousStepIndex) => {
+  if (!canRenderTwoslash.value || !hasMagicMoveSteps.value) return
+
+  const lastStepIndex = getLastMagicMoveStepIndex()
+
+  if (stepIndex < lastStepIndex) {
+    clearFinalSwapTimer()
+    twoslashShown.value = false
+    return
+  }
+
+  if (previousStepIndex === undefined || previousStepIndex < lastStepIndex) {
+    scheduleFinalSwap()
+  }
+}, { immediate: true })
+
+watch(
+  [twoslashShown, canRenderTwoslash, finalCode, shikiTheme, highlighter, twoslashLanguage],
+  async ([shown, canRender, code, theme, hl, language]) => {
+    if (!shown || !canRender || !hl || !language) {
+      return
+    }
+
+    const requestId = ++twoslashRequestId
+
+    try {
+      const html = await renderTwoslashHtml({
+        highlighter: hl,
+        code,
+        language,
+        theme,
+      })
+
+      if (requestId !== twoslashRequestId) return
+      twoslashHtml.value = html
+    } catch {
+      if (requestId !== twoslashRequestId) return
+      twoslashHtml.value = ''
+    }
+  },
+  { immediate: true },
+)
+
+onUnmounted(() => {
+  clearFinalSwapTimer()
 })
 
 const precompiledSteps = computed<KeyedTokensInfo[] | null>(() => {
@@ -84,15 +243,17 @@ const precompiledSteps = computed<KeyedTokensInfo[] | null>(() => {
   const requestedLang = props.language ?? 'typescript'
 
   try {
-    return codeSequence.value.map((code) => codeToKeyedTokens(
-      hl as never,
-      code,
-      {
-        lang: requestedLang,
-        theme: 'github-dark',
-      } as never,
-      false,
-    ))
+    return codeSequence.value.map((code) =>
+      codeToKeyedTokens(
+        hl as never,
+        code,
+        {
+          lang: requestedLang,
+          theme: shikiTheme.value,
+        } as never,
+        false,
+      ),
+    )
   } catch {
     return null
   }
@@ -113,7 +274,7 @@ function estimateWrappedLines(text: string, charsPerLine = 44) {
 const codeViewportHeight = computed(() => {
   const maxLines = codeVariants.value.reduce((max, code) => {
     const lines = shouldWrapLongLines.value
-      ? estimateWrappedLines(code)
+      ? estimateWrappedLines(code, codeCharsPerLine.value)
       : code.split('\n').length
 
     return Math.max(max, lines)
@@ -175,7 +336,8 @@ const magicMoveOptions = {
 
 <template>
   <div
-    class="fn-node w-[340px] rounded-lg border border-border bg-card overflow-hidden"
+    class="fn-node rounded-lg border border-border bg-card overflow-hidden"
+    :style="{ width: `${nodeWidth}px` }"
     :data-active="active"
   >
     <Handle type="target" :position="Position.Left" />
@@ -188,29 +350,36 @@ const magicMoveOptions = {
 
     <!-- Code -->
     <div
-      class="fn-code-stage px-3 py-2.5 overflow-y-auto transition-[height] duration-300 ease-out"
+      class="fn-code-stage nowheel nopan px-3 py-2.5 overflow-y-auto transition-[height] duration-300 ease-out"
       :class="shouldWrapLongLines ? 'overflow-x-hidden' : 'overflow-x-auto'"
       :style="{ height: `${codeViewportHeight}px` }"
       :data-wrap="shouldWrapLongLines"
     >
+      <div
+        v-if="showTwoslashPane"
+        class="fn-twoslash"
+        v-html="twoslashHtml"
+      />
       <ShikiMagicMovePrecompiled
-        v-if="!shouldWrapLongLines && precompiledSteps && precompiledSteps.length > 0"
+        v-else-if="!shouldWrapLongLines && precompiledSteps && precompiledSteps.length > 0"
         :steps="precompiledSteps"
         :step="precompiledStepIndex"
         :options="magicMoveOptions"
+        @end="handleMagicMoveEnd"
       />
       <ShikiMagicMove
         v-else-if="highlighter"
         :highlighter="highlighter"
         :code="displayCode"
         :lang="language"
-        theme="github-dark"
+        :theme="shikiTheme"
         :options="magicMoveOptions"
         class="!bg-transparent"
+        @end="handleMagicMoveEnd"
       />
       <pre
         v-else
-        class="text-xs text-muted-foreground font-mono"
+        class="fn-static-code text-xs text-muted-foreground font-mono"
         :class="shouldWrapLongLines ? 'whitespace-pre-wrap break-words' : 'whitespace-pre'"
       ><code>{{ displayCode }}</code></pre>
     </div>
@@ -218,7 +387,7 @@ const magicMoveOptions = {
     <!-- Story -->
     <div
       v-if="hasNarrative"
-      class="px-3 py-2 border-t border-border/50 overflow-y-auto overflow-x-hidden transition-[height] duration-300 ease-out"
+      class="nowheel nopan px-3 py-2 border-t border-border/50 overflow-y-auto overflow-x-hidden transition-[height] duration-300 ease-out"
       :style="{ height: `${narrativeViewportHeight}px` }"
     >
       <div class="min-h-full">
@@ -244,20 +413,42 @@ const magicMoveOptions = {
 
 <style scoped>
 .fn-code-stage[data-wrap="false"] :deep(.shiki-magic-move-container),
-.fn-code-stage[data-wrap="false"] :deep(pre) {
+.fn-code-stage[data-wrap="false"] :deep(.fn-static-code),
+.fn-code-stage[data-wrap="false"] :deep(.fn-twoslash),
+.fn-code-stage[data-wrap="false"] :deep(.fn-twoslash .twoslash),
+.fn-code-stage[data-wrap="false"] :deep(.fn-twoslash pre.shiki) {
   display: inline-block;
   width: max-content;
   min-width: max-content;
 }
 
 .fn-code-stage[data-wrap="true"] :deep(.shiki-magic-move-container),
-.fn-code-stage[data-wrap="true"] :deep(pre),
-.fn-code-stage[data-wrap="true"] :deep(pre code) {
+.fn-code-stage[data-wrap="true"] :deep(.fn-static-code),
+.fn-code-stage[data-wrap="true"] :deep(.fn-static-code code),
+.fn-code-stage[data-wrap="true"] :deep(.fn-twoslash),
+.fn-code-stage[data-wrap="true"] :deep(.fn-twoslash .twoslash),
+.fn-code-stage[data-wrap="true"] :deep(.fn-twoslash pre.shiki),
+.fn-code-stage[data-wrap="true"] :deep(.fn-twoslash pre.shiki > code) {
   display: block;
   width: 100%;
   min-width: 0 !important;
   white-space: pre-wrap !important;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.fn-twoslash :deep(pre.shiki) {
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+}
+
+.fn-twoslash :deep(pre.shiki code) {
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.fn-twoslash :deep(.twoslash-popup-container) {
+  max-width: min(520px, calc(100vw - 5rem));
 }
 </style>

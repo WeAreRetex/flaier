@@ -38,6 +38,7 @@ export interface CodeNodeProps {
   story?: string
   wrapLongLines?: boolean
   magicMoveSteps?: MagicMoveStep[]
+  twoslash?: boolean
 }
 
 /** Props for prose/description nodes */

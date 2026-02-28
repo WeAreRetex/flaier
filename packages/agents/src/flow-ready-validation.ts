@@ -14,6 +14,9 @@ const FLOW_COMPONENT_TYPES = new Set([
   'LinkNode',
 ])
 
+const TWOSLASH_SUPPORTED_LANGUAGES = new Set(['typescript', 'ts', 'tsx'])
+const TWOSLASH_HINT_PATTERN = /(?:\^\?|\^\||@errors\b|@log\b|@warn\b|@annotate\b|@include\b)/m
+
 export function validateFlowNarratorReadiness(spec: FlowSpec): FlowReadinessResult {
   const errors: string[] = []
   const warnings: string[] = []
@@ -147,8 +150,24 @@ function validateElementProps(
       expectOptionalString(props, 'comment', key, errors)
       expectOptionalString(props, 'story', key, errors)
       expectOptionalBoolean(props, 'wrapLongLines', key, errors)
+      expectOptionalBoolean(props, 'twoslash', key, errors)
+
+      const language = typeof props.language === 'string'
+        ? props.language.trim().toLowerCase()
+        : 'typescript'
+      const twoslash = props.twoslash
+
+      if (twoslash === true) {
+        if (!TWOSLASH_SUPPORTED_LANGUAGES.has(language)) {
+          warnings.push(
+            `Element "${key}" enables twoslash with language "${language}"; prefer TypeScript/TSX snippets for reliable twoslash output.`,
+          )
+        }
+      }
 
       const magicMoveSteps = props.magicMoveSteps
+      const validStepCodes: string[] = []
+
       if (magicMoveSteps !== undefined) {
         if (!Array.isArray(magicMoveSteps)) {
           errors.push(`Element "${key}" prop "magicMoveSteps" must be an array when provided.`)
@@ -163,6 +182,8 @@ function validateElementProps(
 
           if (!isNonEmptyString(step.code)) {
             errors.push(`Element "${key}" magicMoveSteps[${index}] must include non-empty string "code".`)
+          } else {
+            validStepCodes.push(step.code)
           }
 
           for (const optionalKey of ['title', 'comment', 'story', 'speaker'] as const) {
@@ -178,6 +199,38 @@ function validateElementProps(
       const code = typeof props.code === 'string' ? props.code : ''
       if (code.length < 8) {
         warnings.push(`Element "${key}" has very short code content; consider a more representative snippet.`)
+      }
+
+      const allCodeVariants = [code, ...validStepCodes]
+      const finalCode = validStepCodes.length > 0
+        ? validStepCodes[validStepCodes.length - 1] ?? code
+        : code
+      const hasAnyTwoslashHints = allCodeVariants.some((snippet) => hasTwoslashHints(snippet))
+      const finalCodeHasTwoslashHints = hasTwoslashHints(finalCode)
+
+      if (hasAnyTwoslashHints && !TWOSLASH_SUPPORTED_LANGUAGES.has(language)) {
+        warnings.push(
+          `Element "${key}" includes twoslash markers but language is "${language}"; use TypeScript/TSX for reliable twoslash output.`,
+        )
+      }
+
+      if (twoslash === true && !hasAnyTwoslashHints) {
+        warnings.push(
+          `Element "${key}" sets twoslash=true but has no twoslash markers (for example // ^?); add markers to show meaningful callouts.`,
+        )
+      }
+
+      if (twoslash === false && hasAnyTwoslashHints) {
+        warnings.push(
+          `Element "${key}" includes twoslash markers but twoslash is explicitly disabled (twoslash=false).`,
+        )
+      }
+
+      const twoslashInspectionEnabled = twoslash === true || (twoslash !== false && hasAnyTwoslashHints)
+      if (twoslashInspectionEnabled && validStepCodes.length > 0 && hasAnyTwoslashHints && !finalCodeHasTwoslashHints) {
+        warnings.push(
+          `Element "${key}" has twoslash markers only in non-final magicMoveSteps; move markers to the final step code so the post-animation twoslash frame shows callouts.`,
+        )
       }
 
       break
@@ -350,4 +403,8 @@ function isFlowElement(value: unknown): value is FlowElement {
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0
+}
+
+function hasTwoslashHints(code: string) {
+  return TWOSLASH_HINT_PATTERN.test(code)
 }

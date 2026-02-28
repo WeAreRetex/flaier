@@ -44,8 +44,9 @@ export const catalog = defineCatalog(schema, {
         story: z.string().optional(),
         wrapLongLines: z.boolean().default(false),
         magicMoveSteps: z.array(magicMoveStepSchema).optional(),
+        twoslash: z.boolean().optional(),
       }),
-      description: 'Code block with syntax highlighting, step-by-step magic-move transitions, and optional narration/story beats',
+      description: 'Code block with syntax highlighting, step-by-step magic-move transitions, optional twoslash callouts, and narration/story beats',
     },
     DescriptionNode: {
       props: z.object({

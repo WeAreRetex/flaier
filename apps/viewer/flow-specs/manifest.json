@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "defaultFlowId": "hello-world-flow",
+  "defaultFlowId": "twoslash-handoff",
   "flows": [
     {
       "id": "hello-world-flow",
@@ -9,6 +9,14 @@
       "src": "./hello-world.flow.json",
       "tags": ["sample"],
       "entrypoints": ["src/index.ts"]
+    },
+    {
+      "id": "twoslash-handoff",
+      "title": "Twoslash Handoff",
+      "description": "Magic move first, then twoslash callouts",
+      "src": "./twoslash-handoff.flow.json",
+      "tags": ["sample", "twoslash"],
+      "entrypoints": ["src/components/nodes/CodeNode.vue"]
     }
   ]
 }

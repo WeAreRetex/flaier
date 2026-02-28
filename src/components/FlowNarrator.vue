@@ -400,15 +400,33 @@ function createFetchCandidates(source: string) {
   if (!trimmed) return []
 
   const hasJsonSuffix = /\.json(?:[?#].*)?$/i.test(trimmed)
-  const candidates: string[] = []
+  const candidates: string[] = [trimmed]
 
-  if (!hasJsonSuffix) {
-    const normalized = trimmed.endsWith('/') ? trimmed : `${trimmed}/`
-    candidates.push(`${normalized}manifest.json`)
+  if (!hasJsonSuffix && !isLikelyFlowSpecEndpoint(trimmed)) {
+    candidates.push(appendManifestJsonPath(trimmed))
   }
 
-  candidates.push(trimmed)
   return Array.from(new Set(candidates))
+}
+
+function isLikelyFlowSpecEndpoint(value: string) {
+  return /\/api\/flows\/spec\/[^/?#]+(?:[?#].*)?$/i.test(value)
+}
+
+function appendManifestJsonPath(value: string) {
+  const hashSplit = value.split('#', 2)
+  const pathAndQuery = hashSplit[0] ?? ''
+  const hash = hashSplit[1] ?? ''
+
+  const querySplit = pathAndQuery.split('?', 2)
+  const path = querySplit[0] ?? ''
+  const query = querySplit[1] ?? ''
+
+  const normalizedPath = path.endsWith('/') ? path : `${path}/`
+  const manifestPath = `${normalizedPath}manifest.json`
+  const withQuery = query ? `${manifestPath}?${query}` : manifestPath
+
+  return hash ? `${withQuery}#${hash}` : withQuery
 }
 
 async function fetchJsonSource(source: string) {
