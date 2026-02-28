@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "defaultFlowId": "hello-world-flow",
+  "flows": [
+    {
+      "id": "hello-world-flow",
+      "title": "Hello World Flow",
+      "description": "Sample local flow for the Nuxt viewer layer",
+      "src": "./hello-world.flow.json",
+      "tags": ["sample"],
+      "entrypoints": ["src/index.ts"]
+    }
+  ]
+}

@@ -1,9 +1,9 @@
 @import "tailwindcss";
-@source "./**/*.{vue,ts,js,tsx,jsx}";
-@source "../dev/**/*.{html,vue,ts,js,tsx,jsx}";
 @import "@vue-flow/core/dist/style.css";
 @import "@vue-flow/core/dist/theme-default.css";
 @import "shiki-magic-move/dist/style.css";
+@source "./**/*.{vue,ts,js,tsx,jsx}";
+@source "../dev/**/*.{html,vue,ts,js,tsx,jsx}";
 
 @theme {
   --color-border: oklch(0.25 0.005 260);

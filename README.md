@@ -9,6 +9,13 @@ bun install
 bun run dev
 ```
 
+### Run Nuxt viewer layer
+
+```bash
+bun --cwd ./apps/viewer install
+bun run viewer:dev
+```
+
 ## AI Artifact Model
 
 `FlowNarrator` accepts:
@@ -64,3 +71,17 @@ bun run flows:manifest -- --dir ./flow-specs --out ./flow-specs/manifest.json
 ```
 
 This scans `*.flow.json` files and writes a manifest that the viewer can load directly.
+
+## Packages and apps
+
+- `flow-narrator` (this package): Vue component library + json-render catalog/registry exports.
+- `packages/agents`: CLI tools for AI harnesses (manifest generation + validation).
+- `apps/viewer`: Nuxt layer/app that reads local specs from disk and renders them through `FlowNarrator`.
+
+### Agents package quick start
+
+```bash
+bun --cwd ./packages/agents install
+bun run agents:manifest -- --dir ./dev/flow-specs --out ./dev/flow-specs/manifest.json
+bun run agents:validate -- ./dev/flow-specs/manifest.json
+```

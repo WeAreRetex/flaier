@@ -21,7 +21,11 @@
     "build": "BUILD_LIB=1 vite build",
     "test": "bun test",
     "typecheck": "vue-tsc --noEmit",
-    "flows:manifest": "bun ./scripts/build-flow-manifest.ts"
+    "flows:manifest": "bun ./scripts/build-flow-manifest.ts",
+    "viewer:dev": "bun run --cwd ./apps/viewer dev",
+    "viewer:build": "bun run --cwd ./apps/viewer build",
+    "agents:manifest": "FLOW_NARRATOR_ROOT=$PWD bun run --cwd ./packages/agents manifest",
+    "agents:validate": "FLOW_NARRATOR_ROOT=$PWD bun run --cwd ./packages/agents validate"
   },
   "dependencies": {
     "@dagrejs/dagre": "^2.0.4",

@@ -6,6 +6,8 @@ dist/
 dev-dist/
 out/
 *.tgz
+.nuxt/
+.output/
 
 # logs
 logs/

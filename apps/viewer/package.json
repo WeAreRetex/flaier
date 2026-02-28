@@ -1,0 +1,17 @@
+{
+  "name": "@flow-narrator/viewer",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "preview": "nuxt preview",
+    "prepare": "nuxt prepare"
+  },
+  "dependencies": {
+    "flow-narrator": "file:../..",
+    "nuxt": "^4.2.0",
+    "vue": "^3.5.0"
+  }
+}
