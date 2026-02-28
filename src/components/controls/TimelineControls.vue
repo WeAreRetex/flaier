@@ -133,11 +133,11 @@ const hasChoices = computed(() => (props.choices?.length ?? 0) > 0)
     </div>
 
     <div v-if="hasChoices" class="mt-2 border-t border-border/60 pt-2 px-1.5">
-      <p class="text-[10px] uppercase tracking-wider text-muted-foreground">Choose Next Path</p>
+      <p class="text-[10px] uppercase tracking-wider text-muted-foreground">Choose Next Path (1-9)</p>
 
       <div class="mt-1.5 flex flex-wrap gap-1.5">
         <button
-          v-for="choice in props.choices"
+          v-for="(choice, index) in props.choices"
           :key="choice.id"
           class="rounded-lg border px-2 py-1 text-[11px] transition-colors text-left"
           :class="choice.id === props.selectedChoiceId
@@ -145,7 +145,15 @@ const hasChoices = computed(() => (props.choices?.length ?? 0) > 0)
             : 'border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/60'"
           @click="emit('chooseChoice', choice.id)"
         >
-          {{ choice.label }}
+          <span class="flex items-center gap-1.5">
+            <span
+              v-if="index < 9"
+              class="inline-flex h-4 min-w-4 items-center justify-center rounded border border-border/70 bg-background/65 px-1 text-[10px] font-medium tabular-nums"
+            >
+              {{ index + 1 }}
+            </span>
+            <span>{{ choice.label }}</span>
+          </span>
         </button>
       </div>
 

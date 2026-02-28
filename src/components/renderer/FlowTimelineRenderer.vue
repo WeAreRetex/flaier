@@ -1244,9 +1244,53 @@ function handleDocumentPointerDown(event: PointerEvent) {
   closeHeaderDropdown()
 }
 
+function isEditableTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+
+  if (target.isContentEditable) {
+    return true
+  }
+
+  const tagName = target.tagName
+  if (tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT') {
+    return true
+  }
+
+  return Boolean(target.closest('[contenteditable="true"]'))
+}
+
 function handleDocumentKeydown(event: KeyboardEvent) {
-  if (event.key !== 'Escape') return
-  closeHeaderDropdown()
+  if (event.key === 'Escape') {
+    closeHeaderDropdown()
+    return
+  }
+
+  if (event.defaultPrevented) return
+  if (event.metaKey || event.ctrlKey || event.altKey) return
+  if (isEditableTarget(event.target)) return
+
+  if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+    event.preventDefault()
+    next()
+    return
+  }
+
+  if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+    event.preventDefault()
+    prev()
+    return
+  }
+
+  if (/^[1-9]$/.test(event.key)) {
+    const index = Number(event.key) - 1
+    const choice = branchChoices.value[index]
+    if (!choice) return
+
+    event.preventDefault()
+    chooseChoice(choice.id)
+  }
 }
 
 function syncOverviewModeFromZoom(zoom: number) {
