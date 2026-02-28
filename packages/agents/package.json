@@ -5,7 +5,8 @@
   "private": true,
   "scripts": {
     "manifest": "bun ./src/manifest.ts",
-    "validate": "bun ./src/validate.ts"
+    "validate": "bun ./src/validate.ts",
+    "scaffold": "bun ./src/scaffold.ts"
   },
   "dependencies": {
     "@json-render/core": "latest"

@@ -75,13 +75,14 @@ This scans `*.flow.json` files and writes a manifest that the viewer can load di
 ## Packages and apps
 
 - `flow-narrator` (this package): Vue component library + json-render catalog/registry exports.
-- `packages/agents`: CLI tools for AI harnesses (manifest generation + validation).
+- `packages/agents`: skill + CLI tools for generating, validating, and packaging flow specs.
 - `apps/viewer`: Nuxt layer/app that reads local specs from disk and renders them through `FlowNarrator`.
 
 ### Agents package quick start
 
 ```bash
 bun --cwd ./packages/agents install
+bun run agents:scaffold -- --title "Checkout Flow" --template branching --out ./dev/flow-specs/checkout.flow.json
 bun run agents:manifest -- --dir ./dev/flow-specs --out ./dev/flow-specs/manifest.json
 bun run agents:validate -- ./dev/flow-specs/manifest.json
 ```

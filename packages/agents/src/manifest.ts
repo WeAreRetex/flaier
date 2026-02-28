@@ -1,25 +1,39 @@
-import { basename, dirname, extname, join, relative, resolve } from 'node:path'
-
-interface FlowFileMetadata {
-  id: string
-  title?: string
-  description?: string
-  src: string
-}
-
-interface ManifestOutput {
-  version: number
-  defaultFlowId?: string
-  flows: FlowFileMetadata[]
-}
+import { mkdir } from 'node:fs/promises'
+import { dirname, join, relative } from 'node:path'
+import { autoFixSpec, formatSpecIssues, type Spec, validateSpec } from '@json-render/core'
+import { validateFlowNarratorReadiness } from './flow-ready-validation'
+import {
+  asNonEmptyString,
+  ensureUniqueId,
+  getInvocationCwd,
+  getSpecMetadata,
+  hasFlag,
+  isFlowSpec,
+  readArgValue,
+  readJson,
+  resolveDefaultFlowId,
+  resolveFromInvocationCwd,
+  type FlowManifest,
+  type FlowManifestFlow,
+  type FlowSpec,
+  writeJson,
+} from './shared'
 
 const args = Bun.argv.slice(2)
-const invocationCwd = process.env.FLOW_NARRATOR_ROOT ?? process.env.INIT_CWD ?? process.cwd()
+
+if (hasFlag(args, '--help') || hasFlag(args, '-h')) {
+  printUsage()
+  process.exit(0)
+}
+
+const invocationCwd = getInvocationCwd()
 const dirArg = readArgValue(args, '--dir') ?? 'flow-specs'
 const outArg = readArgValue(args, '--out') ?? join(dirArg, 'manifest.json')
-const dir = resolveFromInvocationCwd(dirArg)
-const out = resolveFromInvocationCwd(outArg)
-const defaultFlowId = readArgValue(args, '--default')
+const defaultFlowIdArg = readArgValue(args, '--default')
+const skipValidation = hasFlag(args, '--skip-validate')
+
+const dir = resolveFromInvocationCwd(dirArg, invocationCwd)
+const out = resolveFromInvocationCwd(outArg, invocationCwd)
 
 const flowFiles = await collectFlowFiles(dir)
 
@@ -27,42 +41,55 @@ if (flowFiles.length === 0) {
   throw new Error(`No *.flow.json files found in "${dir}".`)
 }
 
+await mkdir(dirname(out), { recursive: true })
+
 const outputDir = dirname(out)
-const flows: FlowFileMetadata[] = []
+const usedIds = new Set<string>()
+const flows: FlowManifestFlow[] = []
 
 for (const filePath of flowFiles) {
-  const metadata = await readFlowMetadata(filePath)
+  const spec = await readFlowSpec(filePath)
+
+  if (!skipValidation) {
+    assertSpecValidity(spec, filePath)
+  }
+
+  const metadata = getSpecMetadata(spec, filePath)
+  const id = ensureUniqueId(metadata.id, usedIds)
+
+  if (id !== metadata.id) {
+    console.warn(`- adjusted duplicate id "${metadata.id}" -> "${id}" (${filePath})`)
+  }
+
   const relativeSource = relative(outputDir, filePath).replace(/\\/g, '/')
 
   flows.push({
-    id: metadata.id,
+    id,
     title: metadata.title,
     description: metadata.description,
+    tags: metadata.tags,
+    entrypoints: metadata.entrypoints,
     src: relativeSource.startsWith('.') ? relativeSource : `./${relativeSource}`,
   })
 }
 
-const manifest: ManifestOutput = {
+const flowIds = flows.map((flow) => flow.id)
+const preferredDefault = asNonEmptyString(defaultFlowIdArg)
+const defaultFlowId = resolveDefaultFlowId(preferredDefault, flowIds)
+
+if (preferredDefault && preferredDefault !== defaultFlowId) {
+  console.warn(`- requested default flow "${preferredDefault}" not found, using "${defaultFlowId}"`)
+}
+
+const manifest: FlowManifest = {
   version: 1,
-  defaultFlowId: resolveDefaultFlowId(defaultFlowId, flows),
+  defaultFlowId,
   flows,
 }
 
-await Bun.write(out, `${JSON.stringify(manifest, null, 2)}\n`)
+await writeJson(out, manifest)
 
 console.log(`Wrote ${flows.length} flows to ${out}`)
-
-function readArgValue(argv: string[], key: string) {
-  const index = argv.indexOf(key)
-  if (index < 0) return undefined
-
-  const value = argv[index + 1]
-  return value && !value.startsWith('--') ? value : undefined
-}
-
-function resolveFromInvocationCwd(value: string) {
-  return resolve(invocationCwd, value)
-}
 
 async function collectFlowFiles(directory: string) {
   const entries: string[] = []
@@ -76,50 +103,52 @@ async function collectFlowFiles(directory: string) {
   return entries
 }
 
-async function readFlowMetadata(filePath: string) {
-  const text = await Bun.file(filePath).text()
-  const payload = JSON.parse(text) as unknown
+async function readFlowSpec(filePath: string): Promise<FlowSpec> {
+  const payload = await readJson(filePath)
 
-  if (!isObject(payload) || typeof payload.root !== 'string' || !isObject(payload.elements)) {
-    throw new Error(`Invalid flow spec shape in "${filePath}".`)
+  if (!isFlowSpec(payload)) {
+    throw new Error(`File "${filePath}" is not a valid flow spec.`)
   }
 
-  const rootElement = payload.elements[payload.root]
-  const rootProps = isObject(rootElement) && isObject(rootElement.props)
-    ? rootElement.props
-    : undefined
+  const fixed = autoFixSpec(payload as unknown as Spec)
+  return fixed.spec as FlowSpec
+}
 
-  return {
-    id: createIdFromFile(filePath),
-    title: toOptionalString(rootProps?.title),
-    description: toOptionalString(rootProps?.description),
+function assertSpecValidity(spec: FlowSpec, filePath: string) {
+  const schemaValidation = validateSpec(spec as unknown as Spec)
+  if (!schemaValidation.valid) {
+    throw new Error(`Invalid spec shape in "${filePath}":\n${formatSpecIssues(schemaValidation.issues)}`)
+  }
+
+  const readiness = validateFlowNarratorReadiness(spec)
+  if (readiness.errors.length > 0) {
+    throw new Error(`Flow readiness errors in "${filePath}":\n${formatIssues(readiness.errors)}`)
+  }
+
+  if (readiness.warnings.length > 0) {
+    console.warn(`- warnings for ${filePath}:\n${formatIssues(readiness.warnings)}`)
   }
 }
 
-function resolveDefaultFlowId(preferred: string | undefined, flows: FlowFileMetadata[]) {
-  if (preferred && flows.some((flow) => flow.id === preferred)) {
-    return preferred
-  }
-
-  return flows[0]?.id
+function formatIssues(issues: string[]) {
+  return issues
+    .map((issue) => `  - ${issue}`)
+    .join('\n')
 }
 
-function createIdFromFile(filePath: string) {
-  const fileName = basename(filePath)
-  const withoutExt = fileName.slice(0, fileName.length - extname(fileName).length)
-
-  return withoutExt
-    .replace(/\.flow$/i, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    || 'flow'
-}
-
-function toOptionalString(value: unknown) {
-  return typeof value === 'string' && value.length > 0 ? value : undefined
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
+function printUsage() {
+  console.log(
+    [
+      'Build a flow manifest from local *.flow.json files.',
+      '',
+      'Usage:',
+      '  bun ./src/manifest.ts --dir ./flow-specs --out ./flow-specs/manifest.json',
+      '',
+      'Options:',
+      '  --dir <path>             Directory to scan (default: flow-specs)',
+      '  --out <path>             Manifest file path (default: <dir>/manifest.json)',
+      '  --default <flow-id>      Preferred default flow id',
+      '  --skip-validate          Skip schema/readiness checks before writing manifest',
+    ].join('\n'),
+  )
 }

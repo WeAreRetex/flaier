@@ -1,9 +1,28 @@
 import { dirname, resolve } from 'node:path'
 import { autoFixSpec, formatSpecIssues, type Spec, validateSpec } from '@json-render/core'
+import { validateFlowNarratorReadiness } from './flow-ready-validation'
+import {
+  asNonEmptyString,
+  getInvocationCwd,
+  hasFlag,
+  isFlowManifest,
+  isFlowSpec,
+  isObject,
+  readJson,
+  type FlowManifest,
+  type FlowManifestFlow,
+  type FlowSpec,
+} from './shared'
 
 const args = Bun.argv.slice(2)
+
+if (hasFlag(args, '--help') || hasFlag(args, '-h')) {
+  printUsage()
+  process.exit(0)
+}
+
 const input = args[0]
-const invocationCwd = process.env.FLOW_NARRATOR_ROOT ?? process.env.INIT_CWD ?? process.cwd()
+const invocationCwd = getInvocationCwd()
 
 if (!input) {
   throw new Error('Usage: bun ./src/validate.ts <spec-or-manifest.json>')
@@ -12,35 +31,33 @@ if (!input) {
 const absoluteInput = resolve(invocationCwd, input)
 const payload = await readJson(absoluteInput)
 
-if (isManifest(payload)) {
-  await validateManifest(payload, dirname(absoluteInput))
+if (isFlowManifest(payload)) {
+  await validateManifest(payload, dirname(absoluteInput), input)
   process.exit(0)
 }
 
-if (isSpec(payload)) {
+if (isFlowSpec(payload)) {
   validateAndPrintSpec(payload, absoluteInput)
   process.exit(0)
 }
 
 throw new Error(`"${input}" is neither a flow manifest nor a flow spec.`)
 
-async function validateManifest(
-  manifest: { defaultFlowId?: unknown; flows: unknown[] },
-  manifestDir: string,
-) {
+async function validateManifest(manifest: FlowManifest, manifestDir: string, manifestLabel: string) {
   const flowIds = new Set<string>()
 
   if (manifest.flows.length === 0) {
     throw new Error('Manifest has no flows.')
   }
 
-  let totalSpecs = 0
+  let totalValidatedSpecs = 0
 
-  for (const [index, flow] of manifest.flows.entries()) {
-    if (!isObject(flow)) {
+  for (const [index, rawFlow] of manifest.flows.entries()) {
+    if (!isObject(rawFlow)) {
       throw new Error(`Flow entry at index ${index} is not an object.`)
     }
 
+    const flow = rawFlow as FlowManifestFlow
     const id = asNonEmptyString(flow.id)
     if (!id) {
       throw new Error(`Flow entry at index ${index} is missing a valid id.`)
@@ -54,29 +71,30 @@ async function validateManifest(
     const source = flow.src
     if (typeof source === 'string') {
       if (/^https?:\/\//i.test(source)) {
-        console.log(`- ${id}: remote source (${source}) skipped`) 
+        console.log(`- ${id}: remote source (${source}) skipped`)
         continue
       }
 
       const sourcePath = resolve(manifestDir, source)
       const sourceFile = Bun.file(sourcePath)
+
       if (!(await sourceFile.exists())) {
         throw new Error(`Flow "${id}" source does not exist: ${sourcePath}`)
       }
 
       const specPayload = await readJson(sourcePath)
-      if (!isSpec(specPayload)) {
+      if (!isFlowSpec(specPayload)) {
         throw new Error(`Flow "${id}" source is not a valid spec: ${sourcePath}`)
       }
 
       validateAndPrintSpec(specPayload, sourcePath, id)
-      totalSpecs += 1
+      totalValidatedSpecs += 1
       continue
     }
 
-    if (isSpec(source)) {
-      validateAndPrintSpec(source, `${input}#${id}`, id)
-      totalSpecs += 1
+    if (isFlowSpec(source)) {
+      validateAndPrintSpec(source, `${manifestLabel}#${id}`, id)
+      totalValidatedSpecs += 1
       continue
     }
 
@@ -88,47 +106,52 @@ async function validateManifest(
     throw new Error(`Manifest defaultFlowId "${defaultFlowId}" does not exist in flows.`)
   }
 
-  console.log(`Validated manifest with ${flowIds.size} flows (${totalSpecs} local specs checked).`)
+  console.log(`Validated manifest with ${flowIds.size} flows (${totalValidatedSpecs} local specs checked).`)
 }
 
-function validateAndPrintSpec(spec: Record<string, unknown>, label: string, flowId?: string) {
+function validateAndPrintSpec(spec: FlowSpec, label: string, flowId?: string) {
   const fixed = autoFixSpec(spec as unknown as Spec)
-  const validation = validateSpec(fixed.spec)
+  const normalizedSpec = fixed.spec as FlowSpec
+  const schemaValidation = validateSpec(normalizedSpec as unknown as Spec)
 
-  if (!validation.valid) {
+  if (!schemaValidation.valid) {
     const header = flowId ? `Flow ${flowId}` : 'Spec'
-    throw new Error(`${header} invalid (${label}):\n${formatSpecIssues(validation.issues)}`)
+    throw new Error(`${header} invalid (${label}):\n${formatSpecIssues(schemaValidation.issues)}`)
+  }
+
+  const readiness = validateFlowNarratorReadiness(normalizedSpec)
+  if (readiness.errors.length > 0) {
+    const header = flowId ? `Flow ${flowId}` : 'Spec'
+    throw new Error(`${header} is not flow-visualizer ready (${label}):\n${formatIssues(readiness.errors)}`)
+  }
+
+  if (readiness.warnings.length > 0) {
+    const prefix = flowId ? `- ${flowId}` : 'Spec'
+    console.log(`${prefix}: warnings\n${formatIssues(readiness.warnings)}`)
   }
 
   if (flowId) {
-    console.log(`- ${flowId}: valid`) 
+    console.log(`- ${flowId}: valid`)
     return
   }
 
   console.log(`Spec valid: ${label}`)
 }
 
-async function readJson(path: string) {
-  const file = Bun.file(path)
-  if (!(await file.exists())) {
-    throw new Error(`File does not exist: ${path}`)
-  }
-
-  return JSON.parse(await file.text()) as unknown
+function formatIssues(issues: string[]) {
+  return issues
+    .map((issue) => `  - ${issue}`)
+    .join('\n')
 }
 
-function isManifest(value: unknown): value is { defaultFlowId?: unknown; flows: unknown[] } {
-  return isObject(value) && Array.isArray(value.flows)
-}
-
-function isSpec(value: unknown): value is Record<string, unknown> {
-  return isObject(value) && typeof value.root === 'string' && isObject(value.elements)
-}
-
-function asNonEmptyString(value: unknown) {
-  return typeof value === 'string' && value.length > 0 ? value : undefined
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
+function printUsage() {
+  console.log(
+    [
+      'Validate a single flow spec or a multi-flow manifest.',
+      '',
+      'Usage:',
+      '  bun ./src/validate.ts ./flow-specs/manifest.json',
+      '  bun ./src/validate.ts ./flow-specs/auth-login.flow.json',
+    ].join('\n'),
+  )
 }

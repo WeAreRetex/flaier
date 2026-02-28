@@ -24,6 +24,7 @@
     "flows:manifest": "bun ./scripts/build-flow-manifest.ts",
     "viewer:dev": "bun run --cwd ./apps/viewer dev",
     "viewer:build": "bun run --cwd ./apps/viewer build",
+    "agents:scaffold": "FLOW_NARRATOR_ROOT=$PWD bun run --cwd ./packages/agents scaffold",
     "agents:manifest": "FLOW_NARRATOR_ROOT=$PWD bun run --cwd ./packages/agents manifest",
     "agents:validate": "FLOW_NARRATOR_ROOT=$PWD bun run --cwd ./packages/agents validate"
   },

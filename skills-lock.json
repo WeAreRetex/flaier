@@ -5,6 +5,11 @@
       "source": "vercel-labs/json-render",
       "sourceType": "github",
       "computedHash": "8e5a55ec66896a82173ab1c84c3dc264069d4a3a2fac6e927b2a40d2fba9e323"
+    },
+    "skill-creator": {
+      "source": "vercel-labs/agent-browser",
+      "sourceType": "github",
+      "computedHash": "0e1196449595117435416d50c130e706cd86010fed959eb3a6d41cf989328506"
     }
   }
 }
