@@ -54,6 +54,8 @@ const DEFAULT_DAGRE_NODE_SEP_HORIZONTAL = 120
 const DEFAULT_DAGRE_RANK_SEP_VERTICAL = 220
 const DEFAULT_DAGRE_NODE_SEP_VERTICAL = 120
 const DEFAULT_DAGRE_EDGE_SEP = 30
+const OVERVIEW_ENTER_ZOOM = 0.52
+const OVERVIEW_EXIT_ZOOM = 0.62
 
 interface NodeSize {
   width: number
@@ -433,6 +435,110 @@ function buildGuidedPath(startKey: string, maxFrames = 450): TimelineFrame[] {
   return frames
 }
 
+function findNearestFrameIndex(frames: TimelineFrame[], nodeKey: string, anchor = 0) {
+  let bestIndex = -1
+  let bestDistance = Number.POSITIVE_INFINITY
+
+  for (let index = 0; index < frames.length; index += 1) {
+    if (frames[index]?.nodeKey !== nodeKey) continue
+
+    const distance = Math.abs(index - anchor)
+    if (distance < bestDistance) {
+      bestDistance = distance
+      bestIndex = index
+    }
+  }
+
+  return bestIndex
+}
+
+function sortOptionsForTraversal(sourceKey: string, options: string[]) {
+  const selected = selectedBranchByNode.value[sourceKey]
+
+  return [...options].sort((a, b) => {
+    const aSelected = a === selected
+    const bSelected = b === selected
+
+    if (aSelected !== bSelected) {
+      return aSelected ? -1 : 1
+    }
+
+    const aIndex = orderedNodeByKey.value[a]?.index ?? Number.MAX_SAFE_INTEGER
+    const bIndex = orderedNodeByKey.value[b]?.index ?? Number.MAX_SAFE_INTEGER
+
+    return aIndex - bIndex
+  })
+}
+
+function findPathKeysToNode(startKey: string, targetKey: string) {
+  if (startKey === targetKey) {
+    return [startKey]
+  }
+
+  const queue: Array<{ key: string; path: string[]; depth: number }> = [{
+    key: startKey,
+    path: [startKey],
+    depth: 0,
+  }]
+
+  const visitedDepth = new Map<string, number>([[startKey, 0]])
+  const maxDepth = Math.max(8, orderedNodeElements.value.length + 8)
+  const maxIterations = Math.max(80, orderedNodeElements.value.length * orderedNodeElements.value.length * 2)
+  let guard = 0
+
+  while (queue.length > 0 && guard < maxIterations) {
+    guard += 1
+
+    const current = queue.shift()
+    if (!current) continue
+    if (current.depth >= maxDepth) continue
+
+    const options = sortOptionsForTraversal(current.key, outgoingNodeKeys.value[current.key] ?? [])
+
+    for (const option of options) {
+      if (!orderedNodeByKey.value[option]) continue
+
+      const nextDepth = current.depth + 1
+      if (option === targetKey) {
+        return [...current.path, option]
+      }
+
+      const knownDepth = visitedDepth.get(option)
+      if (knownDepth !== undefined && knownDepth <= nextDepth) {
+        continue
+      }
+
+      visitedDepth.set(option, nextDepth)
+      queue.push({
+        key: option,
+        path: [...current.path, option],
+        depth: nextDepth,
+      })
+    }
+  }
+
+  return null
+}
+
+function applyBranchSelectionsForPath(pathKeys: string[]) {
+  if (pathKeys.length < 2) return
+
+  const nextSelected = { ...selectedBranchByNode.value }
+
+  for (let index = 0; index < pathKeys.length - 1; index += 1) {
+    const source = pathKeys[index]
+    const target = pathKeys[index + 1]
+    if (!source || !target) continue
+
+    const options = outgoingNodeKeys.value[source] ?? []
+    if (options.length > 1 && options.includes(target)) {
+      nextSelected[source] = target
+    }
+  }
+
+  selectedBranchByNode.value = nextSelected
+}
+
 const totalSteps = computed(() => pathFrames.value.length)
 const maxStepIndex = computed(() => Math.max(0, totalSteps.value - 1))
 
@@ -540,6 +646,48 @@ function togglePlay() {
 
 const activeFrame = computed(() => pathFrames.value[currentStep.value])
 const nextPlannedNodeKey = computed(() => pathFrames.value[currentStep.value + 1]?.nodeKey)
+
+function jumpToNode(nodeKey: string) {
+  if (!orderedNodeByKey.value[nodeKey]) return
+
+  playing.value = false
+
+  const existingIndex = findNearestFrameIndex(pathFrames.value, nodeKey, currentStep.value)
+  if (existingIndex >= 0) {
+    currentStep.value = existingIndex
+    return
+  }
+
+  const start = startNodeKey.value
+  if (!start) {
+    const standaloneFrames = createFramesForNode(nodeKey)
+    if (standaloneFrames.length === 0) return
+
+    pathFrames.value = standaloneFrames
+    currentStep.value = 0
+    return
+  }
+
+  const pathKeys = findPathKeysToNode(start, nodeKey)
+  if (pathKeys) {
+    applyBranchSelectionsForPath(pathKeys)
+  }
+
+  const rebuiltFrames = buildGuidedPath(start)
+  pathFrames.value = rebuiltFrames.length > 0 ? rebuiltFrames : createFramesForNode(start)
+
+  const rebuiltIndex = findNearestFrameIndex(pathFrames.value, nodeKey, currentStep.value)
+  if (rebuiltIndex >= 0) {
+    currentStep.value = rebuiltIndex
+    return
+  }
+
+  const standaloneFrames = createFramesForNode(nodeKey)
+  if (standaloneFrames.length === 0) return
+
+  pathFrames.value = standaloneFrames
+  currentStep.value = 0
+}
 
 const resolvedLayoutEngine = computed<'dagre' | 'manual'>(() => {
   return props.layoutEngine === 'manual' ? 'manual' : DEFAULT_LAYOUT_ENGINE
@@ -1034,12 +1182,48 @@ const containerMinHeight = computed(() => {
 
 const instance = getCurrentInstance()
 const flowId = `flow-narrator-${instance?.uid ?? 0}`
-const { fitView } = useVueFlow(flowId)
+const {
+  fitView,
+  onNodeClick,
+  onViewportChange,
+  viewport,
+} = useVueFlow(flowId)
 const nodesInitialized = useNodesInitialized()
 const paneReady = ref(false)
 const containerRef = ref<HTMLDivElement | null>(null)
 const containerReady = ref(false)
+const overviewMode = ref(false)
 let resizeObserver: ResizeObserver | null = null
+
+function syncOverviewModeFromZoom(zoom: number) {
+  if (overviewMode.value) {
+    if (zoom >= OVERVIEW_EXIT_ZOOM) {
+      overviewMode.value = false
+    }
+
+    return
+  }
+
+  if (zoom <= OVERVIEW_ENTER_ZOOM) {
+    overviewMode.value = true
+  }
+}
+
+watch(() => viewport.value.zoom, (zoom) => {
+  if (!Number.isFinite(zoom)) return
+
+  syncOverviewModeFromZoom(zoom)
+}, { immediate: true })
+
+onViewportChange((transform) => {
+  if (!Number.isFinite(transform.zoom)) return
+
+  syncOverviewModeFromZoom(transform.zoom)
+})
+
+onNodeClick(({ node }) => {
+  jumpToNode(node.id)
+})
 
 function updateContainerReady() {
   const element = containerRef.value
@@ -1109,6 +1293,7 @@ onUnmounted(() => {
     ref="containerRef"
     class="flow-narrator relative h-full w-full font-sans antialiased bg-background transition-[min-height] duration-300 ease-out"
     :style="{ minHeight: `${containerMinHeight}px` }"
+    :data-focus-mode="overviewMode ? 'overview' : 'focus'"
   >
     <VueFlow
       v-if="containerReady"
