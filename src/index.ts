@@ -23,6 +23,8 @@ export type {
   ErrorNodeProps,
   DescriptionNodeProps,
   LinkNodeProps,
+  SourceAnchor,
+  SourceAnchorInput,
   EdgeTransition,
   EdgeTransitionKind,
   MagicMoveStep,

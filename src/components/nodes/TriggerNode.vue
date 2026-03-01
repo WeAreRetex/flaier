@@ -1,10 +1,15 @@
 <script setup lang="ts">
 import { Handle, Position } from '@vue-flow/core'
+import NodeSourceAnchor from './NodeSourceAnchor.vue'
 
 const props = withDefaults(defineProps<{
   label: string
   description?: string
   color?: string
+  sourceAnchor?: {
+    label: string
+    href?: string
+  }
   active?: boolean
 }>(), {
   color: '#22c55e',
@@ -21,6 +26,9 @@ const props = withDefaults(defineProps<{
       <span class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Trigger</span>
     </div>
     <p class="text-sm font-medium text-foreground leading-snug">{{ label }}</p>
+    <div v-if="sourceAnchor?.label" class="mt-1.5 max-w-full">
+      <NodeSourceAnchor :label="sourceAnchor.label" :href="sourceAnchor.href" />
+    </div>
     <p v-if="description" class="text-[11px] text-muted-foreground mt-1 leading-relaxed">{{ description }}</p>
     <Handle type="source" :position="Position.Right" />
   </div>

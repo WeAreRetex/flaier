@@ -10,6 +10,7 @@ Use this checklist before finalizing generated flow specs.
 - Use `DescriptionNode.body` to explain side effects and state changes, not generic filler text.
 - Use realistic, minimal code snippets in `CodeNode.code`.
 - Use `PayloadNode` for data snapshots/transforms and `ErrorNode` for failure states when those concepts matter to the story.
+- Add `sourceAnchor` to key nodes (`path:line` preferred) so readers can jump to relevant source quickly.
 
 ## Interaction Quality
 
@@ -19,6 +20,7 @@ Use this checklist before finalizing generated flow specs.
 - Use `magicMoveSteps` only when step-by-step code reveal adds clarity.
 - Keep long lines manageable with `wrapLongLines` when needed.
 - Use twoslash markers (for example `// ^?`) only on TypeScript/TSX snippets when inline type/error callouts improve understanding; set `twoslash: true` only when you need to force twoslash mode.
+- Keep twoslash snippets self-contained (inline lightweight helper types/interfaces when needed) so browser callouts stay stable without project-global ambient types.
 - For CodeNodes that combine `magicMoveSteps` and twoslash, keep markers in the final step code so the post-animation twoslash inspection frame has visible callouts.
 
 ## Structural Quality
@@ -28,6 +30,7 @@ Use this checklist before finalizing generated flow specs.
 - Remove unreachable nodes unless intentionally preserved for later generation.
 - Keep `state.currentStep` numeric and `state.playing` boolean.
 - Prefer one entry root child and build traversal from that node.
+- Validate `sourceAnchor` references are plausible and include line numbers where available.
 
 ## Packaging Quality
 

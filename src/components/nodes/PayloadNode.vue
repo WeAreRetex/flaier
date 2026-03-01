@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Handle, Position } from '@vue-flow/core'
+import NodeSourceAnchor from './NodeSourceAnchor.vue'
 
 const props = withDefaults(defineProps<{
   label: string
@@ -9,6 +10,10 @@ const props = withDefaults(defineProps<{
   after?: string
   format?: 'json' | 'yaml' | 'text'
   description?: string
+  sourceAnchor?: {
+    label: string
+    href?: string
+  }
   active?: boolean
 }>(), {
   format: 'json',
@@ -38,6 +43,10 @@ const singlePayload = computed(() => {
     </div>
 
     <div class="px-3 py-2.5">
+      <div v-if="sourceAnchor?.label" class="mb-2 max-w-full">
+        <NodeSourceAnchor :label="sourceAnchor.label" :href="sourceAnchor.href" />
+      </div>
+
       <p v-if="description" class="mb-2 text-[11px] text-muted-foreground leading-relaxed">{{ description }}</p>
 
       <div v-if="hasDiff" class="space-y-2">

@@ -31,8 +31,9 @@ bun run manifest -- --dir ./flow-specs --out ./flow-specs/manifest.json
 2. Replace placeholders with real node labels, code snippets, descriptions, links, and branch paths from the target codebase.
 3. Keep one `FlowTimeline` root, start from a concrete `TriggerNode`, and model choices with `DecisionNode` + multiple children.
 4. Add edge metadata with `props.transitions` on branching nodes to label branch choices (`label`, `description`) and semantics (`kind`: `success`, `error`, `warning`, `retry`, `async`, `default`).
-5. Validate each generated spec or full manifest with `validate`.
-6. Build or refresh `manifest.json` with `manifest` after adding/removing flow files.
+5. Add `sourceAnchor` on key nodes so readers can jump from story to exact code locations (`path:line` or `{ path, line, column, href }`).
+6. Validate each generated spec or full manifest with `validate`.
+7. Build or refresh `manifest.json` with `manifest` after adding/removing flow files.
 
 ## Non-Negotiable Output Rules
 
@@ -41,11 +42,14 @@ bun run manifest -- --dir ./flow-specs --out ./flow-specs/manifest.json
 - Ensure every child reference points to an existing element key.
 - Include `state.currentStep` and `state.playing`.
 - Ensure branch labels and descriptions are explicit enough for keyboard branch selection (prefer `props.transitions` metadata on branching nodes).
+- Prefer adding `sourceAnchor` on Trigger/Code/Decision/Error nodes; include line numbers when possible.
 
 ## Twoslash Authoring Rules (CodeNode)
 
 - Twoslash callouts are for TypeScript/TSX snippets (`language: "typescript"`, `"ts"`, or `"tsx"`).
 - Prefer marker-based auto mode (`// ^?`, `// ^|`, `@errors`) over forcing `twoslash: true`.
+- Keep snippets self-contained so twoslash has deterministic context (include key type aliases/interfaces in the snippet when needed).
+- Avoid depending on ambient stage-proposal libs for callouts; if you must reference one, add a minimal inline declaration instead of relying on global `esnext` typings.
 - If `magicMoveSteps` is present, place twoslash markers in the **final** step code.
 - When `magicMoveSteps` + twoslash are used together, the player includes an extra inspection frame after the last code transform.
 - Keep callouts intentional (usually 1-3 markers per node) and tied to meaningful type/error teaching moments.

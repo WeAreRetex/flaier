@@ -4,6 +4,7 @@ import { Handle, Position } from '@vue-flow/core'
 import { ShikiMagicMove, ShikiMagicMovePrecompiled } from 'shiki-magic-move/vue'
 import { codeToKeyedTokens, type KeyedTokensInfo } from 'shiki-magic-move/core'
 import 'shiki-magic-move/dist/style.css'
+import NodeSourceAnchor from './NodeSourceAnchor.vue'
 import {
   CODE_NODE_MAX_INLINE_CHARS,
   estimateCodeNodeCharsPerLine,
@@ -29,6 +30,10 @@ const props = withDefaults(defineProps<{
   wrapLongLines?: boolean
   magicMoveSteps?: MagicMoveStep[]
   twoslash?: boolean
+  sourceAnchor?: {
+    label: string
+    href?: string
+  }
   uiTheme?: 'dark' | 'light'
   active?: boolean
   stepIndex?: number
@@ -98,6 +103,18 @@ const twoslashRequested = computed(() => {
 
 const twoslashLanguage = computed(() => {
   return normalizeTwoslashLanguage(props.language)
+})
+
+const displaySourceAnchor = computed(() => {
+  if (props.sourceAnchor?.label) {
+    return props.sourceAnchor
+  }
+
+  if (props.file) {
+    return { label: props.file }
+  }
+
+  return undefined
 })
 
 const canRenderTwoslash = computed(() => {
@@ -343,9 +360,13 @@ const magicMoveOptions = {
     <Handle type="target" :position="Position.Left" />
 
     <!-- Header -->
-    <div class="flex items-center justify-between px-3 py-2 border-b border-border/50">
-      <span class="text-sm font-medium text-foreground">{{ label }}</span>
-      <span v-if="file" class="text-[10px] text-muted-foreground font-mono">{{ file }}</span>
+    <div class="flex items-center justify-between gap-2 px-3 py-2 border-b border-border/50">
+      <span class="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{{ label }}</span>
+      <NodeSourceAnchor
+        v-if="displaySourceAnchor"
+        :label="displaySourceAnchor.label"
+        :href="displaySourceAnchor.href"
+      />
     </div>
 
     <!-- Code -->

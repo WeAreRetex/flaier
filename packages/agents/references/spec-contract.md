@@ -51,28 +51,56 @@ Use this contract when writing `*.flow.json` for `flow-narrator`.
   - optional: `description`, `direction`, `minHeight`, `layoutEngine`, `layoutRankSep`, `layoutNodeSep`, `layoutEdgeSep`
 - `TriggerNode`:
   - required: `label`
-  - optional: `description`, `color`, `transitions`
+  - optional: `description`, `color`, `sourceAnchor`, `transitions`
 - `CodeNode`:
   - required: `label`, `code`
-  - optional: `file`, `language`, `comment`, `story`, `wrapLongLines`, `magicMoveSteps`, `twoslash`, `transitions`
+  - optional: `file`, `language`, `comment`, `story`, `wrapLongLines`, `magicMoveSteps`, `twoslash`, `sourceAnchor`, `transitions`
   - note: twoslash works with `language: "typescript"` or `"tsx"`; markers like `// ^?` auto-enable twoslash and `twoslash: true` can force it
+  - note: keep twoslash snippets self-contained (add small inline helper types/interfaces when needed) so browser twoslash does not depend on project-global ambient declarations
   - note: when `magicMoveSteps` are present, twoslash renders as an inspection frame after the final step; place markers in the final step code
 - `DecisionNode`:
   - required: `label`
-  - optional: `condition`, `description`, `transitions`
+  - optional: `condition`, `description`, `sourceAnchor`, `transitions`
 - `PayloadNode`:
   - required: `label`
-  - optional: `payload`, `before`, `after`, `format` (`json` | `yaml` | `text`), `description`, `transitions`
+  - optional: `payload`, `before`, `after`, `format` (`json` | `yaml` | `text`), `description`, `sourceAnchor`, `transitions`
   - note: include at least one of `payload`, `before`, or `after`
 - `ErrorNode`:
   - required: `label`, `message`
-  - optional: `code`, `cause`, `mitigation`, `transitions`
+  - optional: `code`, `cause`, `mitigation`, `sourceAnchor`, `transitions`
 - `DescriptionNode`:
   - required: `label`, `body`
-  - optional: `transitions`
+  - optional: `sourceAnchor`, `transitions`
 - `LinkNode`:
   - required: `label`, `href`
-  - optional: `description`, `transitions`
+  - optional: `description`, `sourceAnchor`, `transitions`
+
+## Source Anchor Contract
+
+Use `sourceAnchor` on nodes to point to exact code locations.
+
+String form:
+
+```json
+{ "sourceAnchor": "src/server/auth.ts:42" }
+```
+
+Object form:
+
+```json
+{
+  "sourceAnchor": {
+    "path": "src/server/auth.ts",
+    "line": 42,
+    "column": 7,
+    "label": "auth.ts:42",
+    "href": "https://github.com/org/repo/blob/main/src/server/auth.ts#L42"
+  }
+}
+```
+
+- Prefer including line numbers (`path:line`) so anchors are precise.
+- `href` is optional and useful when you want clickable repo links.
 
 ## Edge Metadata Contract
 

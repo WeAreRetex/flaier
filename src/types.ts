@@ -26,6 +26,18 @@ export interface EdgeTransition {
   kind?: EdgeTransitionKind
 }
 
+/** Structured node source anchor */
+export interface SourceAnchor {
+  path: string
+  line?: number
+  column?: number
+  label?: string
+  href?: string
+}
+
+/** Source anchor can be a compact string or structured object */
+export type SourceAnchorInput = string | SourceAnchor
+
 /** Props for the FlowTimeline root element */
 export interface FlowTimelineProps {
   title: string
@@ -43,6 +55,7 @@ export interface TriggerNodeProps {
   label: string
   description?: string
   color?: string
+  sourceAnchor?: SourceAnchorInput
   transitions?: EdgeTransition[]
 }
 
@@ -50,6 +63,7 @@ export interface TriggerNodeProps {
 export interface CodeNodeProps {
   label: string
   file?: string
+  sourceAnchor?: SourceAnchorInput
   language?: string
   code: string
   comment?: string
@@ -65,6 +79,7 @@ export interface DecisionNodeProps {
   label: string
   condition?: string
   description?: string
+  sourceAnchor?: SourceAnchorInput
   transitions?: EdgeTransition[]
 }
 
@@ -76,6 +91,7 @@ export interface PayloadNodeProps {
   after?: string
   format?: 'json' | 'yaml' | 'text'
   description?: string
+  sourceAnchor?: SourceAnchorInput
   transitions?: EdgeTransition[]
 }
 
@@ -86,6 +102,7 @@ export interface ErrorNodeProps {
   code?: string
   cause?: string
   mitigation?: string
+  sourceAnchor?: SourceAnchorInput
   transitions?: EdgeTransition[]
 }
 
@@ -93,6 +110,7 @@ export interface ErrorNodeProps {
 export interface DescriptionNodeProps {
   label: string
   body: string
+  sourceAnchor?: SourceAnchorInput
   transitions?: EdgeTransition[]
 }
 
@@ -101,6 +119,7 @@ export interface LinkNodeProps {
   label: string
   href: string
   description?: string
+  sourceAnchor?: SourceAnchorInput
   transitions?: EdgeTransition[]
 }
 

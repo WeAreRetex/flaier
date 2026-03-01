@@ -14,6 +14,8 @@ const props = defineProps<{
   playing: boolean
   label?: string
   description?: string
+  sourceAnchorLabel?: string
+  sourceAnchorHref?: string
   choices?: ChoiceOption[]
   selectedChoiceId?: string
 }>()
@@ -137,9 +139,26 @@ function choiceKindClass(kind?: ChoiceOption['kind']) {
       </div>
     </div>
 
-    <div v-if="props.label || props.description" class="mt-2 border-t border-border/60 pt-2 px-1.5">
+    <div v-if="props.label || props.description || props.sourceAnchorLabel" class="mt-2 border-t border-border/60 pt-2 px-1.5">
       <p v-if="props.label" class="text-[11px] font-medium text-foreground leading-snug break-words">
         {{ props.label }}
+      </p>
+
+      <a
+        v-if="props.sourceAnchorLabel && props.sourceAnchorHref"
+        :href="props.sourceAnchorHref"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="mt-1 inline-flex max-w-full items-center gap-1 rounded-md border border-border/70 bg-muted/25 px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground transition-colors hover:border-primary/45 hover:text-foreground"
+      >
+        <span class="truncate">{{ props.sourceAnchorLabel }}</span>
+      </a>
+
+      <p
+        v-else-if="props.sourceAnchorLabel"
+        class="mt-1 inline-flex max-w-full items-center rounded-md border border-border/70 bg-muted/25 px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground"
+      >
+        <span class="truncate">{{ props.sourceAnchorLabel }}</span>
       </p>
 
       <p

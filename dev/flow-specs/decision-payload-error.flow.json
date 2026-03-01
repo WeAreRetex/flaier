@@ -25,7 +25,8 @@
       "props": {
         "label": "Webhook: user.signup",
         "description": "API gateway forwards the request to signup handler",
-        "color": "#22c55e"
+        "color": "#22c55e",
+        "sourceAnchor": "apps/api/src/routes/signup.ts:14"
       },
       "children": [
         "decision-validate"
@@ -37,6 +38,11 @@
         "label": "Is payload valid?",
         "condition": "validation.ok === true",
         "description": "Route valid requests to normalization, invalid requests to error handling",
+        "sourceAnchor": {
+          "path": "apps/api/src/validation/signup-validator.ts",
+          "line": 22,
+          "column": 1
+        },
         "transitions": [
           {
             "to": "payload-normalized",
@@ -63,6 +69,7 @@
         "label": "Normalized payload",
         "format": "json",
         "description": "Canonicalize values before writing to persistence layer",
+        "sourceAnchor": "apps/api/src/validation/normalize-signup.ts:9",
         "before": "{\n  \"email\": \"USER@EXAMPLE.COM\",\n  \"acceptedTerms\": \"yes\",\n  \"plan\": \"pro\"\n}",
         "after": "{\n  \"email\": \"user@example.com\",\n  \"acceptedTerms\": true,\n  \"plan\": \"pro\"\n}",
         "transitions": [
@@ -82,6 +89,11 @@
       "type": "CodeNode",
       "props": {
         "label": "Upsert user record",
+        "sourceAnchor": {
+          "path": "apps/api/src/services/user-service.ts",
+          "line": 41,
+          "href": "https://github.com/example/flow-visualizer/blob/main/apps/api/src/services/user-service.ts#L41"
+        },
         "language": "typescript",
         "code": "export async function persistUser(input: NormalizedUser) {\n  await db.user.upsert({\n    where: { email: input.email },\n    create: input,\n    update: input\n  })\n}",
         "comment": "Idempotent write keeps retries safe",
@@ -96,6 +108,7 @@
       "props": {
         "label": "Invalid signup payload",
         "message": "Validation failed due to missing required fields.",
+        "sourceAnchor": "apps/api/src/errors/validation-error.ts:5",
         "code": "VAL-422",
         "cause": "Client sent malformed JSON or unsupported value types.",
         "mitigation": "Return typed 422 response and alert API consumers with missing field list.",
@@ -117,7 +130,8 @@
       "props": {
         "label": "Signup Failure Runbook",
         "href": "https://example.com/runbooks/signup-failures",
-        "description": "Dashboards, alerts, and remediation procedures"
+        "description": "Dashboards, alerts, and remediation procedures",
+        "sourceAnchor": "docs/runbooks/signup-failures.md:3"
       }
     }
   }

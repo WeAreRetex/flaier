@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Handle, Position } from '@vue-flow/core'
+import NodeSourceAnchor from './NodeSourceAnchor.vue'
 
 defineProps<{
   label: string
@@ -7,6 +8,10 @@ defineProps<{
   code?: string
   cause?: string
   mitigation?: string
+  sourceAnchor?: {
+    label: string
+    href?: string
+  }
   active?: boolean
 }>()
 </script>
@@ -39,6 +44,10 @@ defineProps<{
       <p v-if="mitigation" class="text-[11px] leading-relaxed text-muted-foreground">
         <span class="font-medium text-foreground/90">Mitigation:</span> {{ mitigation }}
       </p>
+
+      <div v-if="sourceAnchor?.label" class="max-w-full pt-1">
+        <NodeSourceAnchor :label="sourceAnchor.label" :href="sourceAnchor.href" />
+      </div>
     </div>
 
     <Handle type="source" :position="Position.Right" />

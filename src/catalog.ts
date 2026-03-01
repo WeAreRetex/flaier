@@ -26,6 +26,17 @@ const edgeTransitionSchema = z.object({
   kind: edgeTransitionKindSchema.optional(),
 })
 
+const sourceAnchorSchema = z.union([
+  z.string(),
+  z.object({
+    path: z.string(),
+    line: z.number().int().positive().optional(),
+    column: z.number().int().positive().optional(),
+    label: z.string().optional(),
+    href: z.string().optional(),
+  }),
+])
+
 export const catalog = defineCatalog(schema, {
   components: {
     FlowTimeline: {
@@ -47,6 +58,7 @@ export const catalog = defineCatalog(schema, {
         label: z.string(),
         description: z.string().optional(),
         color: z.string().default('#22c55e'),
+        sourceAnchor: sourceAnchorSchema.optional(),
         transitions: z.array(edgeTransitionSchema).optional(),
       }),
       description: 'Entry point node representing a trigger (cron, webhook, event)',
@@ -55,6 +67,7 @@ export const catalog = defineCatalog(schema, {
       props: z.object({
         label: z.string(),
         file: z.string().optional(),
+        sourceAnchor: sourceAnchorSchema.optional(),
         language: z.string().default('typescript'),
         code: z.string(),
         comment: z.string().optional(),
@@ -71,6 +84,7 @@ export const catalog = defineCatalog(schema, {
         label: z.string(),
         condition: z.string().optional(),
         description: z.string().optional(),
+        sourceAnchor: sourceAnchorSchema.optional(),
         transitions: z.array(edgeTransitionSchema).optional(),
       }),
       description: 'Branch decision node that explains routing criteria before fan-out paths',
@@ -83,6 +97,7 @@ export const catalog = defineCatalog(schema, {
         after: z.string().optional(),
         format: z.enum(['json', 'yaml', 'text']).default('json'),
         description: z.string().optional(),
+        sourceAnchor: sourceAnchorSchema.optional(),
         transitions: z.array(edgeTransitionSchema).optional(),
       }),
       description: 'Data-focused node for payload snapshots and before/after transformations',
@@ -94,6 +109,7 @@ export const catalog = defineCatalog(schema, {
         code: z.string().optional(),
         cause: z.string().optional(),
         mitigation: z.string().optional(),
+        sourceAnchor: sourceAnchorSchema.optional(),
         transitions: z.array(edgeTransitionSchema).optional(),
       }),
       description: 'Failure node that captures error detail, cause, and recovery guidance',
@@ -102,6 +118,7 @@ export const catalog = defineCatalog(schema, {
       props: z.object({
         label: z.string(),
         body: z.string(),
+        sourceAnchor: sourceAnchorSchema.optional(),
         transitions: z.array(edgeTransitionSchema).optional(),
       }),
       description: 'Prose/text explanation node for documenting a pipeline step',
@@ -111,6 +128,7 @@ export const catalog = defineCatalog(schema, {
         label: z.string(),
         href: z.string(),
         description: z.string().optional(),
+        sourceAnchor: sourceAnchorSchema.optional(),
         transitions: z.array(edgeTransitionSchema).optional(),
       }),
       description: 'Clickable reference link to a file or URL',

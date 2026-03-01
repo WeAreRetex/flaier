@@ -19,6 +19,13 @@ const FLOW_COMPONENT_TYPES = new Set([
 
 const TWOSLASH_SUPPORTED_LANGUAGES = new Set(['typescript', 'ts', 'tsx'])
 const TWOSLASH_HINT_PATTERN = /(?:\^\?|\^\||@errors\b|@log\b|@warn\b|@annotate\b|@include\b)/m
+const TWOSLASH_AMBIENT_GLOBAL_CANDIDATES = [
+  'WeakRef',
+  'FinalizationRegistry',
+  'DisposableStack',
+  'AsyncDisposableStack',
+  'SuppressedError',
+] as const
 const EDGE_TRANSITION_KINDS = new Set([
   'default',
   'success',
@@ -150,6 +157,10 @@ function validateElementProps(
 
   const props = element.props
 
+  if (element.type !== 'FlowTimeline') {
+    validateSourceAnchorProp(key, props.sourceAnchor, errors, warnings)
+  }
+
   switch (element.type) {
     case 'FlowTimeline': {
       expectRequiredString(props, 'title', key, errors)
@@ -259,6 +270,15 @@ function validateElementProps(
         warnings.push(
           `Element "${key}" has twoslash markers only in non-final magicMoveSteps; move markers to the final step code so the post-animation twoslash frame shows callouts.`,
         )
+      }
+
+      if (twoslashInspectionEnabled && TWOSLASH_SUPPORTED_LANGUAGES.has(language)) {
+        const undeclaredAmbientGlobals = findUndeclaredTwoslashAmbientGlobals(finalCode)
+        if (undeclaredAmbientGlobals.length > 0) {
+          warnings.push(
+            `Element "${key}" twoslash snippet references ambient globals (${undeclaredAmbientGlobals.join(', ')}) without local declaration/import. Browser twoslash can miss those libs; inline minimal declarations or avoid those globals in teaching snippets.`,
+          )
+        }
       }
 
       break
@@ -455,6 +475,81 @@ function mergeOutgoingTargets(children: string[], transitionTargets: string[]) {
   return outgoing
 }
 
+function validateSourceAnchorProp(
+  elementKey: string,
+  sourceAnchor: unknown,
+  errors: string[],
+  warnings: string[],
+) {
+  if (sourceAnchor === undefined) {
+    return
+  }
+
+  if (typeof sourceAnchor === 'string') {
+    if (!isNonEmptyString(sourceAnchor)) {
+      errors.push(`Element "${elementKey}" prop "sourceAnchor" must be a non-empty string when provided.`)
+      return
+    }
+
+    if (!/:\d+(?::\d+)?$/.test(sourceAnchor.trim())) {
+      warnings.push(
+        `Element "${elementKey}" sourceAnchor string should include line context (for example "src/service.ts:42").`,
+      )
+    }
+
+    return
+  }
+
+  if (!isObject(sourceAnchor)) {
+    errors.push(`Element "${elementKey}" prop "sourceAnchor" must be a string or object when provided.`)
+    return
+  }
+
+  const path = sourceAnchor.path
+  if (!isNonEmptyString(path)) {
+    errors.push(`Element "${elementKey}" sourceAnchor.path must be a non-empty string.`)
+    return
+  }
+
+  const line = sourceAnchor.line
+  if (line !== undefined) {
+    if (!isPositiveInteger(line)) {
+      errors.push(`Element "${elementKey}" sourceAnchor.line must be an integer > 0 when provided.`)
+      return
+    }
+  }
+
+  const column = sourceAnchor.column
+  if (column !== undefined) {
+    if (!isPositiveInteger(column)) {
+      errors.push(`Element "${elementKey}" sourceAnchor.column must be an integer > 0 when provided.`)
+      return
+    }
+
+    if (line === undefined) {
+      warnings.push(`Element "${elementKey}" sourceAnchor.column is set without sourceAnchor.line; add line for precise anchors.`)
+    }
+  }
+
+  const label = sourceAnchor.label
+  if (label !== undefined && typeof label !== 'string') {
+    errors.push(`Element "${elementKey}" sourceAnchor.label must be a string when provided.`)
+    return
+  }
+
+  const href = sourceAnchor.href
+  if (href !== undefined && typeof href !== 'string') {
+    errors.push(`Element "${elementKey}" sourceAnchor.href must be a string when provided.`)
+    return
+  }
+
+  if (line === undefined) {
+    warnings.push(
+      `Element "${elementKey}" sourceAnchor.path is missing line context; include sourceAnchor.line for clearer code jumps.`,
+    )
+  }
+}
+
 function validateStateShape(state: unknown, errors: string[], warnings: string[]) {
   if (state === undefined) {
     warnings.push('Spec state is missing; state.currentStep and state.playing will be inferred at runtime.')
@@ -564,6 +659,58 @@ function isFlowElement(value: unknown): value is FlowElement {
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0
+}
+
+function findUndeclaredTwoslashAmbientGlobals(code: string) {
+  const normalizedCode = stripComments(code)
+
+  return TWOSLASH_AMBIENT_GLOBAL_CANDIDATES.filter((globalName) => {
+    if (!referencesAmbientGlobal(normalizedCode, globalName)) {
+      return false
+    }
+
+    return !declaresOrImportsIdentifier(normalizedCode, globalName)
+  })
+}
+
+function referencesAmbientGlobal(code: string, identifier: string) {
+  const escaped = escapeRegExp(identifier)
+
+  return [
+    new RegExp(`\\bnew\\s+${escaped}\\b`),
+    new RegExp(`\\btypeof\\s+${escaped}\\b`),
+    new RegExp(`\\binstanceof\\s+${escaped}\\b`),
+    new RegExp(`\\b${escaped}\\s*<`),
+    new RegExp(`\\b${escaped}\\s*\\(`),
+    new RegExp(`:\\s*${escaped}\\b`),
+    new RegExp(`\\bas\\s+${escaped}\\b`),
+    new RegExp(`\\bsatisfies\\s+${escaped}\\b`),
+    new RegExp(`\\bglobalThis\\.${escaped}\\b`),
+  ].some((pattern) => pattern.test(code))
+}
+
+function declaresOrImportsIdentifier(code: string, identifier: string) {
+  const escaped = escapeRegExp(identifier)
+
+  return [
+    new RegExp(`\\b(?:const|let|var|function|class|interface|type|enum)\\s+${escaped}\\b`),
+    new RegExp(`\\bdeclare\\s+(?:const|let|var|function|class|interface|type|enum)\\s+${escaped}\\b`),
+    new RegExp(`\\bimport\\s+[^;\\n]*\\b${escaped}\\b`),
+  ].some((pattern) => pattern.test(code))
+}
+
+function stripComments(code: string) {
+  return code
+    .replace(/\/\*[\s\S]*?\*\//g, '\n')
+    .replace(/(^|[^:\\])\/\/.*$/gm, '$1')
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 function hasTwoslashHints(code: string) {

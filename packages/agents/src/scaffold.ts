@@ -92,6 +92,10 @@ function createLinearSpec(title: string, description: string | undefined, langua
           label: 'Entry Trigger',
           description: 'Replace with the real event, cron, or webhook that starts this flow.',
           color: '#22c55e',
+          sourceAnchor: {
+            path: 'src/entrypoint.ts',
+            line: 1,
+          },
         },
         children: ['code-main'],
       },
@@ -99,6 +103,10 @@ function createLinearSpec(title: string, description: string | undefined, langua
         type: 'CodeNode',
         props: {
           label: 'Main Processing Step',
+          sourceAnchor: {
+            path: 'src/handler.ts',
+            line: 1,
+          },
           language,
           code: [
             'export async function handler(input: unknown) {',
@@ -116,6 +124,7 @@ function createLinearSpec(title: string, description: string | undefined, langua
         props: {
           label: 'Outcome',
           body: 'Explain the side effects, persisted state, and downstream behavior.',
+          sourceAnchor: 'docs/architecture/flow.md:12',
         },
         children: ['link-reference'],
       },
@@ -125,6 +134,7 @@ function createLinearSpec(title: string, description: string | undefined, langua
           label: 'Reference',
           href: 'https://example.com',
           description: 'Point to source code, dashboards, or runbooks.',
+          sourceAnchor: 'docs/runbooks/flow-reference.md:8',
         },
       },
     },
@@ -158,6 +168,10 @@ function createBranchingSpec(title: string, description: string | undefined, lan
           label: 'Entry Trigger',
           description: 'Replace with the event that starts this flow.',
           color: '#22c55e',
+          sourceAnchor: {
+            path: 'src/entrypoint.ts',
+            line: 1,
+          },
         },
         children: ['decision-route'],
       },
@@ -167,6 +181,10 @@ function createBranchingSpec(title: string, description: string | undefined, lan
           label: 'Route by Input Validity',
           condition: 'payload.isValid === true',
           description: 'Choose success processing for valid payloads, otherwise go to error handling.',
+          sourceAnchor: {
+            path: 'src/validation/route.ts',
+            line: 20,
+          },
           transitions: [
             {
               to: 'payload-success',
@@ -189,6 +207,10 @@ function createBranchingSpec(title: string, description: string | undefined, lan
         props: {
           label: 'Normalized Payload',
           description: 'Show how incoming payload changes after validation and normalization.',
+          sourceAnchor: {
+            path: 'src/validation/normalize.ts',
+            line: 12,
+          },
           format: 'json',
           before: '{\n  "email": "USER@EXAMPLE.COM",\n  "plan": "pro",\n  "acceptedTerms": "yes"\n}',
           after: '{\n  "email": "user@example.com",\n  "plan": "pro",\n  "acceptedTerms": true\n}',
@@ -207,6 +229,10 @@ function createBranchingSpec(title: string, description: string | undefined, lan
         type: 'CodeNode',
         props: {
           label: 'Persist User Record',
+          sourceAnchor: {
+            path: 'src/persistence/user-repository.ts',
+            line: 31,
+          },
           language,
           code: [
             'export async function persistUser(input: NormalizedUser) {',
@@ -227,6 +253,10 @@ function createBranchingSpec(title: string, description: string | undefined, lan
         props: {
           label: 'Input Validation Error',
           message: 'Payload validation failed and cannot be persisted safely.',
+          sourceAnchor: {
+            path: 'src/validation/errors.ts',
+            line: 8,
+          },
           code: 'VAL-422',
           cause: 'Missing required field or incompatible type in submitted payload.',
           mitigation: 'Return 422 response, emit audit log, and notify upstream client with field details.',
@@ -247,6 +277,7 @@ function createBranchingSpec(title: string, description: string | undefined, lan
           label: 'Runbook / Dashboard',
           href: 'https://example.com',
           description: 'Point to operational docs, dashboards, or next investigation step.',
+          sourceAnchor: 'docs/runbooks/recovery.md:5',
         },
       },
     },

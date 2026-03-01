@@ -82,6 +82,8 @@ const EDGE_TRANSITION_KINDS: EdgeTransitionKind[] = [
   'async',
 ]
 const EDGE_TRANSITION_KIND_SET = new Set(EDGE_TRANSITION_KINDS)
+const SOURCE_ANCHOR_LINK_PATTERN = /^(https?:\/\/|vscode:\/\/|idea:\/\/)/i
+const SOURCE_ANCHOR_TRAILING_LOCATION_PATTERN = /^(.*?):(\d+)(?::(\d+))?$/
 
 interface NodeSize {
   width: number
@@ -114,6 +116,17 @@ interface ParsedTransition {
   label?: string
   description?: string
   kind?: EdgeTransitionKind
+}
+
+interface ParsedSourceAnchor {
+  label: string
+  href?: string
+}
+
+interface ParsedAnchorLocation {
+  path: string
+  line?: number
+  column?: number
 }
 
 const runtime = useFlowNarratorRuntime()
@@ -354,6 +367,12 @@ function toOptionalString(value: unknown) {
   return typeof value === 'string' ? value : undefined
 }
 
+function toTrimmedNonEmptyString(value: unknown) {
+  if (typeof value !== 'string') return undefined
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : undefined
+}
+
 function toRequiredString(value: unknown) {
   return toOptionalString(value) ?? ''
 }
@@ -372,6 +391,130 @@ function toPayloadFormat(value: unknown): 'json' | 'yaml' | 'text' | undefined {
   }
 
   return undefined
+}
+
+function toPositiveInteger(value: unknown) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return undefined
+  }
+
+  const asInteger = Math.floor(value)
+  return asInteger > 0 ? asInteger : undefined
+}
+
+function parseInlineSourceAnchorLocation(value: string): ParsedAnchorLocation | undefined {
+  const trimmed = value.trim()
+  if (!trimmed) return undefined
+
+  const matched = SOURCE_ANCHOR_TRAILING_LOCATION_PATTERN.exec(trimmed)
+  if (!matched) {
+    return {
+      path: trimmed,
+    }
+  }
+
+  const rawPath = matched[1]?.trim()
+  const rawLine = matched[2]
+  const rawColumn = matched[3]
+
+  if (!rawPath || !rawLine) {
+    return {
+      path: trimmed,
+    }
+  }
+
+  const line = Number(rawLine)
+  const column = rawColumn ? Number(rawColumn) : undefined
+
+  return {
+    path: rawPath,
+    line: Number.isFinite(line) && line > 0 ? Math.floor(line) : undefined,
+    column: Number.isFinite(column) && (column ?? 0) > 0 ? Math.floor(column as number) : undefined,
+  }
+}
+
+function toVsCodeFileHref(path: string, line?: number, column?: number) {
+  const normalizedPath = path.trim().replace(/\\/g, '/')
+  if (!normalizedPath) return undefined
+
+  const encodedPath = encodeURI(normalizedPath)
+  const linePart = line ? `:${line}` : ''
+  const columnPart = line && column ? `:${column}` : ''
+
+  return `vscode://file/${encodedPath}${linePart}${columnPart}`
+}
+
+function resolveSourceAnchorHref(path: string, line?: number, column?: number, explicitHref?: string) {
+  if (explicitHref) {
+    return explicitHref
+  }
+
+  if (SOURCE_ANCHOR_LINK_PATTERN.test(path)) {
+    return path
+  }
+
+  return toVsCodeFileHref(path, line, column)
+}
+
+function toSourceAnchor(value: unknown): ParsedSourceAnchor | undefined {
+  const inlineAnchor = toTrimmedNonEmptyString(value)
+  if (inlineAnchor) {
+    const parsed = parseInlineSourceAnchorLocation(inlineAnchor)
+
+    return {
+      label: inlineAnchor,
+      href: parsed
+        ? resolveSourceAnchorHref(parsed.path, parsed.line, parsed.column)
+        : undefined,
+    }
+  }
+
+  if (!value || typeof value !== 'object') {
+    return undefined
+  }
+
+  const record = value as Record<string, unknown>
+  const path = toTrimmedNonEmptyString(record.path)
+  if (!path) {
+    return undefined
+  }
+
+  const line = toPositiveInteger(record.line)
+  const column = toPositiveInteger(record.column)
+  const explicitLabel = toTrimmedNonEmptyString(record.label)
+  const explicitHref = toTrimmedNonEmptyString(record.href)
+
+  const location = [path]
+  if (line !== undefined) {
+    location.push(String(line))
+
+    if (column !== undefined) {
+      location.push(String(column))
+    }
+  }
+
+  const label = explicitLabel ?? location.join(':')
+
+  return {
+    label,
+    href: resolveSourceAnchorHref(path, line, column, explicitHref),
+  }
+}
+
+function resolveNodeSourceAnchor(nodeProps: Record<string, unknown>) {
+  const explicit = toSourceAnchor(nodeProps.sourceAnchor)
+  if (explicit) {
+    return explicit
+  }
+
+  const fileFallback = toTrimmedNonEmptyString(nodeProps.file)
+  if (!fileFallback) {
+    return undefined
+  }
+
+  return {
+    label: fileFallback,
+  } satisfies ParsedSourceAnchor
 }
 
 function codeNodeTwoslashEnabled(element: SpecElement) {
@@ -592,10 +735,11 @@ function estimateNodeSize(node: OrderedNodeElement): NodeSize {
   if (element.type === 'TriggerNode') {
     const labelLines = Math.max(1, estimateNodeTextLines(element.props.label, 24))
     const descriptionLines = estimateNodeTextLines(element.props.description, 30)
+    const anchorHeight = resolveNodeSourceAnchor(element.props) ? 18 : 0
 
     return {
       width: 220,
-      height: Math.min(280, Math.max(92, 46 + labelLines * 18 + descriptionLines * 15)),
+      height: Math.min(300, Math.max(100, 46 + labelLines * 18 + descriptionLines * 15 + anchorHeight)),
     }
   }
 
@@ -603,10 +747,11 @@ function estimateNodeSize(node: OrderedNodeElement): NodeSize {
     const labelLines = Math.max(1, estimateNodeTextLines(element.props.label, 26))
     const conditionLines = estimateNodeTextLines(element.props.condition, 34)
     const descriptionLines = estimateNodeTextLines(element.props.description, 34)
+    const anchorHeight = resolveNodeSourceAnchor(element.props) ? 18 : 0
 
     return {
       width: 250,
-      height: Math.min(340, Math.max(116, 50 + labelLines * 18 + conditionLines * 16 + descriptionLines * 15)),
+      height: Math.min(360, Math.max(122, 50 + labelLines * 18 + conditionLines * 16 + descriptionLines * 15 + anchorHeight)),
     }
   }
 
@@ -617,10 +762,11 @@ function estimateNodeSize(node: OrderedNodeElement): NodeSize {
     const afterLines = estimateNodeTextLines(element.props.after, 40)
     const payloadLines = estimateNodeTextLines(element.props.payload, 40)
     const bodyLines = Math.max(payloadLines, beforeLines + afterLines)
+    const anchorHeight = resolveNodeSourceAnchor(element.props) ? 18 : 0
 
     return {
       width: 300,
-      height: Math.min(520, Math.max(150, 60 + labelLines * 18 + descriptionLines * 14 + bodyLines * 10)),
+      height: Math.min(540, Math.max(160, 60 + labelLines * 18 + descriptionLines * 14 + bodyLines * 10 + anchorHeight)),
     }
   }
 
@@ -629,30 +775,33 @@ function estimateNodeSize(node: OrderedNodeElement): NodeSize {
     const messageLines = Math.max(1, estimateNodeTextLines(element.props.message, 34))
     const causeLines = estimateNodeTextLines(element.props.cause, 34)
     const mitigationLines = estimateNodeTextLines(element.props.mitigation, 34)
+    const anchorHeight = resolveNodeSourceAnchor(element.props) ? 18 : 0
 
     return {
       width: 280,
-      height: Math.min(420, Math.max(130, 58 + labelLines * 18 + messageLines * 16 + causeLines * 15 + mitigationLines * 15)),
+      height: Math.min(440, Math.max(140, 58 + labelLines * 18 + messageLines * 16 + causeLines * 15 + mitigationLines * 15 + anchorHeight)),
     }
   }
 
   if (element.type === 'DescriptionNode') {
     const labelLines = Math.max(1, estimateNodeTextLines(element.props.label, 26))
     const bodyLines = Math.max(1, estimateNodeTextLines(element.props.body, 30))
+    const anchorHeight = resolveNodeSourceAnchor(element.props) ? 18 : 0
 
     return {
       width: 240,
-      height: Math.min(340, Math.max(110, 44 + labelLines * 18 + bodyLines * 16)),
+      height: Math.min(360, Math.max(118, 44 + labelLines * 18 + bodyLines * 16 + anchorHeight)),
     }
   }
 
   if (element.type === 'LinkNode') {
     const labelLines = Math.max(1, estimateNodeTextLines(element.props.label, 24))
     const descriptionLines = estimateNodeTextLines(element.props.description, 30)
+    const anchorHeight = resolveNodeSourceAnchor(element.props) ? 18 : 0
 
     return {
       width: 220,
-      height: Math.min(280, Math.max(90, 42 + labelLines * 18 + descriptionLines * 15)),
+      height: Math.min(300, Math.max(98, 42 + labelLines * 18 + descriptionLines * 15 + anchorHeight)),
     }
   }
 
@@ -1406,6 +1555,13 @@ const activeDescription = computed(() => {
   return toOptionalString(node.element.props.description) ?? ''
 })
 
+const activeSourceAnchor = computed(() => {
+  const node = activeNode.value
+  if (!node) return undefined
+
+  return resolveNodeSourceAnchor(node.element.props)
+})
+
 const branchChoices = computed<BranchChoice[]>(() => {
   const node = activeNode.value
   const frame = activeFrame.value
@@ -1719,6 +1875,7 @@ onUnmounted(() => {
           :label="toRequiredString(data.props.label)"
           :description="toOptionalString(data.props.description)"
           :color="toOptionalString(data.props.color)"
+          :source-anchor="resolveNodeSourceAnchor(data.props)"
           :active="isActive(data.key)"
         />
       </template>
@@ -1734,6 +1891,7 @@ onUnmounted(() => {
           :wrap-long-lines="toBoolean(data.props.wrapLongLines)"
           :magic-move-steps="toMagicMoveSteps(data.props.magicMoveSteps)"
           :twoslash="toOptionalBoolean(data.props.twoslash)"
+          :source-anchor="resolveNodeSourceAnchor(data.props)"
           :ui-theme="uiTheme"
           :active="isActive(data.key)"
           :step-index="codeStepIndex(data.key)"
@@ -1745,6 +1903,7 @@ onUnmounted(() => {
           :label="toRequiredString(data.props.label)"
           :condition="toOptionalString(data.props.condition)"
           :description="toOptionalString(data.props.description)"
+          :source-anchor="resolveNodeSourceAnchor(data.props)"
           :active="isActive(data.key)"
         />
       </template>
@@ -1757,6 +1916,7 @@ onUnmounted(() => {
           :after="toOptionalString(data.props.after)"
           :format="toPayloadFormat(data.props.format)"
           :description="toOptionalString(data.props.description)"
+          :source-anchor="resolveNodeSourceAnchor(data.props)"
           :active="isActive(data.key)"
         />
       </template>
@@ -1768,6 +1928,7 @@ onUnmounted(() => {
           :code="toOptionalString(data.props.code)"
           :cause="toOptionalString(data.props.cause)"
           :mitigation="toOptionalString(data.props.mitigation)"
+          :source-anchor="resolveNodeSourceAnchor(data.props)"
           :active="isActive(data.key)"
         />
       </template>
@@ -1776,6 +1937,7 @@ onUnmounted(() => {
         <DescriptionNodeVue
           :label="toRequiredString(data.props.label)"
           :body="toRequiredString(data.props.body)"
+          :source-anchor="resolveNodeSourceAnchor(data.props)"
           :active="isActive(data.key)"
         />
       </template>
@@ -1785,6 +1947,7 @@ onUnmounted(() => {
           :label="toRequiredString(data.props.label)"
           :href="toRequiredString(data.props.href)"
           :description="toOptionalString(data.props.description)"
+          :source-anchor="resolveNodeSourceAnchor(data.props)"
           :active="isActive(data.key)"
         />
       </template>
@@ -1924,6 +2087,8 @@ onUnmounted(() => {
           :playing="playing"
           :label="activeLabel"
           :description="activeDescription"
+          :source-anchor-label="activeSourceAnchor?.label"
+          :source-anchor-href="activeSourceAnchor?.href"
           :choices="branchChoices"
           :selected-choice-id="selectedBranchChoiceId"
           @next="next"

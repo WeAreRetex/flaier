@@ -1,10 +1,15 @@
 <script setup lang="ts">
 import { Handle, Position } from '@vue-flow/core'
+import NodeSourceAnchor from './NodeSourceAnchor.vue'
 
 defineProps<{
   label: string
   condition?: string
   description?: string
+  sourceAnchor?: {
+    label: string
+    href?: string
+  }
   active?: boolean
 }>()
 </script>
@@ -23,6 +28,9 @@ defineProps<{
     <p class="text-sm font-medium text-foreground leading-snug">{{ label }}</p>
     <p v-if="condition" class="mt-1 text-[11px] text-foreground/85 font-mono leading-relaxed break-words">{{ condition }}</p>
     <p v-if="description" class="mt-1.5 text-[11px] text-muted-foreground leading-relaxed">{{ description }}</p>
+    <div v-if="sourceAnchor?.label" class="mt-1.5 max-w-full">
+      <NodeSourceAnchor :label="sourceAnchor.label" :href="sourceAnchor.href" />
+    </div>
     <Handle type="source" :position="Position.Right" />
   </div>
 </template>
