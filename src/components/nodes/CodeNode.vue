@@ -19,6 +19,7 @@ import {
 import type { MagicMoveStep } from '../../types'
 
 const TWOSLASH_SWAP_DELAY_MS = 560
+const FALLBACK_SHIKI_LANGUAGE = 'text'
 
 const props = withDefaults(defineProps<{
   label: string
@@ -74,6 +75,33 @@ const codeSequence = computed(() => {
   }
 
   return [props.code]
+})
+
+const requestedLanguage = computed(() => {
+  return (props.language ?? 'typescript').trim().toLowerCase()
+})
+
+const renderLanguage = computed(() => {
+  const language = requestedLanguage.value || 'typescript'
+  const hl = highlighter.value
+
+  if (!hl) {
+    return language
+  }
+
+  const loadedLanguages = hl.getLoadedLanguages()
+  if (loadedLanguages.includes(language)) {
+    return language
+  }
+
+  try {
+    const resolvedAlias = hl.resolveLangAlias(language)
+    if (loadedLanguages.includes(resolvedAlias)) {
+      return resolvedAlias
+    }
+  } catch {}
+
+  return FALLBACK_SHIKI_LANGUAGE
 })
 
 const codeVariants = computed(() => {
@@ -257,15 +285,13 @@ const precompiledSteps = computed<KeyedTokensInfo[] | null>(() => {
   const hl = highlighter.value
   if (!hl) return null
 
-  const requestedLang = props.language ?? 'typescript'
-
   try {
     return codeSequence.value.map((code) =>
       codeToKeyedTokens(
         hl as never,
         code,
         {
-          lang: requestedLang,
+          lang: renderLanguage.value,
           theme: shikiTheme.value,
         } as never,
         false,
@@ -392,7 +418,7 @@ const magicMoveOptions = {
         v-else-if="highlighter"
         :highlighter="highlighter"
         :code="displayCode"
-        :lang="language"
+        :lang="renderLanguage"
         :theme="shikiTheme"
         :options="magicMoveOptions"
         class="!bg-transparent"
