@@ -25,6 +25,14 @@
       "src": "./decision-payload-error.flow.json",
       "tags": ["sample", "branching"],
       "entrypoints": ["src/components/renderer/FlowTimelineRenderer.vue"]
+    },
+    {
+      "id": "architecture-overview",
+      "title": "Platform Architecture Overview",
+      "description": "Gateway, services, queue, workers, and data tier topology",
+      "src": "./architecture-overview.flow.json",
+      "tags": ["sample", "architecture"],
+      "entrypoints": ["src/components/nodes/ArchitectureNode.vue"]
     }
   ]
 }

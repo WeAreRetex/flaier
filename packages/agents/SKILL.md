@@ -1,6 +1,6 @@
 ---
 name: flow-visualizer-flow-generator
-description: Generate, repair, and validate flow-visualizer ready flows for flow-narrator. Use when converting code paths into `*.flow.json` specs, scaffolding new flow files, fixing invalid flow specs, adding branching narrative paths, or producing/updating `manifest.json` for disk-based viewer workflows.
+description: Generate, repair, and validate flow-visualizer ready flows for flow-narrator. Use when converting code paths into `*.flow.json` specs, scaffolding new flow files, fixing invalid flow specs, adding branching narrative paths, modeling architecture diagrams, or producing/updating `manifest.json` for disk-based viewer workflows.
 ---
 
 # Flow Visualizer Flow Generator
@@ -13,6 +13,7 @@ Run from repo root:
 
 ```bash
 bun run agents:scaffold -- --title "Checkout Flow" --template branching --out ./flow-specs/checkout.flow.json
+bun run agents:scaffold -- --title "Platform Architecture" --template architecture --out ./flow-specs/platform-architecture.flow.json
 bun run agents:validate -- ./flow-specs/checkout.flow.json
 bun run agents:manifest -- --dir ./flow-specs --out ./flow-specs/manifest.json
 ```
@@ -21,6 +22,7 @@ Run directly inside this folder:
 
 ```bash
 bun run scaffold -- --title "Checkout Flow" --template branching --out ./flow-specs/checkout.flow.json
+bun run scaffold -- --title "Platform Architecture" --template architecture --out ./flow-specs/platform-architecture.flow.json
 bun run validate -- ./flow-specs/checkout.flow.json
 bun run manifest -- --dir ./flow-specs --out ./flow-specs/manifest.json
 ```
@@ -29,7 +31,7 @@ bun run manifest -- --dir ./flow-specs --out ./flow-specs/manifest.json
 
 1. Create a scaffold with `scaffold` (`linear` or `branching`) and realistic flow title.
 2. Replace placeholders with real node labels, code snippets, descriptions, links, and branch paths from the target codebase.
-3. Keep one `FlowTimeline` root, start from a concrete `TriggerNode`, and model choices with `DecisionNode` + multiple children.
+3. Keep one `FlowTimeline` root; for architecture diagrams set `FlowTimeline.props.mode` to `"architecture"` and prefer `ArchitectureNode` for infrastructure components.
 4. Add edge metadata with `props.transitions` on branching nodes to label branch choices (`label`, `description`) and semantics (`kind`: `success`, `error`, `warning`, `retry`, `async`, `default`).
 5. Add `sourceAnchor` on key nodes so readers can jump from story to exact code locations (`path:line` or `{ path, line, column, href }`).
 6. Validate each generated spec or full manifest with `validate`.
@@ -38,7 +40,7 @@ bun run manifest -- --dir ./flow-specs --out ./flow-specs/manifest.json
 ## Non-Negotiable Output Rules
 
 - Keep root element type as `FlowTimeline`.
-- Keep node types limited to `TriggerNode`, `CodeNode`, `DecisionNode`, `PayloadNode`, `ErrorNode`, `DescriptionNode`, and `LinkNode`.
+- Keep node types limited to `ArchitectureNode`, `TriggerNode`, `CodeNode`, `DecisionNode`, `PayloadNode`, `ErrorNode`, `DescriptionNode`, and `LinkNode`.
 - Ensure every child reference points to an existing element key.
 - Include `state.currentStep` and `state.playing`.
 - Ensure branch labels and descriptions are explicit enough for keyboard branch selection (prefer `props.transitions` metadata on branching nodes).

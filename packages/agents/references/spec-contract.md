@@ -17,6 +17,7 @@ Use this contract when writing `*.flow.json` for `flow-narrator`.
       "props": {
         "title": "Example Flow",
         "description": "Optional subtitle",
+        "mode": "narrative",
         "layoutEngine": "dagre",
         "layoutRankSep": 260,
         "layoutNodeSep": 170,
@@ -48,7 +49,10 @@ Use this contract when writing `*.flow.json` for `flow-narrator`.
 
 - `FlowTimeline`:
   - required: `title` (string)
-  - optional: `description`, `direction`, `minHeight`, `layoutEngine`, `layoutRankSep`, `layoutNodeSep`, `layoutEdgeSep`
+  - optional: `description`, `mode` (`narrative` | `architecture`), `direction`, `minHeight`, `layoutEngine`, `layoutRankSep`, `layoutNodeSep`, `layoutEdgeSep`
+- `ArchitectureNode`:
+  - required: `label`
+  - optional: `kind` (`service` | `database` | `queue` | `cache` | `gateway` | `external` | `compute`), `technology`, `description`, `sourceAnchor`, `transitions`
 - `TriggerNode`:
   - required: `label`
   - optional: `description`, `color`, `sourceAnchor`, `transitions`
@@ -130,6 +134,12 @@ Use `props.transitions` on any non-root node to attach edge metadata:
 - Add `props.transitions` metadata for branch labels and descriptions; branch buttons use these values when present.
 - Keep branch target labels explicit; branch buttons use target labels in the UI.
 - Avoid dangling branches; each branch path should converge or terminate intentionally.
+
+## Architecture Mode Rules
+
+- Set `FlowTimeline.props.mode` to `"architecture"` for topology-style diagrams.
+- Prefer `ArchitectureNode` for services, stores, queues, gateways, and external dependencies.
+- Keep `children`/`transitions` directional so connection flow is clear for exported full-diagram views.
 
 ## Manifest Contract
 

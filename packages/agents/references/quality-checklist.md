@@ -9,6 +9,7 @@ Use this checklist before finalizing generated flow specs.
 - Keep each node focused on one responsibility.
 - Use `DescriptionNode.body` to explain side effects and state changes, not generic filler text.
 - Use realistic, minimal code snippets in `CodeNode.code`.
+- For topology/system overviews, set `FlowTimeline.props.mode` to `architecture` and model components with `ArchitectureNode`.
 - Use `PayloadNode` for data snapshots/transforms and `ErrorNode` for failure states when those concepts matter to the story.
 - Add `sourceAnchor` to key nodes (`path:line` preferred) so readers can jump to relevant source quickly.
 
@@ -22,6 +23,7 @@ Use this checklist before finalizing generated flow specs.
 - Use twoslash markers (for example `// ^?`) only on TypeScript/TSX snippets when inline type/error callouts improve understanding; set `twoslash: true` only when you need to force twoslash mode.
 - Keep twoslash snippets self-contained (inline lightweight helper types/interfaces when needed) so browser callouts stay stable without project-global ambient types.
 - For CodeNodes that combine `magicMoveSteps` and twoslash, keep markers in the final step code so the post-animation twoslash inspection frame has visible callouts.
+- For architecture mode, use explicit edge labels (`props.transitions`) for critical links (for example async/event/retry paths) so exported diagrams stay self-explanatory.
 
 ## Structural Quality
 

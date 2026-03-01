@@ -1,0 +1,160 @@
+{
+  "root": "timeline-arch",
+  "state": {
+    "currentStep": 0,
+    "playing": false
+  },
+  "elements": {
+    "timeline-arch": {
+      "type": "FlowTimeline",
+      "props": {
+        "title": "Platform Architecture Overview",
+        "description": "Gateway, services, queue, workers, and data tier topology",
+        "mode": "architecture",
+        "minHeight": 660,
+        "layoutEngine": "dagre",
+        "layoutRankSep": 260,
+        "layoutNodeSep": 180,
+        "layoutEdgeSep": 34
+      },
+      "children": [
+        "gateway-edge"
+      ]
+    },
+    "gateway-edge": {
+      "type": "ArchitectureNode",
+      "props": {
+        "label": "Edge Gateway",
+        "kind": "gateway",
+        "technology": "Bun.serve",
+        "description": "Ingress for public traffic with auth and routing middleware.",
+        "sourceAnchor": "apps/api/src/server.ts:18",
+        "transitions": [
+          {
+            "to": "service-api",
+            "label": "Route request",
+            "description": "Forward authenticated calls to API layer.",
+            "kind": "default"
+          }
+        ]
+      },
+      "children": [
+        "service-api"
+      ]
+    },
+    "service-api": {
+      "type": "ArchitectureNode",
+      "props": {
+        "label": "API Service",
+        "kind": "service",
+        "technology": "TypeScript handlers",
+        "description": "Coordinates commands and writes transactional state.",
+        "sourceAnchor": {
+          "path": "apps/api/src/routes/index.ts",
+          "line": 42
+        },
+        "transitions": [
+          {
+            "to": "database-primary",
+            "label": "Commit state",
+            "description": "Persist transaction results.",
+            "kind": "success"
+          },
+          {
+            "to": "queue-events",
+            "label": "Publish events",
+            "description": "Emit domain events for async processing.",
+            "kind": "async"
+          },
+          {
+            "to": "cache-read",
+            "label": "Prime cache",
+            "description": "Refresh hot read models after writes.",
+            "kind": "retry"
+          }
+        ]
+      },
+      "children": [
+        "database-primary",
+        "queue-events",
+        "cache-read"
+      ]
+    },
+    "database-primary": {
+      "type": "ArchitectureNode",
+      "props": {
+        "label": "Primary Database",
+        "kind": "database",
+        "technology": "Postgres",
+        "description": "Source of truth for transactional entities.",
+        "sourceAnchor": "infra/postgres/main.tf:12"
+      }
+    },
+    "queue-events": {
+      "type": "ArchitectureNode",
+      "props": {
+        "label": "Event Queue",
+        "kind": "queue",
+        "technology": "SQS / Kafka topic",
+        "description": "Durable buffer for asynchronous jobs and retries.",
+        "transitions": [
+          {
+            "to": "compute-workers",
+            "label": "Dispatch jobs",
+            "description": "Workers process queued events.",
+            "kind": "async"
+          }
+        ]
+      },
+      "children": [
+        "compute-workers"
+      ]
+    },
+    "compute-workers": {
+      "type": "ArchitectureNode",
+      "props": {
+        "label": "Worker Pool",
+        "kind": "compute",
+        "technology": "Bun workers",
+        "description": "Runs asynchronous tasks and emits metrics.",
+        "transitions": [
+          {
+            "to": "cache-read",
+            "label": "Update cache",
+            "description": "Push post-processing projections for read traffic.",
+            "kind": "retry"
+          },
+          {
+            "to": "external-observability",
+            "label": "Report telemetry",
+            "description": "Publish operational traces and alerts.",
+            "kind": "warning"
+          }
+        ]
+      },
+      "children": [
+        "cache-read",
+        "external-observability"
+      ]
+    },
+    "cache-read": {
+      "type": "ArchitectureNode",
+      "props": {
+        "label": "Read Cache",
+        "kind": "cache",
+        "technology": "Redis",
+        "description": "Low-latency read path for frequently requested aggregates."
+      }
+    },
+    "external-observability": {
+      "type": "ArchitectureNode",
+      "props": {
+        "label": "Observability Stack",
+        "kind": "external",
+        "technology": "Metrics + traces + alerts",
+        "description": "Receives telemetry from gateway, API, and workers.",
+        "sourceAnchor": "docs/ops/telemetry.md:7"
+      }
+    }
+  }
+}

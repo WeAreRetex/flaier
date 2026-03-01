@@ -21,8 +21,10 @@ import {
   hasTwoslashHints,
   normalizeTwoslashLanguage,
 } from '../../composables/useTwoslash'
+import { exportFlowDiagram, type DiagramExportFormat } from '../../composables/useDiagramExport'
 import { useFlowNarratorRuntime } from '../../composables/useFlowNarratorRuntime'
 import type {
+  ArchitectureNodeProps,
   EdgeTransitionKind,
   FlowEdge,
   FlowNode,
@@ -31,6 +33,7 @@ import type {
   SpecElement,
 } from '../../types'
 import TimelineControls from '../controls/TimelineControls.vue'
+import ArchitectureNodeVue from '../nodes/ArchitectureNode.vue'
 import CodeNodeVue from '../nodes/CodeNode.vue'
 import DecisionNodeVue from '../nodes/DecisionNode.vue'
 import DescriptionNodeVue from '../nodes/DescriptionNode.vue'
@@ -42,6 +45,7 @@ import TriggerNodeVue from '../nodes/TriggerNode.vue'
 const props = withDefaults(defineProps<{
   title: string
   description?: string
+  mode?: 'narrative' | 'architecture'
   direction?: 'horizontal' | 'vertical'
   minHeight?: number
   layoutEngine?: 'dagre' | 'manual'
@@ -49,11 +53,13 @@ const props = withDefaults(defineProps<{
   layoutNodeSep?: number
   layoutEdgeSep?: number
 }>(), {
+  mode: 'narrative',
   direction: 'horizontal',
   layoutEngine: 'dagre',
 })
 
 const TYPE_MAP: Record<string, FlowNodeType> = {
+  ArchitectureNode: 'architecture',
   TriggerNode: 'trigger',
   CodeNode: 'code',
   DecisionNode: 'decision',
@@ -82,6 +88,16 @@ const EDGE_TRANSITION_KINDS: EdgeTransitionKind[] = [
   'async',
 ]
 const EDGE_TRANSITION_KIND_SET = new Set(EDGE_TRANSITION_KINDS)
+const ARCHITECTURE_NODE_KINDS: Array<NonNullable<ArchitectureNodeProps['kind']>> = [
+  'service',
+  'database',
+  'queue',
+  'cache',
+  'gateway',
+  'external',
+  'compute',
+]
+const ARCHITECTURE_NODE_KIND_SET = new Set(ARCHITECTURE_NODE_KINDS)
 const SOURCE_ANCHOR_LINK_PATTERN = /^(https?:\/\/|vscode:\/\/|idea:\/\/)/i
 const SOURCE_ANCHOR_TRAILING_LOCATION_PATTERN = /^(.*?):(\d+)(?::(\d+))?$/
 
@@ -141,12 +157,38 @@ const activeFlow = computed(() => {
 const showFlowSelector = computed(() => availableFlows.value.length > 1)
 const overlayTitle = computed(() => activeFlow.value?.title ?? props.title)
 const overlayDescription = computed(() => activeFlow.value?.description ?? props.description)
+const headerModeLabel = computed(() => {
+  if (showFlowSelector.value) {
+    return 'Flow'
+  }
+
+  return isArchitectureMode.value ? 'Diagram' : 'Narrative'
+})
 const headerDropdownRef = ref<HTMLDivElement | null>(null)
 const headerDropdownOpen = ref(false)
+const exportMenuRef = ref<HTMLDivElement | null>(null)
+const exportMenuOpen = ref(false)
+const exportInFlight = ref<DiagramExportFormat | null>(null)
+const exportError = ref<string | null>(null)
+const containerRef = ref<HTMLDivElement | null>(null)
+const containerReady = ref(false)
 const uiTheme = ref<'dark' | 'light'>('dark')
 const isLightTheme = computed(() => uiTheme.value === 'light')
+const isArchitectureMode = computed(() => props.mode === 'architecture')
 const themeToggleLabel = computed(() => {
   return isLightTheme.value ? 'Switch to dark mode' : 'Switch to light mode'
+})
+
+const exportButtonLabel = computed(() => {
+  if (exportInFlight.value === 'png') {
+    return 'Exporting PNG...'
+  }
+
+  if (exportInFlight.value === 'pdf') {
+    return 'Exporting PDF...'
+  }
+
+  return 'Export full diagram'
 })
 
 function toggleTheme() {
@@ -195,6 +237,7 @@ function persistTheme(theme: 'dark' | 'light') {
 
 function toggleHeaderDropdown() {
   if (!showFlowSelector.value) return
+  closeExportMenu()
   headerDropdownOpen.value = !headerDropdownOpen.value
 }
 
@@ -202,11 +245,24 @@ function closeHeaderDropdown() {
   headerDropdownOpen.value = false
 }
 
+function toggleExportMenu() {
+  if (exportInFlight.value) return
+  if (!canExportDiagram.value) return
+
+  closeHeaderDropdown()
+  exportMenuOpen.value = !exportMenuOpen.value
+}
+
+function closeExportMenu() {
+  exportMenuOpen.value = false
+}
+
 function handleFlowSelect(flowId: string) {
   if (!flowId) return
 
   runtime.setActiveFlow(flowId)
   headerDropdownOpen.value = false
+  closeExportMenu()
 }
 
 watch(showFlowSelector, (show) => {
@@ -217,6 +273,7 @@ watch(showFlowSelector, (show) => {
 
 watch(activeFlowId, () => {
   headerDropdownOpen.value = false
+  closeExportMenu()
 })
 
 watch(uiTheme, (theme) => {
@@ -388,6 +445,18 @@ function toOptionalBoolean(value: unknown) {
 function toPayloadFormat(value: unknown): 'json' | 'yaml' | 'text' | undefined {
   if (value === 'json' || value === 'yaml' || value === 'text') {
     return value
+  }
+
+  return undefined
+}
+
+function toArchitectureKind(value: unknown): ArchitectureNodeProps['kind'] | undefined {
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  if (ARCHITECTURE_NODE_KIND_SET.has(value as NonNullable<ArchitectureNodeProps['kind']>)) {
+    return value as ArchitectureNodeProps['kind']
   }
 
   return undefined
@@ -728,6 +797,18 @@ function estimateCodeNodeSize(element: SpecElement): NodeSize {
 function estimateNodeSize(node: OrderedNodeElement): NodeSize {
   const { element } = node
 
+  if (element.type === 'ArchitectureNode') {
+    const labelLines = Math.max(1, estimateNodeTextLines(element.props.label, 28))
+    const technologyLines = estimateNodeTextLines(element.props.technology, 30)
+    const descriptionLines = estimateNodeTextLines(element.props.description, 34)
+    const anchorHeight = resolveNodeSourceAnchor(element.props) ? 18 : 0
+
+    return {
+      width: 270,
+      height: Math.min(380, Math.max(126, 58 + labelLines * 19 + technologyLines * 14 + descriptionLines * 15 + anchorHeight)),
+    }
+  }
+
   if (element.type === 'CodeNode') {
     return estimateCodeNodeSize(element)
   }
@@ -1000,7 +1081,15 @@ const playing = computed<boolean>({
   },
 })
 
-watch([startNodeKey, orderedNodeElements], ([start]) => {
+watch([startNodeKey, orderedNodeElements, isArchitectureMode], ([start, , architectureMode]) => {
+  if (architectureMode) {
+    selectedBranchByNode.value = {}
+    pathFrames.value = []
+    currentStep.value = 0
+    playing.value = false
+    return
+  }
+
   selectedBranchByNode.value = {}
 
   if (!start) {
@@ -1034,6 +1123,10 @@ function clearTimer() {
 }
 
 function next() {
+  if (isArchitectureMode.value) {
+    return false
+  }
+
   if (currentStep.value >= totalSteps.value - 1) {
     return false
   }
@@ -1056,16 +1149,29 @@ watch([playing, totalSteps, intervalMs], ([isPlaying, steps, interval]) => {
 }, { immediate: true })
 
 function prev() {
+  if (isArchitectureMode.value) {
+    return
+  }
+
   if (currentStep.value > 0) {
     currentStep.value -= 1
   }
 }
 
 function goTo(step: number) {
+  if (isArchitectureMode.value) {
+    return
+  }
+
   currentStep.value = clampStep(step)
 }
 
 function togglePlay() {
+  if (isArchitectureMode.value) {
+    playing.value = false
+    return
+  }
+
   if (totalSteps.value <= 1) {
     playing.value = false
     return
@@ -1436,7 +1542,9 @@ const edges = computed<FlowEdge[]>(() => {
     for (const target of targets) {
       if (!orderedNodeByKey.value[target]) continue
 
-      const isActiveEdge = activeFrame.value?.nodeKey === node.key && nextPlannedNodeKey.value === target
+      const isActiveEdge = !isArchitectureMode.value
+        && activeFrame.value?.nodeKey === node.key
+        && nextPlannedNodeKey.value === target
       const transition = transitionMetaBySource.value[node.key]?.[target]
       const edgeClasses = [
         isActiveEdge ? 'active-edge' : null,
@@ -1450,7 +1558,7 @@ const edges = computed<FlowEdge[]>(() => {
         source: node.key,
         target,
         type: 'smoothstep',
-        animated: true,
+        animated: !isArchitectureMode.value,
         class: edgeClasses.length > 0 ? edgeClasses.join(' ') : undefined,
         label: transition?.label,
         labelShowBg: hasLabel,
@@ -1473,7 +1581,98 @@ const edges = computed<FlowEdge[]>(() => {
   return result
 })
 
+const diagramBounds = computed(() => {
+  if (nodes.value.length === 0) {
+    return null
+  }
+
+  let minX = Number.POSITIVE_INFINITY
+  let minY = Number.POSITIVE_INFINITY
+  let maxX = Number.NEGATIVE_INFINITY
+  let maxY = Number.NEGATIVE_INFINITY
+
+  for (const node of nodes.value) {
+    const size = nodeSizes.value[node.id] ?? { width: 240, height: 120 }
+    minX = Math.min(minX, node.position.x)
+    minY = Math.min(minY, node.position.y)
+    maxX = Math.max(maxX, node.position.x + size.width)
+    maxY = Math.max(maxY, node.position.y + size.height)
+  }
+
+  if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+    return null
+  }
+
+  return {
+    x: Math.floor(minX),
+    y: Math.floor(minY),
+    width: Math.max(1, Math.ceil(maxX - minX)),
+    height: Math.max(1, Math.ceil(maxY - minY)),
+  }
+})
+
+const canExportDiagram = computed(() => {
+  return Boolean(containerReady.value && nodes.value.length > 0 && diagramBounds.value)
+})
+
+watch(canExportDiagram, (canExport) => {
+  if (!canExport) {
+    closeExportMenu()
+  }
+})
+
+function createExportFileBaseName() {
+  const rawName = activeFlow.value?.id
+    ?? overlayTitle.value
+    ?? props.title
+    ?? 'flow-diagram'
+
+  const slug = rawName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+
+  return slug || 'flow-diagram'
+}
+
+async function exportDiagram(format: DiagramExportFormat) {
+  if (exportInFlight.value) return
+  if (!canExportDiagram.value) return
+
+  const flowElement = containerRef.value?.querySelector('.vue-flow') as HTMLElement | null
+  const bounds = diagramBounds.value
+
+  if (!flowElement || !bounds) {
+    exportError.value = 'Diagram is still initializing. Try again in a moment.'
+    return
+  }
+
+  exportError.value = null
+  exportMenuOpen.value = false
+  exportInFlight.value = format
+
+  try {
+    await exportFlowDiagram({
+      flowElement,
+      theme: uiTheme.value,
+      bounds,
+      fileNameBase: createExportFileBaseName(),
+      format,
+    })
+  } catch (error) {
+    exportError.value = error instanceof Error
+      ? error.message
+      : `Failed to export ${format.toUpperCase()} diagram.`
+  } finally {
+    exportInFlight.value = null
+  }
+}
+
 function isActive(nodeKey: string) {
+  if (isArchitectureMode.value) {
+    return true
+  }
+
   return activeFrame.value?.nodeKey === nodeKey
 }
 
@@ -1552,6 +1751,15 @@ const activeDescription = computed(() => {
       .join(' ')
   }
 
+  if (node.element.type === 'ArchitectureNode') {
+    const technology = toOptionalString(node.element.props.technology)
+    const description = toOptionalString(node.element.props.description)
+
+    return [technology ? `Technology: ${technology}` : '', description ?? '']
+      .filter((value): value is string => typeof value === 'string' && value.length > 0)
+      .join(' ')
+  }
+
   return toOptionalString(node.element.props.description) ?? ''
 })
 
@@ -1562,7 +1770,91 @@ const activeSourceAnchor = computed(() => {
   return resolveNodeSourceAnchor(node.element.props)
 })
 
+const architectureSelectedNodeKey = ref<string | null>(null)
+
+const architectureSelectedNode = computed(() => {
+  if (!isArchitectureMode.value) {
+    return undefined
+  }
+
+  const selected = architectureSelectedNodeKey.value
+  if (selected && orderedNodeByKey.value[selected]) {
+    return orderedNodeByKey.value[selected]
+  }
+
+  return orderedNodeElements.value[0]
+})
+
+watch([isArchitectureMode, orderedNodeElements], ([architectureMode, ordered]) => {
+  if (!architectureMode) {
+    architectureSelectedNodeKey.value = null
+    return
+  }
+
+  const selected = architectureSelectedNodeKey.value
+  if (selected && ordered.some((node) => node.key === selected)) {
+    return
+  }
+
+  architectureSelectedNodeKey.value = ordered[0]?.key ?? null
+}, { immediate: true })
+
+const architectureInspectorLabel = computed(() => {
+  const node = architectureSelectedNode.value
+  if (!node) return ''
+  return toOptionalString(node.element.props.label) ?? node.key
+})
+
+const architectureInspectorDescription = computed(() => {
+  const node = architectureSelectedNode.value
+  if (!node) return ''
+
+  if (node.element.type === 'ArchitectureNode') {
+    const technology = toOptionalString(node.element.props.technology)
+    const description = toOptionalString(node.element.props.description)
+
+    return [technology ? `Technology: ${technology}` : '', description ?? '']
+      .filter((value): value is string => typeof value === 'string' && value.length > 0)
+      .join('\n')
+  }
+
+  if (node.element.type === 'CodeNode') {
+    return toOptionalString(node.element.props.story)
+      ?? toOptionalString(node.element.props.comment)
+      ?? ''
+  }
+
+  if (node.element.type === 'DecisionNode') {
+    return toOptionalString(node.element.props.description)
+      ?? toOptionalString(node.element.props.condition)
+      ?? ''
+  }
+
+  if (node.element.type === 'DescriptionNode') {
+    return toOptionalString(node.element.props.body) ?? ''
+  }
+
+  if (node.element.type === 'ErrorNode') {
+    return toOptionalString(node.element.props.message)
+      ?? toOptionalString(node.element.props.cause)
+      ?? ''
+  }
+
+  return toOptionalString(node.element.props.description) ?? ''
+})
+
+const architectureInspectorSourceAnchor = computed(() => {
+  const node = architectureSelectedNode.value
+  if (!node) return undefined
+
+  return resolveNodeSourceAnchor(node.element.props)
+})
+
 const branchChoices = computed<BranchChoice[]>(() => {
+  if (isArchitectureMode.value) {
+    return []
+  }
+
   const node = activeNode.value
   const frame = activeFrame.value
   if (!node || !frame) return []
@@ -1636,6 +1928,10 @@ const containerMinHeight = computed(() => {
     return Math.floor(provided)
   }
 
+  if (isArchitectureMode.value) {
+    return 620
+  }
+
   const node = activeNode.value ?? orderedNodeElements.value[0]
   if (!node || node.element.type !== 'CodeNode') {
     return 520
@@ -1674,19 +1970,20 @@ const {
 } = useVueFlow(flowId)
 const nodesInitialized = useNodesInitialized()
 const paneReady = ref(false)
-const containerRef = ref<HTMLDivElement | null>(null)
-const containerReady = ref(false)
 const overviewMode = ref(false)
 let resizeObserver: ResizeObserver | null = null
 
 function handleDocumentPointerDown(event: PointerEvent) {
-  if (!headerDropdownOpen.value) return
-
   const target = event.target as Node | null
   if (!target) return
-  if (headerDropdownRef.value?.contains(target)) return
 
-  closeHeaderDropdown()
+  if (headerDropdownOpen.value && !headerDropdownRef.value?.contains(target)) {
+    closeHeaderDropdown()
+  }
+
+  if (exportMenuOpen.value && !exportMenuRef.value?.contains(target)) {
+    closeExportMenu()
+  }
 }
 
 function isEditableTarget(target: EventTarget | null) {
@@ -1709,12 +2006,14 @@ function isEditableTarget(target: EventTarget | null) {
 function handleDocumentKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') {
     closeHeaderDropdown()
+    closeExportMenu()
     return
   }
 
   if (event.defaultPrevented) return
   if (event.metaKey || event.ctrlKey || event.altKey) return
   if (isEditableTarget(event.target)) return
+  if (isArchitectureMode.value) return
 
   if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
     event.preventDefault()
@@ -1765,6 +2064,11 @@ onViewportChange((transform) => {
 })
 
 onNodeClick(({ node }) => {
+  if (isArchitectureMode.value) {
+    architectureSelectedNodeKey.value = node.id
+    return
+  }
+
   jumpToNode(node.id)
 })
 
@@ -1810,7 +2114,8 @@ const viewportReady = computed(() =>
 const hasInitialFocus = ref(false)
 const lastFocusedNodeKey = ref<string | null>(null)
 
-watch([viewportReady, activeFrame], ([ready, frame]) => {
+watch([viewportReady, activeFrame, isArchitectureMode], ([ready, frame, architectureMode]) => {
+  if (architectureMode) return
   if (!ready || !frame) return
 
   const shouldFocusNode = !hasInitialFocus.value || lastFocusedNodeKey.value !== frame.nodeKey
@@ -1828,6 +2133,41 @@ watch([viewportReady, activeFrame], ([ready, frame]) => {
     lastFocusedNodeKey.value = frame.nodeKey
   })
 }, { immediate: true })
+
+const architectureFitSignature = ref('')
+
+watch([viewportReady, isArchitectureMode, nodes], ([ready, architectureMode, currentNodes]) => {
+  if (!ready || !architectureMode || currentNodes.length === 0) return
+
+  const signature = currentNodes
+    .map((node) => `${node.id}:${Math.round(node.position.x)}:${Math.round(node.position.y)}`)
+    .join('|')
+
+  if (signature === architectureFitSignature.value) {
+    return
+  }
+
+  architectureFitSignature.value = signature
+
+  nextTick(() => {
+    void fitView({
+      duration: 260,
+      padding: 0.2,
+      maxZoom: 1.15,
+    })
+  })
+}, { immediate: true })
+
+watch(isArchitectureMode, (architectureMode) => {
+  if (architectureMode) {
+    playing.value = false
+    hasInitialFocus.value = false
+    lastFocusedNodeKey.value = null
+    return
+  }
+
+  architectureFitSignature.value = ''
+})
 
 onUnmounted(() => {
   clearTimer()
@@ -1870,6 +2210,17 @@ onUnmounted(() => {
       class="h-full w-full"
       @init="onInit"
     >
+      <template #node-architecture="{ data }">
+        <ArchitectureNodeVue
+          :label="toRequiredString(data.props.label)"
+          :kind="toArchitectureKind(data.props.kind)"
+          :technology="toOptionalString(data.props.technology)"
+          :description="toOptionalString(data.props.description)"
+          :source-anchor="resolveNodeSourceAnchor(data.props)"
+          :active="isActive(data.key)"
+        />
+      </template>
+
       <template #node-trigger="{ data }">
         <TriggerNodeVue
           :label="toRequiredString(data.props.label)"
@@ -1973,7 +2324,7 @@ onUnmounted(() => {
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
               <p class="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                {{ showFlowSelector ? 'Flow' : 'Narrative' }}
+                {{ headerModeLabel }}
               </p>
               <p v-if="overlayTitle" class="mt-1 truncate text-sm font-medium text-foreground">
                 {{ overlayTitle }}
@@ -2030,7 +2381,56 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div class="absolute top-4 right-4 z-20">
+    <div class="absolute top-4 right-4 z-20 flex flex-col items-end gap-2">
+      <div ref="exportMenuRef" class="relative">
+        <button
+          type="button"
+          class="group inline-flex h-9 items-center gap-2 rounded-full border border-border/70 bg-card/85 px-3 text-[11px] text-muted-foreground shadow-lg backdrop-blur-md transition-colors hover:text-foreground disabled:cursor-default disabled:opacity-55"
+          :aria-label="exportButtonLabel"
+          :title="exportButtonLabel"
+          :disabled="!canExportDiagram || Boolean(exportInFlight)"
+          @click="toggleExportMenu"
+        >
+          <svg
+            class="h-3.5 w-3.5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M12 3v12" />
+            <path d="m7 10 5 5 5-5" />
+            <path d="M4 20h16" />
+          </svg>
+          <span>Export</span>
+        </button>
+
+        <div
+          v-if="exportMenuOpen"
+          class="absolute right-0 top-[calc(100%+8px)] w-44 rounded-lg border border-border/70 bg-card/95 p-1 shadow-2xl backdrop-blur-md"
+        >
+          <button
+            type="button"
+            class="w-full rounded-md px-2.5 py-2 text-left text-xs text-foreground transition-colors hover:bg-muted/70"
+            :disabled="Boolean(exportInFlight)"
+            @click="exportDiagram('png')"
+          >
+            Export PNG
+          </button>
+          <button
+            type="button"
+            class="w-full rounded-md px-2.5 py-2 text-left text-xs text-foreground transition-colors hover:bg-muted/70"
+            :disabled="Boolean(exportInFlight)"
+            @click="exportDiagram('pdf')"
+          >
+            Export PDF
+          </button>
+        </div>
+      </div>
+
       <button
         type="button"
         class="group inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-card/85 text-muted-foreground shadow-lg backdrop-blur-md transition-colors hover:text-foreground"
@@ -2074,9 +2474,17 @@ onUnmounted(() => {
           <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 1 0 9.79 9.79Z" />
         </svg>
       </button>
+
+      <p
+        v-if="exportError"
+        class="max-w-[260px] rounded-md border border-red-500/45 bg-red-500/12 px-2 py-1 text-[10px] leading-relaxed text-red-200"
+      >
+        {{ exportError }}
+      </p>
     </div>
 
     <div
+      v-if="!isArchitectureMode"
       class="pointer-events-none absolute inset-x-0 bottom-2 z-30 flex justify-center px-3"
       style="padding-bottom: max(env(safe-area-inset-bottom), 0px);"
     >
@@ -2097,6 +2505,42 @@ onUnmounted(() => {
           @toggle-play="togglePlay"
           @choose-choice="chooseChoice"
         />
+      </div>
+    </div>
+
+    <div
+      v-else-if="architectureInspectorLabel || architectureInspectorDescription || architectureInspectorSourceAnchor?.label"
+      class="pointer-events-none absolute inset-x-0 bottom-2 z-30 flex justify-center px-3"
+      style="padding-bottom: max(env(safe-area-inset-bottom), 0px);"
+    >
+      <div class="pointer-events-auto w-full max-w-[680px] rounded-2xl border border-border/60 bg-card/80 px-3 py-2 backdrop-blur-xl shadow-2xl">
+        <p class="text-[11px] font-semibold text-foreground leading-snug break-words">
+          {{ architectureInspectorLabel }}
+        </p>
+
+        <a
+          v-if="architectureInspectorSourceAnchor?.label && architectureInspectorSourceAnchor?.href"
+          :href="architectureInspectorSourceAnchor.href"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="mt-1 inline-flex max-w-full items-center gap-1 rounded-md border border-border/70 bg-muted/25 px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground transition-colors hover:border-primary/45 hover:text-foreground"
+        >
+          <span class="truncate">{{ architectureInspectorSourceAnchor.label }}</span>
+        </a>
+
+        <p
+          v-else-if="architectureInspectorSourceAnchor?.label"
+          class="mt-1 inline-flex max-w-full items-center rounded-md border border-border/70 bg-muted/25 px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground"
+        >
+          <span class="truncate">{{ architectureInspectorSourceAnchor.label }}</span>
+        </p>
+
+        <p
+          v-if="architectureInspectorDescription"
+          class="mt-1 max-h-[150px] overflow-auto pr-1 text-[11px] text-muted-foreground leading-relaxed whitespace-pre-wrap break-words"
+        >
+          {{ architectureInspectorDescription }}
+        </p>
       </div>
     </div>
   </div>

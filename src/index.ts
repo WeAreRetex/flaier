@@ -16,6 +16,7 @@ export type {
   FlowNarratorSource,
   FlowNarratorProps,
   FlowTimelineProps,
+  ArchitectureNodeProps,
   TriggerNodeProps,
   CodeNodeProps,
   DecisionNodeProps,

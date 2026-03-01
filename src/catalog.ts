@@ -43,6 +43,7 @@ export const catalog = defineCatalog(schema, {
       props: z.object({
         title: z.string(),
         description: z.string().optional(),
+        mode: z.enum(['narrative', 'architecture']).default('narrative'),
         direction: z.enum(['horizontal', 'vertical']).default('horizontal'),
         minHeight: z.number().int().positive().optional(),
         layoutEngine: z.enum(['dagre', 'manual']).default('dagre'),
@@ -52,6 +53,17 @@ export const catalog = defineCatalog(schema, {
       }),
       description: 'Root timeline container that orchestrates a pipeline flow graph',
       slots: ['default'],
+    },
+    ArchitectureNode: {
+      props: z.object({
+        label: z.string(),
+        kind: z.enum(['service', 'database', 'queue', 'cache', 'gateway', 'external', 'compute']).default('service'),
+        technology: z.string().optional(),
+        description: z.string().optional(),
+        sourceAnchor: sourceAnchorSchema.optional(),
+        transitions: z.array(edgeTransitionSchema).optional(),
+      }),
+      description: 'Architecture/infrastructure component node for system diagrams',
     },
     TriggerNode: {
       props: z.object({

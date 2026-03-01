@@ -8,6 +8,7 @@ export interface FlowReadinessResult {
 
 const FLOW_COMPONENT_TYPES = new Set([
   'FlowTimeline',
+  'ArchitectureNode',
   'TriggerNode',
   'CodeNode',
   'DecisionNode',
@@ -34,6 +35,7 @@ const EDGE_TRANSITION_KINDS = new Set([
   'retry',
   'async',
 ])
+const ARCHITECTURE_NODE_KINDS = ['service', 'database', 'queue', 'cache', 'gateway', 'external', 'compute']
 
 interface NormalizedTransition {
   to: string
@@ -61,6 +63,8 @@ export function validateFlowNarratorReadiness(spec: FlowSpec): FlowReadinessResu
   if (root.type !== 'FlowTimeline') {
     errors.push(`Root element "${spec.root}" must be type "FlowTimeline".`)
   }
+
+  const rootMode = getFlowTimelineMode(root)
 
   const elementKeys = new Set(entries.map(([key]) => key))
   const childrenByKey = new Map<string, string[]>()
@@ -109,6 +113,16 @@ export function validateFlowNarratorReadiness(spec: FlowSpec): FlowReadinessResu
   const rootChildren = childrenByKey.get(spec.root) ?? []
   if (rootChildren.length === 0) {
     warnings.push('Root FlowTimeline has no children, so no node timeline can be traversed.')
+  }
+
+  if (rootMode === 'architecture') {
+    const architectureNodeCount = entries
+      .filter(([key, element]) => key !== spec.root && isFlowElement(element) && element.type === 'ArchitectureNode')
+      .length
+
+    if (architectureNodeCount === 0) {
+      warnings.push('FlowTimeline mode="architecture" has no ArchitectureNode elements; add architecture components for clearer infrastructure storytelling.')
+    }
   }
 
   const reachable = new Set<string>()
@@ -165,12 +179,21 @@ function validateElementProps(
     case 'FlowTimeline': {
       expectRequiredString(props, 'title', key, errors)
       expectOptionalString(props, 'description', key, errors)
+      expectOptionalEnum(props, 'mode', ['narrative', 'architecture'], key, errors)
       expectOptionalEnum(props, 'direction', ['horizontal', 'vertical'], key, errors)
       expectOptionalEnum(props, 'layoutEngine', ['dagre', 'manual'], key, errors)
       expectOptionalPositiveNumber(props, 'minHeight', key, errors, 1)
       expectOptionalPositiveNumber(props, 'layoutRankSep', key, errors, 1)
       expectOptionalPositiveNumber(props, 'layoutNodeSep', key, errors, 1)
       expectOptionalPositiveNumber(props, 'layoutEdgeSep', key, errors, 1)
+      break
+    }
+
+    case 'ArchitectureNode': {
+      expectRequiredString(props, 'label', key, errors)
+      expectOptionalString(props, 'description', key, errors)
+      expectOptionalString(props, 'technology', key, errors)
+      expectOptionalEnum(props, 'kind', ARCHITECTURE_NODE_KINDS, key, errors)
       break
     }
 
@@ -548,6 +571,10 @@ function validateSourceAnchorProp(
       `Element "${elementKey}" sourceAnchor.path is missing line context; include sourceAnchor.line for clearer code jumps.`,
     )
   }
+}
+
+function getFlowTimelineMode(root: FlowElement) {
+  return root.props.mode === 'architecture' ? 'architecture' : 'narrative'
 }
 
 function validateStateShape(state: unknown, errors: string[], warnings: string[]) {

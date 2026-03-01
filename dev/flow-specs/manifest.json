@@ -25,6 +25,12 @@
       "title": "Decision, Payload, and Error Narrative",
       "description": "Branch metadata with dedicated payload and failure nodes",
       "src": "./decision-payload-error.flow.json"
+    },
+    {
+      "id": "architecture-overview",
+      "title": "Platform Architecture Overview",
+      "description": "Gateway, services, queue, workers, and data tier topology",
+      "src": "./architecture-overview.flow.json"
     }
   ]
 }

@@ -42,12 +42,23 @@ export type SourceAnchorInput = string | SourceAnchor
 export interface FlowTimelineProps {
   title: string
   description?: string
+  mode?: 'narrative' | 'architecture'
   direction?: 'horizontal' | 'vertical'
   minHeight?: number
   layoutEngine?: 'dagre' | 'manual'
   layoutRankSep?: number
   layoutNodeSep?: number
   layoutEdgeSep?: number
+}
+
+/** Props for architecture/infrastructure nodes */
+export interface ArchitectureNodeProps {
+  label: string
+  kind?: 'service' | 'database' | 'queue' | 'cache' | 'gateway' | 'external' | 'compute'
+  technology?: string
+  description?: string
+  sourceAnchor?: SourceAnchorInput
+  transitions?: EdgeTransition[]
 }
 
 /** Props for trigger/entry-point nodes */
@@ -125,6 +136,7 @@ export interface LinkNodeProps {
 
 /** Union of all node prop types */
 export type AnyNodeProps =
+  | ArchitectureNodeProps
   | TriggerNodeProps
   | CodeNodeProps
   | DecisionNodeProps
@@ -135,6 +147,7 @@ export type AnyNodeProps =
 
 /** VueFlow custom node type names */
 export type FlowNodeType =
+  | 'architecture'
   | 'trigger'
   | 'code'
   | 'decision'

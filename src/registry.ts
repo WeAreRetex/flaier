@@ -8,6 +8,7 @@ const FlowTimelineComponent: ComponentFn<typeof catalog, 'FlowTimeline'> = ({ pr
   h(FlowTimelineRenderer, {
     title: props.title,
     description: props.description,
+    mode: props.mode,
     direction: props.direction,
     minHeight: props.minHeight,
     layoutEngine: props.layoutEngine,
@@ -16,6 +17,7 @@ const FlowTimelineComponent: ComponentFn<typeof catalog, 'FlowTimeline'> = ({ pr
     layoutEdgeSep: props.layoutEdgeSep,
   })
 
+const ArchitectureNodeComponent: ComponentFn<typeof catalog, 'ArchitectureNode'> = () => null
 const TriggerNodeComponent: ComponentFn<typeof catalog, 'TriggerNode'> = () => null
 const CodeNodeComponent: ComponentFn<typeof catalog, 'CodeNode'> = () => null
 const DecisionNodeComponent: ComponentFn<typeof catalog, 'DecisionNode'> = () => null
@@ -27,6 +29,7 @@ const LinkNodeComponent: ComponentFn<typeof catalog, 'LinkNode'> = () => null
 export const { registry } = defineRegistry(catalog, {
   components: {
     FlowTimeline: FlowTimelineComponent,
+    ArchitectureNode: ArchitectureNodeComponent,
     TriggerNode: TriggerNodeComponent,
     CodeNode: CodeNodeComponent,
     DecisionNode: DecisionNodeComponent,

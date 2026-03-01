@@ -34,6 +34,8 @@
     "@json-render/vue": "latest",
     "@shikijs/twoslash": "^3",
     "@vue-flow/core": "^1",
+    "html-to-image": "^1.11.11",
+    "jspdf": "^2.5.2",
     "shiki": "^3",
     "shiki-magic-move": "^0.5",
     "twoslash-cdn": "^0.3",

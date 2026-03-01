@@ -30,6 +30,8 @@ export default defineConfig({
             'shiki',
             'shiki-magic-move',
             'shiki-magic-move/vue',
+            'html-to-image',
+            'jspdf',
             'zod',
           ],
         },

@@ -27,6 +27,24 @@ bun run viewer:dev
 
 When a manifest is loaded, the viewer shows a dropdown so users can switch between generated flows.
 
+## Rendering Modes
+
+`FlowTimeline.props.mode` controls player behavior:
+
+- `"narrative"` (default): timeline controls, active-node focus, autoplay/step traversal.
+- `"architecture"`: static topology exploration with node inspector and full-diagram export controls.
+
+For architecture diagrams, prefer `ArchitectureNode` entries and explicit `props.transitions` labels.
+
+## Diagram Export
+
+Use the top-right export button in the renderer to download the **full diagram** as:
+
+- PNG
+- PDF
+
+Export captures all laid-out nodes and edges, not just the current viewport.
+
 ### Recommended on-disk layout
 
 ```text
