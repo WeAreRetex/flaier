@@ -9,6 +9,7 @@ const FlowTimelineComponent: ComponentFn<typeof catalog, 'FlowTimeline'> = ({ pr
     title: props.title,
     description: props.description,
     mode: props.mode,
+    zones: props.zones,
     direction: props.direction,
     minHeight: props.minHeight,
     layoutEngine: props.layoutEngine,

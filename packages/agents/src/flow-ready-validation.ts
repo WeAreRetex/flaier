@@ -36,12 +36,19 @@ const EDGE_TRANSITION_KINDS = new Set([
   'async',
 ])
 const ARCHITECTURE_NODE_KINDS = ['service', 'database', 'queue', 'cache', 'gateway', 'external', 'compute']
+const EDGE_TRANSITION_TRANSPORTS = ['sync', 'async']
+const EDGE_TRANSITION_CRITICALITY = ['low', 'medium', 'high']
 
 interface NormalizedTransition {
   to: string
   label?: string
   description?: string
   kind?: string
+  protocol?: string
+  transport?: string
+  auth?: string
+  contract?: string
+  criticality?: string
 }
 
 export function validateFlowNarratorReadiness(spec: FlowSpec): FlowReadinessResult {
@@ -123,6 +130,19 @@ export function validateFlowNarratorReadiness(spec: FlowSpec): FlowReadinessResu
     if (architectureNodeCount === 0) {
       warnings.push('FlowTimeline mode="architecture" has no ArchitectureNode elements; add architecture components for clearer infrastructure storytelling.')
     }
+
+    const declaredZones = collectDeclaredArchitectureZones(root)
+    const referencedZones = collectReferencedArchitectureZones(entries)
+
+    for (const zoneId of referencedZones) {
+      if (declaredZones.has(zoneId)) continue
+      warnings.push(`Architecture zone "${zoneId}" is referenced by nodes but missing from FlowTimeline.props.zones.`)
+    }
+
+    for (const zoneId of declaredZones) {
+      if (referencedZones.has(zoneId)) continue
+      warnings.push(`FlowTimeline.props.zones includes "${zoneId}" with no assigned ArchitectureNode.`)
+    }
   }
 
   const reachable = new Set<string>()
@@ -180,6 +200,7 @@ function validateElementProps(
       expectRequiredString(props, 'title', key, errors)
       expectOptionalString(props, 'description', key, errors)
       expectOptionalEnum(props, 'mode', ['narrative', 'architecture'], key, errors)
+      validateArchitectureZonesProp(key, props.zones, errors)
       expectOptionalEnum(props, 'direction', ['horizontal', 'vertical'], key, errors)
       expectOptionalEnum(props, 'layoutEngine', ['dagre', 'manual'], key, errors)
       expectOptionalPositiveNumber(props, 'minHeight', key, errors, 1)
@@ -193,7 +214,40 @@ function validateElementProps(
       expectRequiredString(props, 'label', key, errors)
       expectOptionalString(props, 'description', key, errors)
       expectOptionalString(props, 'technology', key, errors)
+      expectOptionalString(props, 'runtime', key, errors)
+      expectOptionalString(props, 'owner', key, errors)
+      expectOptionalString(props, 'zone', key, errors)
       expectOptionalEnum(props, 'kind', ARCHITECTURE_NODE_KINDS, key, errors)
+      expectOptionalEnum(props, 'tier', ['edge', 'application', 'integration', 'data', 'platform', 'external'], key, errors)
+      expectOptionalEnum(props, 'status', ['planned', 'active', 'degraded', 'retired'], key, errors)
+
+      expectOptionalStringArray(props, 'tags', key, errors)
+      expectOptionalStringArray(props, 'responsibilities', key, errors)
+      expectOptionalStringArray(props, 'capabilities', key, errors)
+      validateArchitectureInterfacesProp(key, props.interfaces, errors)
+      validateArchitectureDataProp(key, props.data, errors)
+      validateArchitectureSecurityProp(key, props.security, errors)
+      validateArchitectureOperationsProp(key, props.operations, errors)
+      validateArchitectureLinksProp(key, props.links, errors)
+
+      if (!isNonEmptyString(props.owner)) {
+        warnings.push(`Element "${key}" is ArchitectureNode without owner metadata; include "owner" for operational clarity.`)
+      }
+
+      const kind = typeof props.kind === 'string' ? props.kind : 'service'
+
+      if (kind === 'gateway' && !Array.isArray(props.interfaces)) {
+        warnings.push(`Element "${key}" is gateway-like but has no "interfaces" metadata; add contracts/protocol details.`)
+      }
+
+      if ((kind === 'database' || kind === 'cache') && !Array.isArray(props.data)) {
+        warnings.push(`Element "${key}" is ${kind} but has no "data" metadata; add data classification/retention details.`)
+      }
+
+      if (!Array.isArray(props.capabilities) && !Array.isArray(props.responsibilities)) {
+        warnings.push(`Element "${key}" has no capabilities/responsibilities list; add one for stronger architecture narration.`)
+      }
+
       break
     }
 
@@ -467,12 +521,55 @@ function normalizeTransitions(
       }
     }
 
+    const protocol = transition.protocol
+    if (protocol !== undefined && typeof protocol !== 'string') {
+      errors.push(`Element "${key}" transitions[${index}].protocol must be a string when provided.`)
+      continue
+    }
+
+    const transport = transition.transport
+    if (transport !== undefined) {
+      if (typeof transport !== 'string' || !EDGE_TRANSITION_TRANSPORTS.includes(transport)) {
+        errors.push(
+          `Element "${key}" transitions[${index}].transport must be one of: ${EDGE_TRANSITION_TRANSPORTS.join(', ')}.`,
+        )
+        continue
+      }
+    }
+
+    const auth = transition.auth
+    if (auth !== undefined && typeof auth !== 'string') {
+      errors.push(`Element "${key}" transitions[${index}].auth must be a string when provided.`)
+      continue
+    }
+
+    const contract = transition.contract
+    if (contract !== undefined && typeof contract !== 'string') {
+      errors.push(`Element "${key}" transitions[${index}].contract must be a string when provided.`)
+      continue
+    }
+
+    const criticality = transition.criticality
+    if (criticality !== undefined) {
+      if (typeof criticality !== 'string' || !EDGE_TRANSITION_CRITICALITY.includes(criticality)) {
+        errors.push(
+          `Element "${key}" transitions[${index}].criticality must be one of: ${EDGE_TRANSITION_CRITICALITY.join(', ')}.`,
+        )
+        continue
+      }
+    }
+
     seenTargets.add(to)
     normalized.push({
       to,
       label: typeof label === 'string' ? label : undefined,
       description: typeof description === 'string' ? description : undefined,
       kind: typeof kind === 'string' ? kind : undefined,
+      protocol: typeof protocol === 'string' ? protocol : undefined,
+      transport: typeof transport === 'string' ? transport : undefined,
+      auth: typeof auth === 'string' ? auth : undefined,
+      contract: typeof contract === 'string' ? contract : undefined,
+      criticality: typeof criticality === 'string' ? criticality : undefined,
     })
   }
 
@@ -575,6 +672,285 @@ function validateSourceAnchorProp(
 
 function getFlowTimelineMode(root: FlowElement) {
   return root.props.mode === 'architecture' ? 'architecture' : 'narrative'
+}
+
+function collectDeclaredArchitectureZones(root: FlowElement) {
+  const zones = new Set<string>()
+  const rawZones = root.props.zones
+
+  if (!Array.isArray(rawZones)) {
+    return zones
+  }
+
+  for (const zone of rawZones) {
+    if (!isObject(zone)) {
+      continue
+    }
+
+    const id = zone.id
+    if (isNonEmptyString(id)) {
+      zones.add(id.trim())
+    }
+  }
+
+  return zones
+}
+
+function collectReferencedArchitectureZones(entries: Array<[string, unknown]>) {
+  const zones = new Set<string>()
+
+  for (const [, rawElement] of entries) {
+    if (!isFlowElement(rawElement)) {
+      continue
+    }
+
+    if (rawElement.type !== 'ArchitectureNode') {
+      continue
+    }
+
+    const zone = rawElement.props.zone
+    if (isNonEmptyString(zone)) {
+      zones.add(zone.trim())
+    }
+  }
+
+  return zones
+}
+
+function validateArchitectureZonesProp(
+  elementKey: string,
+  zones: unknown,
+  errors: string[],
+) {
+  if (zones === undefined) {
+    return
+  }
+
+  if (!Array.isArray(zones)) {
+    errors.push(`Element "${elementKey}" prop "zones" must be an array when provided.`)
+    return
+  }
+
+  const seen = new Set<string>()
+
+  for (const [index, zone] of zones.entries()) {
+    if (!isObject(zone)) {
+      errors.push(`Element "${elementKey}" zones[${index}] must be an object.`)
+      continue
+    }
+
+    if (!isNonEmptyString(zone.id)) {
+      errors.push(`Element "${elementKey}" zones[${index}].id must be a non-empty string.`)
+      continue
+    }
+
+    const id = zone.id.trim()
+    if (seen.has(id)) {
+      errors.push(`Element "${elementKey}" zones has duplicate id "${id}".`)
+      continue
+    }
+    seen.add(id)
+
+    if (!isNonEmptyString(zone.label)) {
+      errors.push(`Element "${elementKey}" zones[${index}].label must be a non-empty string.`)
+    }
+
+    if (zone.description !== undefined && typeof zone.description !== 'string') {
+      errors.push(`Element "${elementKey}" zones[${index}].description must be a string when provided.`)
+    }
+
+    if (zone.color !== undefined && typeof zone.color !== 'string') {
+      errors.push(`Element "${elementKey}" zones[${index}].color must be a string when provided.`)
+    }
+
+    if (zone.padding !== undefined) {
+      if (typeof zone.padding !== 'number' || !Number.isFinite(zone.padding) || zone.padding <= 0) {
+        errors.push(`Element "${elementKey}" zones[${index}].padding must be a positive number when provided.`)
+      }
+    }
+  }
+}
+
+function expectOptionalStringArray(
+  props: Record<string, unknown>,
+  key: string,
+  elementKey: string,
+  errors: string[],
+) {
+  const value = props[key]
+  if (value === undefined) {
+    return
+  }
+
+  if (!Array.isArray(value)) {
+    errors.push(`Element "${elementKey}" prop "${key}" must be an array of strings when provided.`)
+    return
+  }
+
+  for (const [index, entry] of value.entries()) {
+    if (!isNonEmptyString(entry)) {
+      errors.push(`Element "${elementKey}" prop "${key}"[${index}] must be a non-empty string.`)
+    }
+  }
+}
+
+function validateArchitectureInterfacesProp(
+  elementKey: string,
+  value: unknown,
+  errors: string[],
+) {
+  if (value === undefined) {
+    return
+  }
+
+  if (!Array.isArray(value)) {
+    errors.push(`Element "${elementKey}" prop "interfaces" must be an array when provided.`)
+    return
+  }
+
+  for (const [index, entry] of value.entries()) {
+    if (!isObject(entry)) {
+      errors.push(`Element "${elementKey}" interfaces[${index}] must be an object.`)
+      continue
+    }
+
+    if (!isNonEmptyString(entry.name)) {
+      errors.push(`Element "${elementKey}" interfaces[${index}].name must be a non-empty string.`)
+    }
+
+    for (const optionalKey of ['protocol', 'contract', 'auth', 'notes'] as const) {
+      const optional = entry[optionalKey]
+      if (optional !== undefined && typeof optional !== 'string') {
+        errors.push(`Element "${elementKey}" interfaces[${index}].${optionalKey} must be a string when provided.`)
+      }
+    }
+
+    const direction = entry.direction
+    if (direction !== undefined) {
+      if (typeof direction !== 'string' || !['inbound', 'outbound', 'bidirectional'].includes(direction)) {
+        errors.push(`Element "${elementKey}" interfaces[${index}].direction must be inbound, outbound, or bidirectional.`)
+      }
+    }
+  }
+}
+
+function validateArchitectureDataProp(
+  elementKey: string,
+  value: unknown,
+  errors: string[],
+) {
+  if (value === undefined) {
+    return
+  }
+
+  if (!Array.isArray(value)) {
+    errors.push(`Element "${elementKey}" prop "data" must be an array when provided.`)
+    return
+  }
+
+  for (const [index, entry] of value.entries()) {
+    if (!isObject(entry)) {
+      errors.push(`Element "${elementKey}" data[${index}] must be an object.`)
+      continue
+    }
+
+    if (!isNonEmptyString(entry.name)) {
+      errors.push(`Element "${elementKey}" data[${index}].name must be a non-empty string.`)
+    }
+
+    for (const optionalKey of ['kind', 'retention', 'notes'] as const) {
+      const optional = entry[optionalKey]
+      if (optional !== undefined && typeof optional !== 'string') {
+        errors.push(`Element "${elementKey}" data[${index}].${optionalKey} must be a string when provided.`)
+      }
+    }
+
+    const classification = entry.classification
+    if (classification !== undefined) {
+      if (typeof classification !== 'string' || !['public', 'internal', 'confidential', 'restricted'].includes(classification)) {
+        errors.push(`Element "${elementKey}" data[${index}].classification must be public, internal, confidential, or restricted.`)
+      }
+    }
+  }
+}
+
+function validateArchitectureSecurityProp(
+  elementKey: string,
+  value: unknown,
+  errors: string[],
+) {
+  if (value === undefined) {
+    return
+  }
+
+  if (!isObject(value)) {
+    errors.push(`Element "${elementKey}" prop "security" must be an object when provided.`)
+    return
+  }
+
+  for (const optionalKey of ['auth', 'encryption', 'threatModel'] as const) {
+    const optional = value[optionalKey]
+    if (optional !== undefined && typeof optional !== 'string') {
+      errors.push(`Element "${elementKey}" security.${optionalKey} must be a string when provided.`)
+    }
+  }
+
+  const pii = value.pii
+  if (pii !== undefined && typeof pii !== 'boolean') {
+    errors.push(`Element "${elementKey}" security.pii must be a boolean when provided.`)
+  }
+}
+
+function validateArchitectureOperationsProp(
+  elementKey: string,
+  value: unknown,
+  errors: string[],
+) {
+  if (value === undefined) {
+    return
+  }
+
+  if (!isObject(value)) {
+    errors.push(`Element "${elementKey}" prop "operations" must be an object when provided.`)
+    return
+  }
+
+  for (const optionalKey of ['owner', 'slo', 'alert', 'runbook'] as const) {
+    const optional = value[optionalKey]
+    if (optional !== undefined && typeof optional !== 'string') {
+      errors.push(`Element "${elementKey}" operations.${optionalKey} must be a string when provided.`)
+    }
+  }
+}
+
+function validateArchitectureLinksProp(
+  elementKey: string,
+  value: unknown,
+  errors: string[],
+) {
+  if (value === undefined) {
+    return
+  }
+
+  if (!Array.isArray(value)) {
+    errors.push(`Element "${elementKey}" prop "links" must be an array when provided.`)
+    return
+  }
+
+  for (const [index, entry] of value.entries()) {
+    if (!isObject(entry)) {
+      errors.push(`Element "${elementKey}" links[${index}] must be an object.`)
+      continue
+    }
+
+    if (!isNonEmptyString(entry.label)) {
+      errors.push(`Element "${elementKey}" links[${index}].label must be a non-empty string.`)
+    }
+
+    if (!isNonEmptyString(entry.href)) {
+      errors.push(`Element "${elementKey}" links[${index}].href must be a non-empty string.`)
+    }
+  }
 }
 
 function validateStateShape(state: unknown, errors: string[], warnings: string[]) {

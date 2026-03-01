@@ -24,7 +24,13 @@ import {
 import { exportFlowDiagram, type DiagramExportFormat } from '../../composables/useDiagramExport'
 import { useFlowNarratorRuntime } from '../../composables/useFlowNarratorRuntime'
 import type {
+  ArchitectureDataAsset,
+  ArchitectureInterface,
+  ArchitectureLink,
   ArchitectureNodeProps,
+  ArchitectureOperations,
+  ArchitectureSecurity,
+  ArchitectureZone,
   EdgeTransitionKind,
   FlowEdge,
   FlowNode,
@@ -46,6 +52,7 @@ const props = withDefaults(defineProps<{
   title: string
   description?: string
   mode?: 'narrative' | 'architecture'
+  zones?: ArchitectureZone[]
   direction?: 'horizontal' | 'vertical'
   minHeight?: number
   layoutEngine?: 'dagre' | 'manual'
@@ -88,6 +95,8 @@ const EDGE_TRANSITION_KINDS: EdgeTransitionKind[] = [
   'async',
 ]
 const EDGE_TRANSITION_KIND_SET = new Set(EDGE_TRANSITION_KINDS)
+const EDGE_TRANSITION_TRANSPORT_SET = new Set(['sync', 'async'])
+const EDGE_TRANSITION_CRITICALITY_SET = new Set(['low', 'medium', 'high'])
 const ARCHITECTURE_NODE_KINDS: Array<NonNullable<ArchitectureNodeProps['kind']>> = [
   'service',
   'database',
@@ -98,6 +107,44 @@ const ARCHITECTURE_NODE_KINDS: Array<NonNullable<ArchitectureNodeProps['kind']>>
   'compute',
 ]
 const ARCHITECTURE_NODE_KIND_SET = new Set(ARCHITECTURE_NODE_KINDS)
+const ARCHITECTURE_NODE_STATUS_VALUES: Array<NonNullable<ArchitectureNodeProps['status']>> = [
+  'planned',
+  'active',
+  'degraded',
+  'retired',
+]
+const ARCHITECTURE_NODE_STATUS_SET = new Set(ARCHITECTURE_NODE_STATUS_VALUES)
+const ARCHITECTURE_NODE_TIER_VALUES: Array<NonNullable<ArchitectureNodeProps['tier']>> = [
+  'edge',
+  'application',
+  'integration',
+  'data',
+  'platform',
+  'external',
+]
+const ARCHITECTURE_NODE_TIER_SET = new Set(ARCHITECTURE_NODE_TIER_VALUES)
+const ARCHITECTURE_INTERFACE_DIRECTION_VALUES: Array<NonNullable<ArchitectureInterface['direction']>> = [
+  'inbound',
+  'outbound',
+  'bidirectional',
+]
+const ARCHITECTURE_INTERFACE_DIRECTION_SET = new Set(ARCHITECTURE_INTERFACE_DIRECTION_VALUES)
+const ARCHITECTURE_DATA_CLASSIFICATION_VALUES: Array<NonNullable<ArchitectureDataAsset['classification']>> = [
+  'public',
+  'internal',
+  'confidential',
+  'restricted',
+]
+const ARCHITECTURE_DATA_CLASSIFICATION_SET = new Set(ARCHITECTURE_DATA_CLASSIFICATION_VALUES)
+const ARCHITECTURE_ZONE_COLOR_PALETTE = [
+  '#38bdf8',
+  '#22c55e',
+  '#f59e0b',
+  '#f97316',
+  '#a78bfa',
+  '#14b8a6',
+  '#fb7185',
+]
 const SOURCE_ANCHOR_LINK_PATTERN = /^(https?:\/\/|vscode:\/\/|idea:\/\/)/i
 const SOURCE_ANCHOR_TRAILING_LOCATION_PATTERN = /^(.*?):(\d+)(?::(\d+))?$/
 
@@ -132,6 +179,11 @@ interface ParsedTransition {
   label?: string
   description?: string
   kind?: EdgeTransitionKind
+  protocol?: string
+  transport?: 'sync' | 'async'
+  auth?: string
+  contract?: string
+  criticality?: 'low' | 'medium' | 'high'
 }
 
 interface ParsedSourceAnchor {
@@ -143,6 +195,77 @@ interface ParsedAnchorLocation {
   path: string
   line?: number
   column?: number
+}
+
+interface ResolvedArchitectureZone extends ArchitectureZone {
+  padding: number
+}
+
+interface ArchitectureZoneOverlay {
+  id: string
+  label: string
+  description?: string
+  color: string
+  x: number
+  y: number
+  width: number
+  height: number
+  nodeCount: number
+}
+
+interface ArchitectureOutgoingEdge {
+  target: string
+  label?: string
+  protocol?: string
+  transport?: 'sync' | 'async'
+  auth?: string
+  criticality?: 'low' | 'medium' | 'high'
+}
+
+interface ArchitectureInspectorArchitectureView {
+  type: 'ArchitectureNode'
+  label: string
+  sourceAnchor?: ParsedSourceAnchor
+  kind?: ArchitectureNodeProps['kind']
+  status?: ArchitectureNodeProps['status']
+  tier?: ArchitectureNodeProps['tier']
+  technology?: string
+  runtime?: string
+  owner?: string
+  zoneLabel?: string
+  summary: string
+  tags: string[]
+  responsibilities: string[]
+  capabilities: string[]
+  interfaces: ArchitectureInterface[]
+  dataAssets: ArchitectureDataAsset[]
+  security?: ArchitectureSecurity
+  operations?: ArchitectureOperations
+  links: ArchitectureLink[]
+  outgoing: ArchitectureOutgoingEdge[]
+}
+
+interface ArchitectureInspectorGenericView {
+  type: 'Other'
+  label: string
+  sourceAnchor?: ParsedSourceAnchor
+  summary: string
+  elementType: string
+}
+
+type ArchitectureInspectorView = ArchitectureInspectorArchitectureView | ArchitectureInspectorGenericView
+
+const EMPTY_ARCHITECTURE_INSPECTOR_NODE: ArchitectureInspectorArchitectureView = {
+  type: 'ArchitectureNode',
+  label: '',
+  summary: '',
+  tags: [],
+  responsibilities: [],
+  capabilities: [],
+  interfaces: [],
+  dataAssets: [],
+  links: [],
+  outgoing: [],
 }
 
 const runtime = useFlowNarratorRuntime()
@@ -171,6 +294,7 @@ const exportMenuOpen = ref(false)
 const exportInFlight = ref<DiagramExportFormat | null>(null)
 const exportError = ref<string | null>(null)
 const containerRef = ref<HTMLDivElement | null>(null)
+const sceneRef = ref<HTMLElement | null>(null)
 const containerReady = ref(false)
 const uiTheme = ref<'dark' | 'light'>('dark')
 const isLightTheme = computed(() => uiTheme.value === 'light')
@@ -424,6 +548,16 @@ function toOptionalString(value: unknown) {
   return typeof value === 'string' ? value : undefined
 }
 
+function toStringArray(value: unknown) {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .map((entry) => toTrimmedNonEmptyString(entry))
+    .filter((entry): entry is string => Boolean(entry))
+}
+
 function toTrimmedNonEmptyString(value: unknown) {
   if (typeof value !== 'string') return undefined
   const trimmed = value.trim()
@@ -460,6 +594,267 @@ function toArchitectureKind(value: unknown): ArchitectureNodeProps['kind'] | und
   }
 
   return undefined
+}
+
+function toArchitectureZoneId(value: unknown) {
+  return toTrimmedNonEmptyString(value)
+}
+
+function toArchitectureStatus(value: unknown): ArchitectureNodeProps['status'] | undefined {
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  if (ARCHITECTURE_NODE_STATUS_SET.has(value as NonNullable<ArchitectureNodeProps['status']>)) {
+    return value as ArchitectureNodeProps['status']
+  }
+
+  return undefined
+}
+
+function toArchitectureTier(value: unknown): ArchitectureNodeProps['tier'] | undefined {
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  if (ARCHITECTURE_NODE_TIER_SET.has(value as NonNullable<ArchitectureNodeProps['tier']>)) {
+    return value as ArchitectureNodeProps['tier']
+  }
+
+  return undefined
+}
+
+function toArchitectureInterfaces(value: unknown): ArchitectureInterface[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  const result: ArchitectureInterface[] = []
+
+  for (const rawEntry of value) {
+    if (!rawEntry || typeof rawEntry !== 'object') {
+      continue
+    }
+
+    const entry = rawEntry as Record<string, unknown>
+    const name = toTrimmedNonEmptyString(entry.name)
+    if (!name) {
+      continue
+    }
+
+    const directionRaw = toTrimmedNonEmptyString(entry.direction)
+    const direction = directionRaw && ARCHITECTURE_INTERFACE_DIRECTION_SET.has(directionRaw as NonNullable<ArchitectureInterface['direction']>)
+      ? directionRaw as ArchitectureInterface['direction']
+      : undefined
+
+    result.push({
+      name,
+      protocol: toTrimmedNonEmptyString(entry.protocol),
+      direction,
+      contract: toTrimmedNonEmptyString(entry.contract),
+      auth: toTrimmedNonEmptyString(entry.auth),
+      notes: toTrimmedNonEmptyString(entry.notes),
+    })
+  }
+
+  return result
+}
+
+function toArchitectureDataAssets(value: unknown): ArchitectureDataAsset[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  const result: ArchitectureDataAsset[] = []
+
+  for (const rawEntry of value) {
+    if (!rawEntry || typeof rawEntry !== 'object') {
+      continue
+    }
+
+    const entry = rawEntry as Record<string, unknown>
+    const name = toTrimmedNonEmptyString(entry.name)
+    if (!name) {
+      continue
+    }
+
+    const classificationRaw = toTrimmedNonEmptyString(entry.classification)
+    const classification = classificationRaw && ARCHITECTURE_DATA_CLASSIFICATION_SET.has(classificationRaw as NonNullable<ArchitectureDataAsset['classification']>)
+      ? classificationRaw as ArchitectureDataAsset['classification']
+      : undefined
+
+    result.push({
+      name,
+      kind: toTrimmedNonEmptyString(entry.kind),
+      classification,
+      retention: toTrimmedNonEmptyString(entry.retention),
+      notes: toTrimmedNonEmptyString(entry.notes),
+    })
+  }
+
+  return result
+}
+
+function toArchitectureSecurity(value: unknown): ArchitectureSecurity | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined
+  }
+
+  const record = value as Record<string, unknown>
+  const security = {
+    auth: toTrimmedNonEmptyString(record.auth),
+    encryption: toTrimmedNonEmptyString(record.encryption),
+    pii: toOptionalBoolean(record.pii),
+    threatModel: toTrimmedNonEmptyString(record.threatModel),
+  } satisfies ArchitectureSecurity
+
+  if (
+    !security.auth
+    && !security.encryption
+    && security.pii === undefined
+    && !security.threatModel
+  ) {
+    return undefined
+  }
+
+  return security
+}
+
+function toArchitectureOperations(value: unknown): ArchitectureOperations | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined
+  }
+
+  const record = value as Record<string, unknown>
+  const operations = {
+    owner: toTrimmedNonEmptyString(record.owner),
+    slo: toTrimmedNonEmptyString(record.slo),
+    alert: toTrimmedNonEmptyString(record.alert),
+    runbook: toTrimmedNonEmptyString(record.runbook),
+  } satisfies ArchitectureOperations
+
+  if (!operations.owner && !operations.slo && !operations.alert && !operations.runbook) {
+    return undefined
+  }
+
+  return operations
+}
+
+function toArchitectureLinks(value: unknown): ArchitectureLink[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  const result: ArchitectureLink[] = []
+
+  for (const rawEntry of value) {
+    if (!rawEntry || typeof rawEntry !== 'object') {
+      continue
+    }
+
+    const entry = rawEntry as Record<string, unknown>
+    const label = toTrimmedNonEmptyString(entry.label)
+    const href = toTrimmedNonEmptyString(entry.href)
+    if (!label || !href) {
+      continue
+    }
+
+    result.push({
+      label,
+      href,
+    })
+  }
+
+  return result
+}
+
+function toArchitectureZones(value: unknown): ResolvedArchitectureZone[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  const seen = new Set<string>()
+  const result: ResolvedArchitectureZone[] = []
+
+  for (const rawEntry of value) {
+    if (!rawEntry || typeof rawEntry !== 'object') {
+      continue
+    }
+
+    const entry = rawEntry as Record<string, unknown>
+    const id = toTrimmedNonEmptyString(entry.id)
+    const label = toTrimmedNonEmptyString(entry.label)
+    if (!id || !label || seen.has(id)) {
+      continue
+    }
+
+    seen.add(id)
+
+    const paddingRaw = entry.padding
+    const padding = typeof paddingRaw === 'number' && Number.isFinite(paddingRaw)
+      ? Math.max(28, Math.min(180, Math.round(paddingRaw)))
+      : 62
+
+    result.push({
+      id,
+      label,
+      description: toTrimmedNonEmptyString(entry.description),
+      color: toTrimmedNonEmptyString(entry.color),
+      padding,
+    })
+  }
+
+  return result
+}
+
+function humanizeZoneId(value: string) {
+  return value
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/(^|\s)\w/g, (char) => char.toUpperCase())
+}
+
+function resolveZoneColor(index: number, explicitColor?: string) {
+  return explicitColor || ARCHITECTURE_ZONE_COLOR_PALETTE[index % ARCHITECTURE_ZONE_COLOR_PALETTE.length] || '#38bdf8'
+}
+
+function toHexChannel(value: string) {
+  return Number.parseInt(value, 16)
+}
+
+function hexToRgb(value: string) {
+  const hex = value.trim().replace(/^#/, '')
+  if (hex.length === 3) {
+    const r = toHexChannel(`${hex[0]}${hex[0]}`)
+    const g = toHexChannel(`${hex[1]}${hex[1]}`)
+    const b = toHexChannel(`${hex[2]}${hex[2]}`)
+    if ([r, g, b].every((channel) => Number.isFinite(channel))) {
+      return { r, g, b }
+    }
+
+    return undefined
+  }
+
+  if (hex.length === 6) {
+    const r = toHexChannel(hex.slice(0, 2))
+    const g = toHexChannel(hex.slice(2, 4))
+    const b = toHexChannel(hex.slice(4, 6))
+    if ([r, g, b].every((channel) => Number.isFinite(channel))) {
+      return { r, g, b }
+    }
+  }
+
+  return undefined
+}
+
+function withAlpha(color: string, alpha: number) {
+  const rgb = hexToRgb(color)
+  if (!rgb) {
+    return color
+  }
+
+  return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${alpha})`
 }
 
 function toPositiveInteger(value: unknown) {
@@ -651,6 +1046,20 @@ function toTransitionKind(value: unknown): EdgeTransitionKind | undefined {
     : undefined
 }
 
+function toTransitionTransport(value: unknown): 'sync' | 'async' | undefined {
+  if (typeof value !== 'string') return undefined
+  return EDGE_TRANSITION_TRANSPORT_SET.has(value)
+    ? value as 'sync' | 'async'
+    : undefined
+}
+
+function toTransitionCriticality(value: unknown): 'low' | 'medium' | 'high' | undefined {
+  if (typeof value !== 'string') return undefined
+  return EDGE_TRANSITION_CRITICALITY_SET.has(value)
+    ? value as 'low' | 'medium' | 'high'
+    : undefined
+}
+
 function toTransitions(value: unknown): ParsedTransition[] {
   if (!Array.isArray(value)) return []
 
@@ -662,10 +1071,20 @@ function toTransitions(value: unknown): ParsedTransition[] {
       const label = item.label
       const description = item.description
       const kind = item.kind
+      const protocol = item.protocol
+      const transport = item.transport
+      const auth = item.auth
+      const contract = item.contract
+      const criticality = item.criticality
 
       if (label !== undefined && typeof label !== 'string') return false
       if (description !== undefined && typeof description !== 'string') return false
       if (kind !== undefined && !toTransitionKind(kind)) return false
+      if (protocol !== undefined && typeof protocol !== 'string') return false
+      if (transport !== undefined && !toTransitionTransport(transport)) return false
+      if (auth !== undefined && typeof auth !== 'string') return false
+      if (contract !== undefined && typeof contract !== 'string') return false
+      if (criticality !== undefined && !toTransitionCriticality(criticality)) return false
 
       return true
     })
@@ -674,7 +1093,36 @@ function toTransitions(value: unknown): ParsedTransition[] {
       label: toOptionalString(item.label),
       description: toOptionalString(item.description),
       kind: toTransitionKind(item.kind),
+      protocol: toOptionalString(item.protocol),
+      transport: toTransitionTransport(item.transport),
+      auth: toOptionalString(item.auth),
+      contract: toOptionalString(item.contract),
+      criticality: toTransitionCriticality(item.criticality),
     }))
+}
+
+function resolveTransitionEdgeLabel(transition?: ParsedTransition) {
+  if (!transition) {
+    return undefined
+  }
+
+  const metadataParts = [
+    transition.protocol,
+    transition.transport,
+    transition.criticality,
+  ].filter((value): value is string => Boolean(value))
+
+  if (transition.label) {
+    return metadataParts.length > 0
+      ? `${transition.label} (${metadataParts.join(' | ')})`
+      : transition.label
+  }
+
+  if (metadataParts.length > 0) {
+    return metadataParts.join(' | ')
+  }
+
+  return undefined
 }
 
 function mergeOutgoingTargets(primary: string[], secondary: string[]) {
@@ -800,12 +1248,32 @@ function estimateNodeSize(node: OrderedNodeElement): NodeSize {
   if (element.type === 'ArchitectureNode') {
     const labelLines = Math.max(1, estimateNodeTextLines(element.props.label, 28))
     const technologyLines = estimateNodeTextLines(element.props.technology, 30)
+    const ownerLines = estimateNodeTextLines(element.props.owner, 30)
+    const runtimeLines = estimateNodeTextLines(element.props.runtime, 30)
     const descriptionLines = estimateNodeTextLines(element.props.description, 34)
+    const capabilityCount = Math.min(4, toStringArray(element.props.capabilities).length)
+    const tagCount = Math.min(4, toStringArray(element.props.tags).length)
+    const chipRows = (capabilityCount > 0 ? Math.ceil(capabilityCount / 2) : 0) + (tagCount > 0 ? 1 : 0)
+    const metaRows = toArchitectureStatus(element.props.status) || toArchitectureTier(element.props.tier) ? 1 : 0
     const anchorHeight = resolveNodeSourceAnchor(element.props) ? 18 : 0
 
     return {
       width: 270,
-      height: Math.min(380, Math.max(126, 58 + labelLines * 19 + technologyLines * 14 + descriptionLines * 15 + anchorHeight)),
+      height: Math.min(
+        460,
+        Math.max(
+          144,
+          58
+            + labelLines * 19
+            + technologyLines * 14
+            + ownerLines * 12
+            + runtimeLines * 12
+            + descriptionLines * 15
+            + metaRows * 16
+            + chipRows * 18
+            + anchorHeight,
+        ),
+      ),
     }
   }
 
@@ -1430,6 +1898,132 @@ const nodeSizes = computed<Record<string, NodeSize>>(() => {
   return sizes
 })
 
+const architectureZoneDefinitions = computed<ResolvedArchitectureZone[]>(() => {
+  if (!isArchitectureMode.value) {
+    return []
+  }
+
+  const rootZones = toArchitectureZones(props.zones ?? rootElement.value?.props.zones)
+  const byId = new Map<string, ResolvedArchitectureZone>()
+
+  for (const zone of rootZones) {
+    byId.set(zone.id, zone)
+  }
+
+  for (const node of orderedNodeElements.value) {
+    const zoneId = toArchitectureZoneId(node.element.props.zone)
+    if (!zoneId || byId.has(zoneId)) {
+      continue
+    }
+
+    byId.set(zoneId, {
+      id: zoneId,
+      label: humanizeZoneId(zoneId),
+      padding: 62,
+    })
+  }
+
+  return Array.from(byId.values())
+})
+
+const architectureZoneLabelById = computed<Record<string, string>>(() => {
+  const map: Record<string, string> = {}
+
+  for (const zone of architectureZoneDefinitions.value) {
+    map[zone.id] = zone.label
+  }
+
+  return map
+})
+
+const architectureNodeZoneByKey = computed<Record<string, string>>(() => {
+  const map: Record<string, string> = {}
+
+  for (const node of orderedNodeElements.value) {
+    const zoneId = toArchitectureZoneId(node.element.props.zone)
+    if (!zoneId) {
+      continue
+    }
+
+    map[node.key] = zoneId
+  }
+
+  return map
+})
+
+const architectureZoneOverlays = computed<ArchitectureZoneOverlay[]>(() => {
+  if (!isArchitectureMode.value) {
+    return []
+  }
+
+  const overlays: ArchitectureZoneOverlay[] = []
+
+  architectureZoneDefinitions.value.forEach((zone, index) => {
+    const members = orderedNodeElements.value.filter((node) => architectureNodeZoneByKey.value[node.key] === zone.id)
+    if (members.length === 0) {
+      return
+    }
+
+    let minX = Number.POSITIVE_INFINITY
+    let minY = Number.POSITIVE_INFINITY
+    let maxX = Number.NEGATIVE_INFINITY
+    let maxY = Number.NEGATIVE_INFINITY
+
+    for (const member of members) {
+      const position = layoutPositions.value[member.key]
+      if (!position) {
+        continue
+      }
+
+      const size = nodeSizes.value[member.key] ?? { width: 240, height: 120 }
+
+      minX = Math.min(minX, position.x)
+      minY = Math.min(minY, position.y)
+      maxX = Math.max(maxX, position.x + size.width)
+      maxY = Math.max(maxY, position.y + size.height)
+    }
+
+    if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+      return
+    }
+
+    const padding = zone.padding
+    overlays.push({
+      id: zone.id,
+      label: zone.label,
+      description: zone.description,
+      color: resolveZoneColor(index, zone.color),
+      x: Math.round(minX - padding),
+      y: Math.round(minY - padding),
+      width: Math.max(120, Math.round(maxX - minX + padding * 2)),
+      height: Math.max(100, Math.round(maxY - minY + padding * 2)),
+      nodeCount: members.length,
+    })
+  })
+
+  return overlays
+})
+
+function architectureZoneCardStyle(zone: ArchitectureZoneOverlay) {
+  return {
+    left: `${zone.x}px`,
+    top: `${zone.y}px`,
+    width: `${zone.width}px`,
+    height: `${zone.height}px`,
+    borderColor: withAlpha(zone.color, 0.55),
+    background: withAlpha(zone.color, 0.12),
+    boxShadow: `inset 0 0 0 1px ${withAlpha(zone.color, 0.16)}`,
+  }
+}
+
+function architectureZoneLabelStyle(zone: ArchitectureZoneOverlay) {
+  return {
+    borderColor: withAlpha(zone.color, 0.55),
+    background: withAlpha(zone.color, 0.18),
+    color: zone.color,
+  }
+}
+
 const layoutPositions = computed<Record<string, { x: number; y: number }>>(() => {
   const orderedNodes = orderedNodeElements.value
   if (orderedNodes.length === 0) return {}
@@ -1551,7 +2145,8 @@ const edges = computed<FlowEdge[]>(() => {
         transition?.kind ? `edge-kind-${transition.kind}` : null,
       ].filter((value): value is string => Boolean(value))
 
-      const hasLabel = Boolean(transition?.label)
+      const edgeLabel = resolveTransitionEdgeLabel(transition)
+      const hasLabel = Boolean(edgeLabel)
 
       result.push({
         id: `e-${node.key}-${target}`,
@@ -1560,7 +2155,7 @@ const edges = computed<FlowEdge[]>(() => {
         type: 'smoothstep',
         animated: !isArchitectureMode.value,
         class: edgeClasses.length > 0 ? edgeClasses.join(' ') : undefined,
-        label: transition?.label,
+        label: edgeLabel,
         labelShowBg: hasLabel,
         labelBgPadding: hasLabel ? [6, 3] : undefined,
         labelBgBorderRadius: hasLabel ? 6 : undefined,
@@ -1597,6 +2192,13 @@ const diagramBounds = computed(() => {
     minY = Math.min(minY, node.position.y)
     maxX = Math.max(maxX, node.position.x + size.width)
     maxY = Math.max(maxY, node.position.y + size.height)
+  }
+
+  for (const zone of architectureZoneOverlays.value) {
+    minX = Math.min(minX, zone.x)
+    minY = Math.min(minY, zone.y)
+    maxX = Math.max(maxX, zone.x + zone.width)
+    maxY = Math.max(maxY, zone.y + zone.height)
   }
 
   if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
@@ -1639,7 +2241,7 @@ async function exportDiagram(format: DiagramExportFormat) {
   if (exportInFlight.value) return
   if (!canExportDiagram.value) return
 
-  const flowElement = containerRef.value?.querySelector('.vue-flow') as HTMLElement | null
+  const flowElement = sceneRef.value
   const bounds = diagramBounds.value
 
   if (!flowElement || !bounds) {
@@ -1799,55 +2401,113 @@ watch([isArchitectureMode, orderedNodeElements], ([architectureMode, ordered]) =
   architectureSelectedNodeKey.value = ordered[0]?.key ?? null
 }, { immediate: true })
 
-const architectureInspectorLabel = computed(() => {
+const architectureInspector = computed<ArchitectureInspectorView | null>(() => {
   const node = architectureSelectedNode.value
-  if (!node) return ''
-  return toOptionalString(node.element.props.label) ?? node.key
+  if (!node) {
+    return null
+  }
+
+  const label = toTrimmedNonEmptyString(node.element.props.label) ?? node.key
+  const sourceAnchor = resolveNodeSourceAnchor(node.element.props)
+
+  if (node.element.type !== 'ArchitectureNode') {
+    const summary = (() => {
+      if (node.element.type === 'CodeNode') {
+        return toTrimmedNonEmptyString(node.element.props.story)
+          ?? toTrimmedNonEmptyString(node.element.props.comment)
+          ?? ''
+      }
+
+      if (node.element.type === 'DecisionNode') {
+        return toTrimmedNonEmptyString(node.element.props.description)
+          ?? toTrimmedNonEmptyString(node.element.props.condition)
+          ?? ''
+      }
+
+      if (node.element.type === 'DescriptionNode') {
+        return toTrimmedNonEmptyString(node.element.props.body) ?? ''
+      }
+
+      if (node.element.type === 'ErrorNode') {
+        return toTrimmedNonEmptyString(node.element.props.message)
+          ?? toTrimmedNonEmptyString(node.element.props.cause)
+          ?? ''
+      }
+
+      return toTrimmedNonEmptyString(node.element.props.description) ?? ''
+    })()
+
+    return {
+      type: 'Other',
+      label,
+      summary,
+      sourceAnchor,
+      elementType: node.element.type,
+    }
+  }
+
+  const zoneId = toArchitectureZoneId(node.element.props.zone)
+  const zoneLabel = zoneId ? architectureZoneLabelById.value[zoneId] ?? humanizeZoneId(zoneId) : undefined
+  const interfaces = toArchitectureInterfaces(node.element.props.interfaces)
+  const dataAssets = toArchitectureDataAssets(node.element.props.data)
+  const security = toArchitectureSecurity(node.element.props.security)
+  const operations = toArchitectureOperations(node.element.props.operations)
+  const links = toArchitectureLinks(node.element.props.links)
+  const outgoing: ArchitectureOutgoingEdge[] = []
+
+  for (const targetKey of outgoingNodeKeys.value[node.key] ?? []) {
+    const targetNode = orderedNodeByKey.value[targetKey]
+    if (!targetNode) {
+      continue
+    }
+
+    const transition = transitionMetaBySource.value[node.key]?.[targetKey]
+
+    outgoing.push({
+      target: toTrimmedNonEmptyString(targetNode.element.props.label) ?? targetKey,
+      label: transition?.label,
+      protocol: transition?.protocol,
+      transport: transition?.transport,
+      auth: transition?.auth,
+      criticality: transition?.criticality,
+    })
+  }
+
+  return {
+    type: 'ArchitectureNode',
+    label,
+    kind: toArchitectureKind(node.element.props.kind),
+    status: toArchitectureStatus(node.element.props.status),
+    tier: toArchitectureTier(node.element.props.tier),
+    technology: toTrimmedNonEmptyString(node.element.props.technology),
+    runtime: toTrimmedNonEmptyString(node.element.props.runtime),
+    owner: toTrimmedNonEmptyString(node.element.props.owner),
+    zoneLabel,
+    summary: toTrimmedNonEmptyString(node.element.props.description) ?? '',
+    tags: toStringArray(node.element.props.tags),
+    responsibilities: toStringArray(node.element.props.responsibilities),
+    capabilities: toStringArray(node.element.props.capabilities),
+    interfaces,
+    dataAssets,
+    security,
+    operations,
+    links,
+    outgoing,
+    sourceAnchor,
+  }
 })
 
-const architectureInspectorDescription = computed(() => {
-  const node = architectureSelectedNode.value
-  if (!node) return ''
-
-  if (node.element.type === 'ArchitectureNode') {
-    const technology = toOptionalString(node.element.props.technology)
-    const description = toOptionalString(node.element.props.description)
-
-    return [technology ? `Technology: ${technology}` : '', description ?? '']
-      .filter((value): value is string => typeof value === 'string' && value.length > 0)
-      .join('\n')
+const architectureInspectorNode = computed<ArchitectureInspectorArchitectureView | null>(() => {
+  const inspector = architectureInspector.value
+  if (!inspector || inspector.type !== 'ArchitectureNode') {
+    return null
   }
 
-  if (node.element.type === 'CodeNode') {
-    return toOptionalString(node.element.props.story)
-      ?? toOptionalString(node.element.props.comment)
-      ?? ''
-  }
-
-  if (node.element.type === 'DecisionNode') {
-    return toOptionalString(node.element.props.description)
-      ?? toOptionalString(node.element.props.condition)
-      ?? ''
-  }
-
-  if (node.element.type === 'DescriptionNode') {
-    return toOptionalString(node.element.props.body) ?? ''
-  }
-
-  if (node.element.type === 'ErrorNode') {
-    return toOptionalString(node.element.props.message)
-      ?? toOptionalString(node.element.props.cause)
-      ?? ''
-  }
-
-  return toOptionalString(node.element.props.description) ?? ''
+  return inspector
 })
 
-const architectureInspectorSourceAnchor = computed(() => {
-  const node = architectureSelectedNode.value
-  if (!node) return undefined
-
-  return resolveNodeSourceAnchor(node.element.props)
+const architectureInspectorNodeSafe = computed(() => {
+  return architectureInspectorNode.value ?? EMPTY_ARCHITECTURE_INSPECTOR_NODE
 })
 
 const branchChoices = computed<BranchChoice[]>(() => {
@@ -1972,6 +2632,17 @@ const nodesInitialized = useNodesInitialized()
 const paneReady = ref(false)
 const overviewMode = ref(false)
 let resizeObserver: ResizeObserver | null = null
+
+const architectureZoneLayerStyle = computed(() => {
+  const x = Number.isFinite(viewport.value.x) ? viewport.value.x : 0
+  const y = Number.isFinite(viewport.value.y) ? viewport.value.y : 0
+  const zoom = Number.isFinite(viewport.value.zoom) ? viewport.value.zoom : 1
+
+  return {
+    transform: `translate(${x}px, ${y}px) scale(${zoom})`,
+    transformOrigin: '0 0',
+  }
+})
 
 function handleDocumentPointerDown(event: PointerEvent) {
   const target = event.target as Node | null
@@ -2192,119 +2863,160 @@ onUnmounted(() => {
     :data-focus-mode="overviewMode ? 'overview' : 'focus'"
     :data-theme="uiTheme"
   >
-    <VueFlow
-      v-if="containerReady"
-      :id="flowId"
-      :nodes="nodes"
-      :edges="edges"
-      :fit-view-on-init="false"
-      :nodes-draggable="false"
-      :nodes-connectable="false"
-      :zoom-on-scroll="true"
-      :zoom-on-pinch="true"
-      :pan-on-drag="true"
-      :pan-on-scroll="true"
-      :min-zoom="0.15"
-      :max-zoom="2"
-      :prevent-scrolling="true"
-      class="h-full w-full"
-      @init="onInit"
-    >
-      <template #node-architecture="{ data }">
-        <ArchitectureNodeVue
-          :label="toRequiredString(data.props.label)"
-          :kind="toArchitectureKind(data.props.kind)"
-          :technology="toOptionalString(data.props.technology)"
-          :description="toOptionalString(data.props.description)"
-          :source-anchor="resolveNodeSourceAnchor(data.props)"
-          :active="isActive(data.key)"
-        />
-      </template>
+    <div ref="sceneRef" class="relative h-full w-full overflow-hidden">
+      <div
+        v-if="containerReady && isArchitectureMode && architectureZoneOverlays.length > 0"
+        class="pointer-events-none absolute inset-0 z-[1]"
+      >
+        <div
+          class="absolute inset-0"
+          data-zone-overlay="true"
+          :style="architectureZoneLayerStyle"
+        >
+          <div
+            v-for="zone in architectureZoneOverlays"
+            :key="zone.id"
+            class="absolute rounded-2xl border border-dashed"
+            :style="architectureZoneCardStyle(zone)"
+          >
+            <div
+              class="absolute left-4 top-3 inline-flex items-center gap-2 rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-wider"
+              :style="architectureZoneLabelStyle(zone)"
+            >
+              <span>{{ zone.label }}</span>
+              <span class="opacity-80">{{ zone.nodeCount }} node{{ zone.nodeCount === 1 ? '' : 's' }}</span>
+            </div>
 
-      <template #node-trigger="{ data }">
-        <TriggerNodeVue
-          :label="toRequiredString(data.props.label)"
-          :description="toOptionalString(data.props.description)"
-          :color="toOptionalString(data.props.color)"
-          :source-anchor="resolveNodeSourceAnchor(data.props)"
-          :active="isActive(data.key)"
-        />
-      </template>
+            <p
+              v-if="zone.description"
+              class="absolute left-4 right-4 top-10 text-[10px] leading-snug text-muted-foreground"
+            >
+              {{ zone.description }}
+            </p>
+          </div>
+        </div>
+      </div>
 
-      <template #node-code="{ data }">
-        <CodeNodeVue
-          :label="toRequiredString(data.props.label)"
-          :file="toOptionalString(data.props.file)"
-          :language="toOptionalString(data.props.language)"
-          :code="toRequiredString(data.props.code)"
-          :comment="toOptionalString(data.props.comment)"
-          :story="toOptionalString(data.props.story)"
-          :wrap-long-lines="toBoolean(data.props.wrapLongLines)"
-          :magic-move-steps="toMagicMoveSteps(data.props.magicMoveSteps)"
-          :twoslash="toOptionalBoolean(data.props.twoslash)"
-          :source-anchor="resolveNodeSourceAnchor(data.props)"
-          :ui-theme="uiTheme"
-          :active="isActive(data.key)"
-          :step-index="codeStepIndex(data.key)"
-        />
-      </template>
+      <VueFlow
+        v-if="containerReady"
+        :id="flowId"
+        :nodes="nodes"
+        :edges="edges"
+        :fit-view-on-init="false"
+        :nodes-draggable="false"
+        :nodes-connectable="false"
+        :zoom-on-scroll="true"
+        :zoom-on-pinch="true"
+        :pan-on-drag="true"
+        :pan-on-scroll="true"
+        :min-zoom="0.15"
+        :max-zoom="2"
+        :prevent-scrolling="true"
+        class="relative z-[5] h-full w-full"
+        @init="onInit"
+      >
+        <template #node-architecture="{ data }">
+          <ArchitectureNodeVue
+            :label="toRequiredString(data.props.label)"
+            :kind="toArchitectureKind(data.props.kind)"
+            :technology="toOptionalString(data.props.technology)"
+            :runtime="toOptionalString(data.props.runtime)"
+            :owner="toOptionalString(data.props.owner)"
+            :tier="toArchitectureTier(data.props.tier)"
+            :status="toArchitectureStatus(data.props.status)"
+            :tags="toStringArray(data.props.tags)"
+            :capabilities="toStringArray(data.props.capabilities)"
+            :description="toOptionalString(data.props.description)"
+            :source-anchor="resolveNodeSourceAnchor(data.props)"
+            :active="isActive(data.key)"
+          />
+        </template>
 
-      <template #node-decision="{ data }">
-        <DecisionNodeVue
-          :label="toRequiredString(data.props.label)"
-          :condition="toOptionalString(data.props.condition)"
-          :description="toOptionalString(data.props.description)"
-          :source-anchor="resolveNodeSourceAnchor(data.props)"
-          :active="isActive(data.key)"
-        />
-      </template>
+        <template #node-trigger="{ data }">
+          <TriggerNodeVue
+            :label="toRequiredString(data.props.label)"
+            :description="toOptionalString(data.props.description)"
+            :color="toOptionalString(data.props.color)"
+            :source-anchor="resolveNodeSourceAnchor(data.props)"
+            :active="isActive(data.key)"
+          />
+        </template>
 
-      <template #node-payload="{ data }">
-        <PayloadNodeVue
-          :label="toRequiredString(data.props.label)"
-          :payload="toOptionalString(data.props.payload)"
-          :before="toOptionalString(data.props.before)"
-          :after="toOptionalString(data.props.after)"
-          :format="toPayloadFormat(data.props.format)"
-          :description="toOptionalString(data.props.description)"
-          :source-anchor="resolveNodeSourceAnchor(data.props)"
-          :active="isActive(data.key)"
-        />
-      </template>
+        <template #node-code="{ data }">
+          <CodeNodeVue
+            :label="toRequiredString(data.props.label)"
+            :file="toOptionalString(data.props.file)"
+            :language="toOptionalString(data.props.language)"
+            :code="toRequiredString(data.props.code)"
+            :comment="toOptionalString(data.props.comment)"
+            :story="toOptionalString(data.props.story)"
+            :wrap-long-lines="toBoolean(data.props.wrapLongLines)"
+            :magic-move-steps="toMagicMoveSteps(data.props.magicMoveSteps)"
+            :twoslash="toOptionalBoolean(data.props.twoslash)"
+            :source-anchor="resolveNodeSourceAnchor(data.props)"
+            :ui-theme="uiTheme"
+            :active="isActive(data.key)"
+            :step-index="codeStepIndex(data.key)"
+          />
+        </template>
 
-      <template #node-error="{ data }">
-        <ErrorNodeVue
-          :label="toRequiredString(data.props.label)"
-          :message="toRequiredString(data.props.message)"
-          :code="toOptionalString(data.props.code)"
-          :cause="toOptionalString(data.props.cause)"
-          :mitigation="toOptionalString(data.props.mitigation)"
-          :source-anchor="resolveNodeSourceAnchor(data.props)"
-          :active="isActive(data.key)"
-        />
-      </template>
+        <template #node-decision="{ data }">
+          <DecisionNodeVue
+            :label="toRequiredString(data.props.label)"
+            :condition="toOptionalString(data.props.condition)"
+            :description="toOptionalString(data.props.description)"
+            :source-anchor="resolveNodeSourceAnchor(data.props)"
+            :active="isActive(data.key)"
+          />
+        </template>
 
-      <template #node-description="{ data }">
-        <DescriptionNodeVue
-          :label="toRequiredString(data.props.label)"
-          :body="toRequiredString(data.props.body)"
-          :source-anchor="resolveNodeSourceAnchor(data.props)"
-          :active="isActive(data.key)"
-        />
-      </template>
+        <template #node-payload="{ data }">
+          <PayloadNodeVue
+            :label="toRequiredString(data.props.label)"
+            :payload="toOptionalString(data.props.payload)"
+            :before="toOptionalString(data.props.before)"
+            :after="toOptionalString(data.props.after)"
+            :format="toPayloadFormat(data.props.format)"
+            :description="toOptionalString(data.props.description)"
+            :source-anchor="resolveNodeSourceAnchor(data.props)"
+            :active="isActive(data.key)"
+          />
+        </template>
 
-      <template #node-link="{ data }">
-        <LinkNodeVue
-          :label="toRequiredString(data.props.label)"
-          :href="toRequiredString(data.props.href)"
-          :description="toOptionalString(data.props.description)"
-          :source-anchor="resolveNodeSourceAnchor(data.props)"
-          :active="isActive(data.key)"
-        />
-      </template>
-    </VueFlow>
+        <template #node-error="{ data }">
+          <ErrorNodeVue
+            :label="toRequiredString(data.props.label)"
+            :message="toRequiredString(data.props.message)"
+            :code="toOptionalString(data.props.code)"
+            :cause="toOptionalString(data.props.cause)"
+            :mitigation="toOptionalString(data.props.mitigation)"
+            :source-anchor="resolveNodeSourceAnchor(data.props)"
+            :active="isActive(data.key)"
+          />
+        </template>
 
-    <div v-else class="h-full w-full" />
+        <template #node-description="{ data }">
+          <DescriptionNodeVue
+            :label="toRequiredString(data.props.label)"
+            :body="toRequiredString(data.props.body)"
+            :source-anchor="resolveNodeSourceAnchor(data.props)"
+            :active="isActive(data.key)"
+          />
+        </template>
+
+        <template #node-link="{ data }">
+          <LinkNodeVue
+            :label="toRequiredString(data.props.label)"
+            :href="toRequiredString(data.props.href)"
+            :description="toOptionalString(data.props.description)"
+            :source-anchor="resolveNodeSourceAnchor(data.props)"
+            :active="isActive(data.key)"
+          />
+        </template>
+      </VueFlow>
+
+      <div v-else class="h-full w-full" />
+    </div>
 
     <div
       v-if="showFlowSelector || overlayTitle || overlayDescription"
@@ -2509,38 +3221,184 @@ onUnmounted(() => {
     </div>
 
     <div
-      v-else-if="architectureInspectorLabel || architectureInspectorDescription || architectureInspectorSourceAnchor?.label"
+      v-else-if="architectureInspector"
       class="pointer-events-none absolute inset-x-0 bottom-2 z-30 flex justify-center px-3"
       style="padding-bottom: max(env(safe-area-inset-bottom), 0px);"
     >
-      <div class="pointer-events-auto w-full max-w-[680px] rounded-2xl border border-border/60 bg-card/80 px-3 py-2 backdrop-blur-xl shadow-2xl">
-        <p class="text-[11px] font-semibold text-foreground leading-snug break-words">
-          {{ architectureInspectorLabel }}
-        </p>
+      <div class="pointer-events-auto w-full max-w-[960px] rounded-2xl border border-border/60 bg-card/85 px-3 py-2 backdrop-blur-xl shadow-2xl">
+        <div class="flex flex-wrap items-start justify-between gap-2">
+          <div class="min-w-0">
+            <p class="text-[11px] font-semibold text-foreground leading-snug break-words">
+              {{ architectureInspector.label }}
+            </p>
 
-        <a
-          v-if="architectureInspectorSourceAnchor?.label && architectureInspectorSourceAnchor?.href"
-          :href="architectureInspectorSourceAnchor.href"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="mt-1 inline-flex max-w-full items-center gap-1 rounded-md border border-border/70 bg-muted/25 px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground transition-colors hover:border-primary/45 hover:text-foreground"
-        >
-          <span class="truncate">{{ architectureInspectorSourceAnchor.label }}</span>
-        </a>
+            <div
+              v-if="architectureInspectorNode"
+              class="mt-1 flex flex-wrap gap-1"
+            >
+              <span
+                v-if="architectureInspectorNodeSafe.kind"
+                class="inline-flex items-center rounded border border-border/70 bg-muted/25 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-muted-foreground"
+              >
+                {{ architectureInspectorNodeSafe.kind }}
+              </span>
+              <span
+                v-if="architectureInspectorNodeSafe.status"
+                class="inline-flex items-center rounded border border-primary/35 bg-primary/10 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-primary"
+              >
+                {{ architectureInspectorNodeSafe.status }}
+              </span>
+              <span
+                v-if="architectureInspectorNodeSafe.tier"
+                class="inline-flex items-center rounded border border-border/70 bg-muted/25 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-muted-foreground"
+              >
+                {{ architectureInspectorNodeSafe.tier }}
+              </span>
+              <span
+                v-if="architectureInspectorNodeSafe.zoneLabel"
+                class="inline-flex items-center rounded border border-border/70 bg-muted/25 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-muted-foreground"
+              >
+                Zone: {{ architectureInspectorNodeSafe.zoneLabel }}
+              </span>
+            </div>
+          </div>
+
+          <a
+            v-if="architectureInspector.sourceAnchor?.label && architectureInspector.sourceAnchor?.href"
+            :href="architectureInspector.sourceAnchor.href"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex max-w-full items-center gap-1 rounded-md border border-border/70 bg-muted/25 px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground transition-colors hover:border-primary/45 hover:text-foreground"
+          >
+            <span class="truncate">{{ architectureInspector.sourceAnchor.label }}</span>
+          </a>
+
+          <p
+            v-else-if="architectureInspector.sourceAnchor?.label"
+            class="inline-flex max-w-full items-center rounded-md border border-border/70 bg-muted/25 px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground"
+          >
+            <span class="truncate">{{ architectureInspector.sourceAnchor.label }}</span>
+          </p>
+        </div>
 
         <p
-          v-else-if="architectureInspectorSourceAnchor?.label"
-          class="mt-1 inline-flex max-w-full items-center rounded-md border border-border/70 bg-muted/25 px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground"
+          v-if="architectureInspector.summary"
+          class="mt-1 max-h-[110px] overflow-auto pr-1 text-[11px] text-muted-foreground leading-relaxed whitespace-pre-wrap break-words"
         >
-          <span class="truncate">{{ architectureInspectorSourceAnchor.label }}</span>
+          {{ architectureInspector.summary }}
         </p>
 
-        <p
-          v-if="architectureInspectorDescription"
-          class="mt-1 max-h-[150px] overflow-auto pr-1 text-[11px] text-muted-foreground leading-relaxed whitespace-pre-wrap break-words"
+        <div
+          v-if="architectureInspectorNode"
+          class="mt-2 grid gap-2 md:grid-cols-2"
         >
-          {{ architectureInspectorDescription }}
-        </p>
+          <div class="rounded-lg border border-border/60 bg-muted/20 px-2 py-1.5">
+            <p class="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Core</p>
+            <p v-if="architectureInspectorNodeSafe.technology" class="mt-1 text-[10px] text-foreground">Technology: {{ architectureInspectorNodeSafe.technology }}</p>
+            <p v-if="architectureInspectorNodeSafe.runtime" class="mt-1 text-[10px] text-foreground">Runtime: {{ architectureInspectorNodeSafe.runtime }}</p>
+            <p v-if="architectureInspectorNodeSafe.owner" class="mt-1 text-[10px] text-foreground">Owner: {{ architectureInspectorNodeSafe.owner }}</p>
+            <p v-if="architectureInspectorNodeSafe.operations?.slo" class="mt-1 text-[10px] text-foreground">SLO: {{ architectureInspectorNodeSafe.operations.slo }}</p>
+            <p v-if="architectureInspectorNodeSafe.operations?.alert" class="mt-1 text-[10px] text-foreground">Alert: {{ architectureInspectorNodeSafe.operations.alert }}</p>
+          </div>
+
+          <div
+            v-if="architectureInspectorNodeSafe.security || architectureInspectorNodeSafe.dataAssets.length > 0"
+            class="rounded-lg border border-border/60 bg-muted/20 px-2 py-1.5"
+          >
+            <p class="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Data & Security</p>
+            <template v-if="architectureInspectorNodeSafe.security">
+              <p v-if="architectureInspectorNodeSafe.security.auth" class="mt-1 text-[10px] text-foreground">Auth: {{ architectureInspectorNodeSafe.security.auth }}</p>
+              <p v-if="architectureInspectorNodeSafe.security.encryption" class="mt-1 text-[10px] text-foreground">Encryption: {{ architectureInspectorNodeSafe.security.encryption }}</p>
+              <p v-if="architectureInspectorNodeSafe.security.pii !== undefined" class="mt-1 text-[10px] text-foreground">PII: {{ architectureInspectorNodeSafe.security.pii ? 'Yes' : 'No' }}</p>
+              <p v-if="architectureInspectorNodeSafe.security.threatModel" class="mt-1 text-[10px] text-foreground">Threat Model: {{ architectureInspectorNodeSafe.security.threatModel }}</p>
+            </template>
+
+            <div v-if="architectureInspectorNodeSafe.dataAssets.length > 0" class="mt-1.5 space-y-1">
+              <p
+                v-for="asset in architectureInspectorNodeSafe.dataAssets"
+                :key="`${asset.name}-${asset.kind ?? ''}`"
+                class="text-[10px] text-foreground"
+              >
+                {{ asset.name }}<span v-if="asset.kind"> ({{ asset.kind }})</span><span v-if="asset.classification"> - {{ asset.classification }}</span><span v-if="asset.retention"> - {{ asset.retention }}</span>
+              </p>
+            </div>
+          </div>
+
+          <div
+            v-if="architectureInspectorNodeSafe.responsibilities.length > 0 || architectureInspectorNodeSafe.capabilities.length > 0 || architectureInspectorNodeSafe.tags.length > 0"
+            class="rounded-lg border border-border/60 bg-muted/20 px-2 py-1.5"
+          >
+            <p class="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Capabilities</p>
+
+            <div v-if="architectureInspectorNodeSafe.capabilities.length > 0" class="mt-1 flex flex-wrap gap-1">
+              <span
+                v-for="capability in architectureInspectorNodeSafe.capabilities"
+                :key="capability"
+                class="inline-flex items-center rounded border border-primary/35 bg-primary/10 px-1.5 py-0.5 text-[9px] text-primary"
+              >
+                {{ capability }}
+              </span>
+            </div>
+
+            <div v-if="architectureInspectorNodeSafe.tags.length > 0" class="mt-1 flex flex-wrap gap-1">
+              <span
+                v-for="tag in architectureInspectorNodeSafe.tags"
+                :key="tag"
+                class="inline-flex items-center rounded border border-border/70 bg-card/35 px-1.5 py-0.5 text-[9px] text-muted-foreground"
+              >
+                #{{ tag }}
+              </span>
+            </div>
+
+            <ul v-if="architectureInspectorNodeSafe.responsibilities.length > 0" class="mt-1 space-y-0.5 text-[10px] text-foreground">
+              <li v-for="item in architectureInspectorNodeSafe.responsibilities" :key="item">- {{ item }}</li>
+            </ul>
+          </div>
+
+          <div
+            v-if="architectureInspectorNodeSafe.interfaces.length > 0 || architectureInspectorNodeSafe.outgoing.length > 0 || architectureInspectorNodeSafe.links.length > 0 || architectureInspectorNodeSafe.operations?.runbook"
+            class="rounded-lg border border-border/60 bg-muted/20 px-2 py-1.5"
+          >
+            <p class="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Interfaces & Links</p>
+
+            <div v-if="architectureInspectorNodeSafe.interfaces.length > 0" class="mt-1 space-y-1">
+              <p
+                v-for="iface in architectureInspectorNodeSafe.interfaces"
+                :key="`${iface.name}-${iface.protocol ?? ''}-${iface.direction ?? ''}`"
+                class="text-[10px] text-foreground"
+              >
+                {{ iface.name }}<span v-if="iface.protocol"> ({{ iface.protocol }})</span><span v-if="iface.direction"> - {{ iface.direction }}</span><span v-if="iface.auth"> - auth: {{ iface.auth }}</span><span v-if="iface.contract"> - {{ iface.contract }}</span>
+              </p>
+            </div>
+
+            <p v-if="architectureInspectorNodeSafe.operations?.runbook" class="mt-1 text-[10px] text-foreground">
+              Runbook: {{ architectureInspectorNodeSafe.operations.runbook }}
+            </p>
+
+            <div v-if="architectureInspectorNodeSafe.outgoing.length > 0" class="mt-1 space-y-1">
+              <p
+                v-for="edge in architectureInspectorNodeSafe.outgoing"
+                :key="`${edge.target}-${edge.label ?? ''}-${edge.protocol ?? ''}`"
+                class="text-[10px] text-foreground"
+              >
+                {{ edge.label ?? 'Connect' }} -> {{ edge.target }}<span v-if="edge.protocol"> ({{ edge.protocol }})</span><span v-if="edge.transport"> - {{ edge.transport }}</span><span v-if="edge.auth"> - auth: {{ edge.auth }}</span><span v-if="edge.criticality"> - {{ edge.criticality }}</span>
+              </p>
+            </div>
+
+            <div v-if="architectureInspectorNodeSafe.links.length > 0" class="mt-1 flex flex-wrap gap-1">
+              <a
+                v-for="link in architectureInspectorNodeSafe.links"
+                :key="`${link.label}-${link.href}`"
+                :href="link.href"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="inline-flex items-center rounded border border-border/70 bg-card/35 px-1.5 py-0.5 text-[9px] text-foreground transition-colors hover:border-primary/45"
+              >
+                {{ link.label }}
+              </a>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>

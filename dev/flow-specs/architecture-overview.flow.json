@@ -9,9 +9,46 @@
       "type": "FlowTimeline",
       "props": {
         "title": "Platform Architecture Overview",
-        "description": "Gateway, services, queue, workers, and data tier topology",
+        "description": "Gateway, core services, async workers, and data plane topology",
         "mode": "architecture",
-        "minHeight": 660,
+        "zones": [
+          {
+            "id": "edge-zone",
+            "label": "Edge",
+            "description": "Public ingress and perimeter controls.",
+            "color": "#6366f1",
+            "padding": 64
+          },
+          {
+            "id": "core-zone",
+            "label": "Core Services",
+            "description": "Application logic and request orchestration.",
+            "color": "#0ea5e9",
+            "padding": 68
+          },
+          {
+            "id": "async-zone",
+            "label": "Async Processing",
+            "description": "Event buffering and worker execution.",
+            "color": "#f59e0b",
+            "padding": 62
+          },
+          {
+            "id": "data-zone",
+            "label": "Data Plane",
+            "description": "Persistent and cached storage systems.",
+            "color": "#22c55e",
+            "padding": 66
+          },
+          {
+            "id": "ops-zone",
+            "label": "Observability",
+            "description": "Monitoring, traces, and operational alerts.",
+            "color": "#a855f7",
+            "padding": 58
+          }
+        ],
+        "minHeight": 700,
         "layoutEngine": "dagre",
         "layoutRankSep": 260,
         "layoutNodeSep": 180,
@@ -26,15 +63,61 @@
       "props": {
         "label": "Edge Gateway",
         "kind": "gateway",
+        "zone": "edge-zone",
+        "status": "active",
+        "tier": "edge",
+        "owner": "Platform Edge Team",
         "technology": "Bun.serve",
+        "runtime": "Bun 1.x",
         "description": "Ingress for public traffic with auth and routing middleware.",
+        "responsibilities": [
+          "Terminate TLS and validate authentication",
+          "Apply perimeter rate limits before core services"
+        ],
+        "capabilities": [
+          "jwt-validation",
+          "rate-limit",
+          "request-routing"
+        ],
+        "interfaces": [
+          {
+            "name": "Public HTTPS API",
+            "protocol": "HTTPS",
+            "direction": "inbound",
+            "contract": "OpenAPI v1",
+            "auth": "JWT + mTLS"
+          }
+        ],
+        "security": {
+          "auth": "JWT, API keys",
+          "encryption": "TLS 1.3",
+          "pii": false,
+          "threatModel": "docs/security/edge-threat-model.md"
+        },
+        "operations": {
+          "owner": "Platform Edge Team",
+          "slo": "99.95% availability",
+          "alert": "gateway-5xx-rate > 1%",
+          "runbook": "docs/runbooks/gateway-incident.md"
+        },
+        "links": [
+          {
+            "label": "Gateway Dashboard",
+            "href": "https://example.com/dashboards/gateway"
+          }
+        ],
         "sourceAnchor": "apps/api/src/server.ts:18",
         "transitions": [
           {
             "to": "service-api",
             "label": "Route request",
             "description": "Forward authenticated calls to API layer.",
-            "kind": "default"
+            "kind": "default",
+            "protocol": "HTTPS",
+            "transport": "sync",
+            "auth": "JWT claim passthrough",
+            "contract": "internal.api.v2",
+            "criticality": "high"
           }
         ]
       },
@@ -47,8 +130,43 @@
       "props": {
         "label": "API Service",
         "kind": "service",
+        "zone": "core-zone",
+        "status": "active",
+        "tier": "application",
+        "owner": "Core Services Team",
         "technology": "TypeScript handlers",
-        "description": "Coordinates commands and writes transactional state.",
+        "runtime": "Bun workers",
+        "description": "Coordinates command execution and emits domain events.",
+        "responsibilities": [
+          "Validate commands and enforce domain invariants",
+          "Persist canonical state and publish events"
+        ],
+        "capabilities": [
+          "idempotent-upsert",
+          "domain-events",
+          "command-validation"
+        ],
+        "interfaces": [
+          {
+            "name": "Gateway RPC",
+            "protocol": "HTTPS",
+            "direction": "inbound",
+            "contract": "internal.api.v2",
+            "auth": "service-token"
+          },
+          {
+            "name": "Event publish",
+            "protocol": "Kafka",
+            "direction": "outbound",
+            "contract": "domain.events.v3"
+          }
+        ],
+        "operations": {
+          "owner": "Core Services Team",
+          "slo": "p95 latency < 200ms",
+          "alert": "api-latency-p95 > 250ms",
+          "runbook": "docs/runbooks/api-latency.md"
+        },
         "sourceAnchor": {
           "path": "apps/api/src/routes/index.ts",
           "line": 42
@@ -58,19 +176,31 @@
             "to": "database-primary",
             "label": "Commit state",
             "description": "Persist transaction results.",
-            "kind": "success"
+            "kind": "success",
+            "protocol": "SQL",
+            "transport": "sync",
+            "auth": "db-role:app_writer",
+            "contract": "schema.public.v12",
+            "criticality": "high"
           },
           {
             "to": "queue-events",
             "label": "Publish events",
             "description": "Emit domain events for async processing.",
-            "kind": "async"
+            "kind": "async",
+            "protocol": "Kafka",
+            "transport": "async",
+            "contract": "domain.events.v3",
+            "criticality": "medium"
           },
           {
             "to": "cache-read",
             "label": "Prime cache",
             "description": "Refresh hot read models after writes.",
-            "kind": "retry"
+            "kind": "retry",
+            "protocol": "Redis",
+            "transport": "sync",
+            "criticality": "medium"
           }
         ]
       },
@@ -85,8 +215,37 @@
       "props": {
         "label": "Primary Database",
         "kind": "database",
+        "zone": "data-zone",
+        "status": "active",
+        "tier": "data",
+        "owner": "Data Platform Team",
         "technology": "Postgres",
+        "runtime": "Managed Postgres 16",
         "description": "Source of truth for transactional entities.",
+        "capabilities": [
+          "point-in-time-recovery",
+          "read-replicas"
+        ],
+        "data": [
+          {
+            "name": "Orders + Accounts",
+            "kind": "relational",
+            "classification": "confidential",
+            "retention": "7 years"
+          }
+        ],
+        "security": {
+          "auth": "IAM auth + db roles",
+          "encryption": "at rest + in transit",
+          "pii": true,
+          "threatModel": "docs/security/data-tier.md"
+        },
+        "operations": {
+          "owner": "Data Platform Team",
+          "slo": "RPO < 5m, RTO < 30m",
+          "alert": "replication-lag > 60s",
+          "runbook": "docs/runbooks/db-replication-lag.md"
+        },
         "sourceAnchor": "infra/postgres/main.tf:12"
       }
     },
@@ -95,14 +254,41 @@
       "props": {
         "label": "Event Queue",
         "kind": "queue",
+        "zone": "async-zone",
+        "status": "active",
+        "tier": "integration",
+        "owner": "Platform Messaging Team",
         "technology": "SQS / Kafka topic",
+        "runtime": "Managed Kafka",
         "description": "Durable buffer for asynchronous jobs and retries.",
+        "capabilities": [
+          "backpressure",
+          "dead-letter-routing"
+        ],
+        "data": [
+          {
+            "name": "Domain Event Envelope",
+            "kind": "event-stream",
+            "classification": "internal",
+            "retention": "7 days"
+          }
+        ],
+        "operations": {
+          "owner": "Platform Messaging Team",
+          "slo": "99.9% message durability",
+          "alert": "consumer-lag > 2m",
+          "runbook": "docs/runbooks/queue-backlog.md"
+        },
         "transitions": [
           {
             "to": "compute-workers",
             "label": "Dispatch jobs",
             "description": "Workers process queued events.",
-            "kind": "async"
+            "kind": "async",
+            "protocol": "Kafka",
+            "transport": "async",
+            "contract": "domain.events.v3",
+            "criticality": "medium"
           }
         ]
       },
@@ -115,20 +301,58 @@
       "props": {
         "label": "Worker Pool",
         "kind": "compute",
+        "zone": "async-zone",
+        "status": "active",
+        "tier": "platform",
+        "owner": "Automation Team",
         "technology": "Bun workers",
+        "runtime": "Bun queue consumers",
         "description": "Runs asynchronous tasks and emits metrics.",
+        "responsibilities": [
+          "Apply retries for transient failures",
+          "Project async writes into cache"
+        ],
+        "capabilities": [
+          "retry-orchestration",
+          "idempotency-keys"
+        ],
+        "interfaces": [
+          {
+            "name": "Queue consumer",
+            "protocol": "Kafka",
+            "direction": "inbound",
+            "contract": "domain.events.v3"
+          }
+        ],
+        "security": {
+          "auth": "service-account token",
+          "encryption": "TLS + envelope keys",
+          "pii": false
+        },
+        "operations": {
+          "owner": "Automation Team",
+          "slo": "Retry success > 98% in 10m",
+          "alert": "worker-error-rate > 2%",
+          "runbook": "docs/runbooks/worker-errors.md"
+        },
         "transitions": [
           {
             "to": "cache-read",
             "label": "Update cache",
             "description": "Push post-processing projections for read traffic.",
-            "kind": "retry"
+            "kind": "retry",
+            "protocol": "Redis",
+            "transport": "sync",
+            "criticality": "medium"
           },
           {
             "to": "external-observability",
             "label": "Report telemetry",
             "description": "Publish operational traces and alerts.",
-            "kind": "warning"
+            "kind": "warning",
+            "protocol": "OTLP/HTTP",
+            "transport": "async",
+            "criticality": "low"
           }
         ]
       },
@@ -142,8 +366,25 @@
       "props": {
         "label": "Read Cache",
         "kind": "cache",
+        "zone": "data-zone",
+        "status": "active",
+        "tier": "data",
+        "owner": "Data Platform Team",
         "technology": "Redis",
-        "description": "Low-latency read path for frequently requested aggregates."
+        "runtime": "Redis cluster",
+        "description": "Low-latency read path for frequently requested aggregates.",
+        "capabilities": [
+          "ttl-projections",
+          "hot-key-protection"
+        ],
+        "data": [
+          {
+            "name": "Read models",
+            "kind": "key-value",
+            "classification": "internal",
+            "retention": "24 hours"
+          }
+        ]
       }
     },
     "external-observability": {
@@ -151,8 +392,28 @@
       "props": {
         "label": "Observability Stack",
         "kind": "external",
+        "zone": "ops-zone",
+        "status": "active",
+        "tier": "external",
+        "owner": "SRE",
         "technology": "Metrics + traces + alerts",
+        "runtime": "Managed observability SaaS",
         "description": "Receives telemetry from gateway, API, and workers.",
+        "capabilities": [
+          "service-level-alerting",
+          "distributed-tracing"
+        ],
+        "links": [
+          {
+            "label": "Ops Dashboard",
+            "href": "https://example.com/dashboards/ops"
+          }
+        ],
+        "operations": {
+          "owner": "SRE",
+          "slo": "Alert dispatch < 1 minute",
+          "runbook": "docs/runbooks/ops-observability.md"
+        },
         "sourceAnchor": "docs/ops/telemetry.md:7"
       }
     }

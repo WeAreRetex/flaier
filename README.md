@@ -34,7 +34,7 @@ When a manifest is loaded, the viewer shows a dropdown so users can switch betwe
 - `"narrative"` (default): timeline controls, active-node focus, autoplay/step traversal.
 - `"architecture"`: static topology exploration with node inspector and full-diagram export controls.
 
-For architecture diagrams, prefer `ArchitectureNode` entries and explicit `props.transitions` labels.
+For architecture diagrams, prefer `ArchitectureNode` entries, explicit `props.transitions` labels, and `FlowTimeline.props.zones` + `ArchitectureNode.props.zone` to visualize system boundaries.
 
 ## Diagram Export
 

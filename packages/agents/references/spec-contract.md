@@ -49,10 +49,10 @@ Use this contract when writing `*.flow.json` for `flow-narrator`.
 
 - `FlowTimeline`:
   - required: `title` (string)
-  - optional: `description`, `mode` (`narrative` | `architecture`), `direction`, `minHeight`, `layoutEngine`, `layoutRankSep`, `layoutNodeSep`, `layoutEdgeSep`
+  - optional: `description`, `mode` (`narrative` | `architecture`), `zones`, `direction`, `minHeight`, `layoutEngine`, `layoutRankSep`, `layoutNodeSep`, `layoutEdgeSep`
 - `ArchitectureNode`:
   - required: `label`
-  - optional: `kind` (`service` | `database` | `queue` | `cache` | `gateway` | `external` | `compute`), `technology`, `description`, `sourceAnchor`, `transitions`
+  - optional: `kind` (`service` | `database` | `queue` | `cache` | `gateway` | `external` | `compute`), `zone`, `status`, `tier`, `technology`, `runtime`, `owner`, `description`, `tags`, `responsibilities`, `capabilities`, `interfaces`, `data`, `security`, `operations`, `links`, `sourceAnchor`, `transitions`
 - `TriggerNode`:
   - required: `label`
   - optional: `description`, `color`, `sourceAnchor`, `transitions`
@@ -117,7 +117,12 @@ Use `props.transitions` on any non-root node to attach edge metadata:
       "to": "next-node-key",
       "label": "Valid payload",
       "description": "Continue with canonicalized request",
-      "kind": "success"
+      "kind": "success",
+      "protocol": "HTTPS",
+      "transport": "sync",
+      "auth": "service-token",
+      "contract": "internal.api.v2",
+      "criticality": "high"
     }
   ]
 }
@@ -125,6 +130,7 @@ Use `props.transitions` on any non-root node to attach edge metadata:
 
 - `to` is required and must reference an existing element key.
 - optional `kind`: `default` | `success` | `error` | `warning` | `retry` | `async`.
+- optional architecture metadata: `protocol`, `transport` (`sync` | `async`), `auth`, `contract`, `criticality` (`low` | `medium` | `high`).
 - Keep `children` for traversal; `transitions` enriches labels/descriptions/styles (and can define ordering).
 
 ## Branching Rules
@@ -138,7 +144,9 @@ Use `props.transitions` on any non-root node to attach edge metadata:
 ## Architecture Mode Rules
 
 - Set `FlowTimeline.props.mode` to `"architecture"` for topology-style diagrams.
+- Define `FlowTimeline.props.zones` when you want named group containers/boundaries.
 - Prefer `ArchitectureNode` for services, stores, queues, gateways, and external dependencies.
+- Assign `ArchitectureNode.props.zone` to group components inside zone containers.
 - Keep `children`/`transitions` directional so connection flow is clear for exported full-diagram views.
 
 ## Manifest Contract

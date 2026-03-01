@@ -32,10 +32,12 @@ bun run manifest -- --dir ./flow-specs --out ./flow-specs/manifest.json
 1. Create a scaffold with `scaffold` (`linear` or `branching`) and realistic flow title.
 2. Replace placeholders with real node labels, code snippets, descriptions, links, and branch paths from the target codebase.
 3. Keep one `FlowTimeline` root; for architecture diagrams set `FlowTimeline.props.mode` to `"architecture"` and prefer `ArchitectureNode` for infrastructure components.
+4. Use `FlowTimeline.props.zones` + `ArchitectureNode.props.zone` when you need explicit group containers (edge/core/data/ops boundaries).
 4. Add edge metadata with `props.transitions` on branching nodes to label branch choices (`label`, `description`) and semantics (`kind`: `success`, `error`, `warning`, `retry`, `async`, `default`).
 5. Add `sourceAnchor` on key nodes so readers can jump from story to exact code locations (`path:line` or `{ path, line, column, href }`).
-6. Validate each generated spec or full manifest with `validate`.
-7. Build or refresh `manifest.json` with `manifest` after adding/removing flow files.
+6. For architecture nodes, include operational metadata where available (`owner`, `status`, `tier`, `interfaces`, `data`, `security`, `operations`, `links`).
+7. Validate each generated spec or full manifest with `validate`.
+8. Build or refresh `manifest.json` with `manifest` after adding/removing flow files.
 
 ## Non-Negotiable Output Rules
 

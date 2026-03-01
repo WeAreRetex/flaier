@@ -24,6 +24,11 @@ export interface EdgeTransition {
   label?: string
   description?: string
   kind?: EdgeTransitionKind
+  protocol?: string
+  transport?: 'sync' | 'async'
+  auth?: string
+  contract?: string
+  criticality?: 'low' | 'medium' | 'high'
 }
 
 /** Structured node source anchor */
@@ -38,11 +43,62 @@ export interface SourceAnchor {
 /** Source anchor can be a compact string or structured object */
 export type SourceAnchorInput = string | SourceAnchor
 
+/** Architectural zone/group container metadata */
+export interface ArchitectureZone {
+  id: string
+  label: string
+  description?: string
+  color?: string
+  padding?: number
+}
+
+/** Architecture interface contract metadata */
+export interface ArchitectureInterface {
+  name: string
+  protocol?: string
+  direction?: 'inbound' | 'outbound' | 'bidirectional'
+  contract?: string
+  auth?: string
+  notes?: string
+}
+
+/** Architecture data asset metadata */
+export interface ArchitectureDataAsset {
+  name: string
+  kind?: string
+  classification?: 'public' | 'internal' | 'confidential' | 'restricted'
+  retention?: string
+  notes?: string
+}
+
+/** Architecture security metadata */
+export interface ArchitectureSecurity {
+  auth?: string
+  encryption?: string
+  pii?: boolean
+  threatModel?: string
+}
+
+/** Architecture operations metadata */
+export interface ArchitectureOperations {
+  owner?: string
+  slo?: string
+  alert?: string
+  runbook?: string
+}
+
+/** Architecture reference links */
+export interface ArchitectureLink {
+  label: string
+  href: string
+}
+
 /** Props for the FlowTimeline root element */
 export interface FlowTimelineProps {
   title: string
   description?: string
   mode?: 'narrative' | 'architecture'
+  zones?: ArchitectureZone[]
   direction?: 'horizontal' | 'vertical'
   minHeight?: number
   layoutEngine?: 'dagre' | 'manual'
@@ -56,7 +112,20 @@ export interface ArchitectureNodeProps {
   label: string
   kind?: 'service' | 'database' | 'queue' | 'cache' | 'gateway' | 'external' | 'compute'
   technology?: string
+  runtime?: string
+  owner?: string
+  tier?: 'edge' | 'application' | 'integration' | 'data' | 'platform' | 'external'
+  status?: 'planned' | 'active' | 'degraded' | 'retired'
+  zone?: string
   description?: string
+  tags?: string[]
+  responsibilities?: string[]
+  capabilities?: string[]
+  interfaces?: ArchitectureInterface[]
+  data?: ArchitectureDataAsset[]
+  security?: ArchitectureSecurity
+  operations?: ArchitectureOperations
+  links?: ArchitectureLink[]
   sourceAnchor?: SourceAnchorInput
   transitions?: EdgeTransition[]
 }

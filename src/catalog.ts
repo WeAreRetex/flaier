@@ -24,6 +24,11 @@ const edgeTransitionSchema = z.object({
   label: z.string().optional(),
   description: z.string().optional(),
   kind: edgeTransitionKindSchema.optional(),
+  protocol: z.string().optional(),
+  transport: z.enum(['sync', 'async']).optional(),
+  auth: z.string().optional(),
+  contract: z.string().optional(),
+  criticality: z.enum(['low', 'medium', 'high']).optional(),
 })
 
 const sourceAnchorSchema = z.union([
@@ -37,6 +42,50 @@ const sourceAnchorSchema = z.union([
   }),
 ])
 
+const architectureZoneSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  description: z.string().optional(),
+  color: z.string().optional(),
+  padding: z.number().positive().optional(),
+})
+
+const architectureInterfaceSchema = z.object({
+  name: z.string(),
+  protocol: z.string().optional(),
+  direction: z.enum(['inbound', 'outbound', 'bidirectional']).optional(),
+  contract: z.string().optional(),
+  auth: z.string().optional(),
+  notes: z.string().optional(),
+})
+
+const architectureDataAssetSchema = z.object({
+  name: z.string(),
+  kind: z.string().optional(),
+  classification: z.enum(['public', 'internal', 'confidential', 'restricted']).optional(),
+  retention: z.string().optional(),
+  notes: z.string().optional(),
+})
+
+const architectureSecuritySchema = z.object({
+  auth: z.string().optional(),
+  encryption: z.string().optional(),
+  pii: z.boolean().optional(),
+  threatModel: z.string().optional(),
+})
+
+const architectureOperationsSchema = z.object({
+  owner: z.string().optional(),
+  slo: z.string().optional(),
+  alert: z.string().optional(),
+  runbook: z.string().optional(),
+})
+
+const architectureLinkSchema = z.object({
+  label: z.string(),
+  href: z.string(),
+})
+
 export const catalog = defineCatalog(schema, {
   components: {
     FlowTimeline: {
@@ -44,6 +93,7 @@ export const catalog = defineCatalog(schema, {
         title: z.string(),
         description: z.string().optional(),
         mode: z.enum(['narrative', 'architecture']).default('narrative'),
+        zones: z.array(architectureZoneSchema).optional(),
         direction: z.enum(['horizontal', 'vertical']).default('horizontal'),
         minHeight: z.number().int().positive().optional(),
         layoutEngine: z.enum(['dagre', 'manual']).default('dagre'),
@@ -59,7 +109,20 @@ export const catalog = defineCatalog(schema, {
         label: z.string(),
         kind: z.enum(['service', 'database', 'queue', 'cache', 'gateway', 'external', 'compute']).default('service'),
         technology: z.string().optional(),
+        runtime: z.string().optional(),
+        owner: z.string().optional(),
+        tier: z.enum(['edge', 'application', 'integration', 'data', 'platform', 'external']).optional(),
+        status: z.enum(['planned', 'active', 'degraded', 'retired']).optional(),
+        zone: z.string().optional(),
         description: z.string().optional(),
+        tags: z.array(z.string()).optional(),
+        responsibilities: z.array(z.string()).optional(),
+        capabilities: z.array(z.string()).optional(),
+        interfaces: z.array(architectureInterfaceSchema).optional(),
+        data: z.array(architectureDataAssetSchema).optional(),
+        security: architectureSecuritySchema.optional(),
+        operations: architectureOperationsSchema.optional(),
+        links: z.array(architectureLinkSchema).optional(),
         sourceAnchor: sourceAnchorSchema.optional(),
         transitions: z.array(edgeTransitionSchema).optional(),
       }),

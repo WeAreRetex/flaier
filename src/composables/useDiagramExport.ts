@@ -105,9 +105,17 @@ function createCaptureStage({
   flowClone.style.margin = '0'
 
   const viewport = flowClone.querySelector('.vue-flow__viewport') as HTMLElement | null
+  const exportTransform = `translate(${Math.round(EXPORT_PADDING_PX - bounds.x)}px, ${Math.round(EXPORT_PADDING_PX - bounds.y)}px) scale(1)`
+
   if (viewport) {
     viewport.style.transformOrigin = '0 0'
-    viewport.style.transform = `translate(${Math.round(EXPORT_PADDING_PX - bounds.x)}px, ${Math.round(EXPORT_PADDING_PX - bounds.y)}px) scale(1)`
+    viewport.style.transform = exportTransform
+  }
+
+  const zoneOverlays = flowClone.querySelectorAll<HTMLElement>('[data-zone-overlay="true"]')
+  for (const overlay of zoneOverlays) {
+    overlay.style.transformOrigin = '0 0'
+    overlay.style.transform = exportTransform
   }
 
   stage.appendChild(flowClone)

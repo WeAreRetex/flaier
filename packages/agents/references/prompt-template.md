@@ -11,6 +11,8 @@ Requirements:
 - Allowed node types: ArchitectureNode, TriggerNode, CodeNode, DecisionNode, PayloadNode, ErrorNode, DescriptionNode, LinkNode.
 - Include `state.currentStep` (number) and `state.playing` (boolean).
 - For topology/system diagrams, set `FlowTimeline.props.mode` to `architecture` and prefer `ArchitectureNode` for services/stores/queues/gateways.
+- When boundaries matter, define `FlowTimeline.props.zones` and set `ArchitectureNode.props.zone` references.
+- For architecture nodes, include operational metadata when known (`owner`, `status`, `tier`, `interfaces`, `data`, `security`, `operations`, `links`).
 - Include realistic code snippets for each CodeNode.
 - Prefer `DecisionNode` for branch points and add edge metadata in `props.transitions` (`to`, `label`, `description`, `kind`) on branching nodes.
 - Use `PayloadNode` when before/after payload snapshots help explain transformations.
