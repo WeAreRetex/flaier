@@ -299,8 +299,15 @@ const containerReady = ref(false)
 const uiTheme = ref<'dark' | 'light'>('dark')
 const isLightTheme = computed(() => uiTheme.value === 'light')
 const isArchitectureMode = computed(() => props.mode === 'architecture')
+const architectureInspectorOpen = ref(true)
 const themeToggleLabel = computed(() => {
   return isLightTheme.value ? 'Switch to dark mode' : 'Switch to light mode'
+})
+
+const architectureInspectorToggleLabel = computed(() => {
+  return architectureInspectorOpen.value
+    ? 'Hide architecture details sidebar'
+    : 'Show architecture details sidebar'
 })
 
 const exportButtonLabel = computed(() => {
@@ -317,6 +324,10 @@ const exportButtonLabel = computed(() => {
 
 function toggleTheme() {
   uiTheme.value = isLightTheme.value ? 'dark' : 'light'
+}
+
+function toggleArchitectureInspector() {
+  architectureInspectorOpen.value = !architectureInspectorOpen.value
 }
 
 function normalizeTheme(value: unknown): 'dark' | 'light' | null {
@@ -2010,9 +2021,9 @@ function architectureZoneCardStyle(zone: ArchitectureZoneOverlay) {
     top: `${zone.y}px`,
     width: `${zone.width}px`,
     height: `${zone.height}px`,
-    borderColor: withAlpha(zone.color, 0.55),
-    background: withAlpha(zone.color, 0.12),
-    boxShadow: `inset 0 0 0 1px ${withAlpha(zone.color, 0.16)}`,
+    borderColor: withAlpha(zone.color, 0.38),
+    background: `linear-gradient(180deg, ${withAlpha(zone.color, 0.1)} 0%, ${withAlpha(zone.color, 0.045)} 62%, ${withAlpha(zone.color, 0.03)} 100%)`,
+    boxShadow: `inset 0 0 0 1px ${withAlpha(zone.color, 0.1)}`,
   }
 }
 
@@ -2160,7 +2171,7 @@ const edges = computed<FlowEdge[]>(() => {
         labelBgPadding: hasLabel ? [6, 3] : undefined,
         labelBgBorderRadius: hasLabel ? 6 : undefined,
         labelBgStyle: hasLabel
-          ? { fill: 'var(--color-card)', fillOpacity: 0.92, stroke: 'var(--color-border)' }
+          ? { fill: 'var(--color-card)', fillOpacity: 0.985, stroke: 'var(--color-border)' }
           : undefined,
         labelStyle: hasLabel
           ? {
@@ -2510,6 +2521,12 @@ const architectureInspectorNodeSafe = computed(() => {
   return architectureInspectorNode.value ?? EMPTY_ARCHITECTURE_INSPECTOR_NODE
 })
 
+const architectureInspectorPanelStyle = computed(() => {
+  return {
+    transform: architectureInspectorOpen.value ? 'translateX(0)' : 'translateX(100%)',
+  }
+})
+
 const branchChoices = computed<BranchChoice[]>(() => {
   if (isArchitectureMode.value) {
     return []
@@ -2678,6 +2695,11 @@ function handleDocumentKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') {
     closeHeaderDropdown()
     closeExportMenu()
+
+    if (isArchitectureMode.value) {
+      architectureInspectorOpen.value = false
+    }
+
     return
   }
 
@@ -2737,6 +2759,7 @@ onViewportChange((transform) => {
 onNodeClick(({ node }) => {
   if (isArchitectureMode.value) {
     architectureSelectedNodeKey.value = node.id
+    architectureInspectorOpen.value = true
     return
   }
 
@@ -2834,10 +2857,12 @@ watch(isArchitectureMode, (architectureMode) => {
     playing.value = false
     hasInitialFocus.value = false
     lastFocusedNodeKey.value = null
+    architectureInspectorOpen.value = true
     return
   }
 
   architectureFitSignature.value = ''
+  architectureInspectorOpen.value = true
 })
 
 onUnmounted(() => {
@@ -2866,7 +2891,7 @@ onUnmounted(() => {
     <div ref="sceneRef" class="relative h-full w-full overflow-hidden">
       <div
         v-if="containerReady && isArchitectureMode && architectureZoneOverlays.length > 0"
-        class="pointer-events-none absolute inset-0 z-[1]"
+        class="pointer-events-none absolute inset-0 z-0"
       >
         <div
           class="absolute inset-0"
@@ -2912,7 +2937,7 @@ onUnmounted(() => {
         :min-zoom="0.15"
         :max-zoom="2"
         :prevent-scrolling="true"
-        class="relative z-[5] h-full w-full"
+        class="relative z-[10] h-full w-full"
         @init="onInit"
       >
         <template #node-architecture="{ data }">
@@ -3221,184 +3246,217 @@ onUnmounted(() => {
     </div>
 
     <div
-      v-else-if="architectureInspector"
-      class="pointer-events-none absolute inset-x-0 bottom-2 z-30 flex justify-center px-3"
-      style="padding-bottom: max(env(safe-area-inset-bottom), 0px);"
+      v-if="isArchitectureMode && architectureInspector"
+      class="pointer-events-none absolute bottom-3 right-0 top-16 z-30 w-[min(92vw,430px)]"
+      style="padding-right: max(env(safe-area-inset-right), 0px); padding-bottom: max(env(safe-area-inset-bottom), 0px);"
     >
-      <div class="pointer-events-auto w-full max-w-[960px] rounded-2xl border border-border/60 bg-card/85 px-3 py-2 backdrop-blur-xl shadow-2xl">
-        <div class="flex flex-wrap items-start justify-between gap-2">
-          <div class="min-w-0">
-            <p class="text-[11px] font-semibold text-foreground leading-snug break-words">
-              {{ architectureInspector.label }}
-            </p>
-
-            <div
-              v-if="architectureInspectorNode"
-              class="mt-1 flex flex-wrap gap-1"
+      <div class="absolute inset-0 overflow-visible">
+        <aside
+          class="pointer-events-auto absolute inset-y-0 right-0 w-full transition-all duration-300 ease-out"
+          :style="architectureInspectorPanelStyle"
+        >
+          <button
+            type="button"
+            class="absolute right-full top-1/2 z-30 inline-flex h-20 w-8 -translate-y-1/2 translate-x-px flex-col items-center justify-center gap-1 rounded-l-lg rounded-r-none border border-border/70 border-r-0 bg-gradient-to-b from-card/95 via-card/88 to-card/78 px-0.5 text-[8px] font-semibold uppercase tracking-[0.12em] text-muted-foreground shadow-2xl backdrop-blur-xl transition-all duration-200 hover:text-foreground"
+            :aria-label="architectureInspectorToggleLabel"
+            :title="architectureInspectorToggleLabel"
+            @click="toggleArchitectureInspector"
+          >
+            <svg
+              class="h-2.5 w-2.5"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
             >
-              <span
-                v-if="architectureInspectorNodeSafe.kind"
-                class="inline-flex items-center rounded border border-border/70 bg-muted/25 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-muted-foreground"
+              <path v-if="architectureInspectorOpen" d="m14.5 6-5.5 6 5.5 6" />
+              <path v-else d="m9.5 6 5.5 6-5.5 6" />
+            </svg>
+            <span class="inline-block font-semibold leading-none" style="writing-mode: vertical-rl; transform: rotate(180deg); letter-spacing: 0.1em;">
+              Details
+            </span>
+          </button>
+
+          <div class="flex h-full flex-col overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-b from-card/95 via-card/90 to-card/82 shadow-2xl backdrop-blur-xl">
+            <div class="border-b border-border/60 px-3 py-2.5">
+              <div class="flex flex-wrap items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <p class="text-[11px] font-semibold text-foreground leading-snug break-words">
+                    {{ architectureInspector.label }}
+                  </p>
+
+                  <div
+                    v-if="architectureInspectorNode"
+                    class="mt-1 flex flex-wrap gap-1"
+                  >
+                    <span
+                      v-if="architectureInspectorNodeSafe.kind"
+                      class="inline-flex items-center rounded border border-border/70 bg-muted/25 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-muted-foreground"
+                    >
+                      {{ architectureInspectorNodeSafe.kind }}
+                    </span>
+                    <span
+                      v-if="architectureInspectorNodeSafe.status"
+                      class="inline-flex items-center rounded border border-primary/35 bg-primary/10 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-primary"
+                    >
+                      {{ architectureInspectorNodeSafe.status }}
+                    </span>
+                    <span
+                      v-if="architectureInspectorNodeSafe.tier"
+                      class="inline-flex items-center rounded border border-border/70 bg-muted/25 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-muted-foreground"
+                    >
+                      {{ architectureInspectorNodeSafe.tier }}
+                    </span>
+                    <span
+                      v-if="architectureInspectorNodeSafe.zoneLabel"
+                      class="inline-flex items-center rounded border border-border/70 bg-muted/25 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-muted-foreground"
+                    >
+                      Zone: {{ architectureInspectorNodeSafe.zoneLabel }}
+                    </span>
+                  </div>
+                </div>
+
+                <a
+                  v-if="architectureInspector.sourceAnchor?.label && architectureInspector.sourceAnchor?.href"
+                  :href="architectureInspector.sourceAnchor.href"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="inline-flex max-w-full items-center gap-1 rounded-md border border-border/70 bg-muted/25 px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground transition-colors hover:border-primary/45 hover:text-foreground"
+                >
+                  <span class="truncate">{{ architectureInspector.sourceAnchor.label }}</span>
+                </a>
+
+                <p
+                  v-else-if="architectureInspector.sourceAnchor?.label"
+                  class="inline-flex max-w-full items-center rounded-md border border-border/70 bg-muted/25 px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground"
+                >
+                  <span class="truncate">{{ architectureInspector.sourceAnchor.label }}</span>
+                </p>
+              </div>
+
+              <p
+                v-if="architectureInspector.summary"
+                class="mt-1.5 text-[11px] text-muted-foreground leading-relaxed whitespace-pre-wrap break-words"
               >
-                {{ architectureInspectorNodeSafe.kind }}
-              </span>
-              <span
-                v-if="architectureInspectorNodeSafe.status"
-                class="inline-flex items-center rounded border border-primary/35 bg-primary/10 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-primary"
-              >
-                {{ architectureInspectorNodeSafe.status }}
-              </span>
-              <span
-                v-if="architectureInspectorNodeSafe.tier"
-                class="inline-flex items-center rounded border border-border/70 bg-muted/25 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-muted-foreground"
-              >
-                {{ architectureInspectorNodeSafe.tier }}
-              </span>
-              <span
-                v-if="architectureInspectorNodeSafe.zoneLabel"
-                class="inline-flex items-center rounded border border-border/70 bg-muted/25 px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-muted-foreground"
-              >
-                Zone: {{ architectureInspectorNodeSafe.zoneLabel }}
-              </span>
+                {{ architectureInspector.summary }}
+              </p>
             </div>
-          </div>
 
-          <a
-            v-if="architectureInspector.sourceAnchor?.label && architectureInspector.sourceAnchor?.href"
-            :href="architectureInspector.sourceAnchor.href"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="inline-flex max-w-full items-center gap-1 rounded-md border border-border/70 bg-muted/25 px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground transition-colors hover:border-primary/45 hover:text-foreground"
-          >
-            <span class="truncate">{{ architectureInspector.sourceAnchor.label }}</span>
-          </a>
+          <div class="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-2.5">
+            <template v-if="architectureInspectorNode">
+              <div class="rounded-lg border border-border/60 bg-muted/20 px-2 py-1.5">
+                <p class="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Core</p>
+                <p v-if="architectureInspectorNodeSafe.technology" class="mt-1 text-[10px] text-foreground">Technology: {{ architectureInspectorNodeSafe.technology }}</p>
+                <p v-if="architectureInspectorNodeSafe.runtime" class="mt-1 text-[10px] text-foreground">Runtime: {{ architectureInspectorNodeSafe.runtime }}</p>
+                <p v-if="architectureInspectorNodeSafe.owner" class="mt-1 text-[10px] text-foreground">Owner: {{ architectureInspectorNodeSafe.owner }}</p>
+                <p v-if="architectureInspectorNodeSafe.operations?.slo" class="mt-1 text-[10px] text-foreground">SLO: {{ architectureInspectorNodeSafe.operations.slo }}</p>
+                <p v-if="architectureInspectorNodeSafe.operations?.alert" class="mt-1 text-[10px] text-foreground">Alert: {{ architectureInspectorNodeSafe.operations.alert }}</p>
+              </div>
 
-          <p
-            v-else-if="architectureInspector.sourceAnchor?.label"
-            class="inline-flex max-w-full items-center rounded-md border border-border/70 bg-muted/25 px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground"
-          >
-            <span class="truncate">{{ architectureInspector.sourceAnchor.label }}</span>
-          </p>
-        </div>
+              <div
+                v-if="architectureInspectorNodeSafe.security || architectureInspectorNodeSafe.dataAssets.length > 0"
+                class="rounded-lg border border-border/60 bg-muted/20 px-2 py-1.5"
+              >
+                <p class="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Data & Security</p>
+                <template v-if="architectureInspectorNodeSafe.security">
+                  <p v-if="architectureInspectorNodeSafe.security.auth" class="mt-1 text-[10px] text-foreground">Auth: {{ architectureInspectorNodeSafe.security.auth }}</p>
+                  <p v-if="architectureInspectorNodeSafe.security.encryption" class="mt-1 text-[10px] text-foreground">Encryption: {{ architectureInspectorNodeSafe.security.encryption }}</p>
+                  <p v-if="architectureInspectorNodeSafe.security.pii !== undefined" class="mt-1 text-[10px] text-foreground">PII: {{ architectureInspectorNodeSafe.security.pii ? 'Yes' : 'No' }}</p>
+                  <p v-if="architectureInspectorNodeSafe.security.threatModel" class="mt-1 text-[10px] text-foreground">Threat Model: {{ architectureInspectorNodeSafe.security.threatModel }}</p>
+                </template>
 
-        <p
-          v-if="architectureInspector.summary"
-          class="mt-1 max-h-[110px] overflow-auto pr-1 text-[11px] text-muted-foreground leading-relaxed whitespace-pre-wrap break-words"
-        >
-          {{ architectureInspector.summary }}
-        </p>
+                <div v-if="architectureInspectorNodeSafe.dataAssets.length > 0" class="mt-1.5 space-y-1">
+                  <p
+                    v-for="asset in architectureInspectorNodeSafe.dataAssets"
+                    :key="`${asset.name}-${asset.kind ?? ''}`"
+                    class="text-[10px] text-foreground"
+                  >
+                    {{ asset.name }}<span v-if="asset.kind"> ({{ asset.kind }})</span><span v-if="asset.classification"> - {{ asset.classification }}</span><span v-if="asset.retention"> - {{ asset.retention }}</span>
+                  </p>
+                </div>
+              </div>
 
-        <div
-          v-if="architectureInspectorNode"
-          class="mt-2 grid gap-2 md:grid-cols-2"
-        >
-          <div class="rounded-lg border border-border/60 bg-muted/20 px-2 py-1.5">
-            <p class="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Core</p>
-            <p v-if="architectureInspectorNodeSafe.technology" class="mt-1 text-[10px] text-foreground">Technology: {{ architectureInspectorNodeSafe.technology }}</p>
-            <p v-if="architectureInspectorNodeSafe.runtime" class="mt-1 text-[10px] text-foreground">Runtime: {{ architectureInspectorNodeSafe.runtime }}</p>
-            <p v-if="architectureInspectorNodeSafe.owner" class="mt-1 text-[10px] text-foreground">Owner: {{ architectureInspectorNodeSafe.owner }}</p>
-            <p v-if="architectureInspectorNodeSafe.operations?.slo" class="mt-1 text-[10px] text-foreground">SLO: {{ architectureInspectorNodeSafe.operations.slo }}</p>
-            <p v-if="architectureInspectorNodeSafe.operations?.alert" class="mt-1 text-[10px] text-foreground">Alert: {{ architectureInspectorNodeSafe.operations.alert }}</p>
-          </div>
+              <div
+                v-if="architectureInspectorNodeSafe.responsibilities.length > 0 || architectureInspectorNodeSafe.capabilities.length > 0 || architectureInspectorNodeSafe.tags.length > 0"
+                class="rounded-lg border border-border/60 bg-muted/20 px-2 py-1.5"
+              >
+                <p class="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Capabilities</p>
 
-          <div
-            v-if="architectureInspectorNodeSafe.security || architectureInspectorNodeSafe.dataAssets.length > 0"
-            class="rounded-lg border border-border/60 bg-muted/20 px-2 py-1.5"
-          >
-            <p class="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Data & Security</p>
-            <template v-if="architectureInspectorNodeSafe.security">
-              <p v-if="architectureInspectorNodeSafe.security.auth" class="mt-1 text-[10px] text-foreground">Auth: {{ architectureInspectorNodeSafe.security.auth }}</p>
-              <p v-if="architectureInspectorNodeSafe.security.encryption" class="mt-1 text-[10px] text-foreground">Encryption: {{ architectureInspectorNodeSafe.security.encryption }}</p>
-              <p v-if="architectureInspectorNodeSafe.security.pii !== undefined" class="mt-1 text-[10px] text-foreground">PII: {{ architectureInspectorNodeSafe.security.pii ? 'Yes' : 'No' }}</p>
-              <p v-if="architectureInspectorNodeSafe.security.threatModel" class="mt-1 text-[10px] text-foreground">Threat Model: {{ architectureInspectorNodeSafe.security.threatModel }}</p>
+                <div v-if="architectureInspectorNodeSafe.capabilities.length > 0" class="mt-1 flex flex-wrap gap-1">
+                  <span
+                    v-for="capability in architectureInspectorNodeSafe.capabilities"
+                    :key="capability"
+                    class="inline-flex items-center rounded border border-primary/35 bg-primary/10 px-1.5 py-0.5 text-[9px] text-primary"
+                  >
+                    {{ capability }}
+                  </span>
+                </div>
+
+                <div v-if="architectureInspectorNodeSafe.tags.length > 0" class="mt-1 flex flex-wrap gap-1">
+                  <span
+                    v-for="tag in architectureInspectorNodeSafe.tags"
+                    :key="tag"
+                    class="inline-flex items-center rounded border border-border/70 bg-card/35 px-1.5 py-0.5 text-[9px] text-muted-foreground"
+                  >
+                    #{{ tag }}
+                  </span>
+                </div>
+
+                <ul v-if="architectureInspectorNodeSafe.responsibilities.length > 0" class="mt-1 space-y-0.5 text-[10px] text-foreground">
+                  <li v-for="item in architectureInspectorNodeSafe.responsibilities" :key="item">- {{ item }}</li>
+                </ul>
+              </div>
+
+              <div
+                v-if="architectureInspectorNodeSafe.interfaces.length > 0 || architectureInspectorNodeSafe.outgoing.length > 0 || architectureInspectorNodeSafe.links.length > 0 || architectureInspectorNodeSafe.operations?.runbook"
+                class="rounded-lg border border-border/60 bg-muted/20 px-2 py-1.5"
+              >
+                <p class="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Interfaces & Links</p>
+
+                <div v-if="architectureInspectorNodeSafe.interfaces.length > 0" class="mt-1 space-y-1">
+                  <p
+                    v-for="iface in architectureInspectorNodeSafe.interfaces"
+                    :key="`${iface.name}-${iface.protocol ?? ''}-${iface.direction ?? ''}`"
+                    class="text-[10px] text-foreground"
+                  >
+                    {{ iface.name }}<span v-if="iface.protocol"> ({{ iface.protocol }})</span><span v-if="iface.direction"> - {{ iface.direction }}</span><span v-if="iface.auth"> - auth: {{ iface.auth }}</span><span v-if="iface.contract"> - {{ iface.contract }}</span>
+                  </p>
+                </div>
+
+                <p v-if="architectureInspectorNodeSafe.operations?.runbook" class="mt-1 text-[10px] text-foreground">
+                  Runbook: {{ architectureInspectorNodeSafe.operations.runbook }}
+                </p>
+
+                <div v-if="architectureInspectorNodeSafe.outgoing.length > 0" class="mt-1 space-y-1">
+                  <p
+                    v-for="edge in architectureInspectorNodeSafe.outgoing"
+                    :key="`${edge.target}-${edge.label ?? ''}-${edge.protocol ?? ''}`"
+                    class="text-[10px] text-foreground"
+                  >
+                    {{ edge.label ?? 'Connect' }} -> {{ edge.target }}<span v-if="edge.protocol"> ({{ edge.protocol }})</span><span v-if="edge.transport"> - {{ edge.transport }}</span><span v-if="edge.auth"> - auth: {{ edge.auth }}</span><span v-if="edge.criticality"> - {{ edge.criticality }}</span>
+                  </p>
+                </div>
+
+                <div v-if="architectureInspectorNodeSafe.links.length > 0" class="mt-1 flex flex-wrap gap-1">
+                  <a
+                    v-for="link in architectureInspectorNodeSafe.links"
+                    :key="`${link.label}-${link.href}`"
+                    :href="link.href"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-flex items-center rounded border border-border/70 bg-card/35 px-1.5 py-0.5 text-[9px] text-foreground transition-colors hover:border-primary/45"
+                  >
+                    {{ link.label }}
+                  </a>
+                </div>
+              </div>
             </template>
-
-            <div v-if="architectureInspectorNodeSafe.dataAssets.length > 0" class="mt-1.5 space-y-1">
-              <p
-                v-for="asset in architectureInspectorNodeSafe.dataAssets"
-                :key="`${asset.name}-${asset.kind ?? ''}`"
-                class="text-[10px] text-foreground"
-              >
-                {{ asset.name }}<span v-if="asset.kind"> ({{ asset.kind }})</span><span v-if="asset.classification"> - {{ asset.classification }}</span><span v-if="asset.retention"> - {{ asset.retention }}</span>
-              </p>
-            </div>
-          </div>
-
-          <div
-            v-if="architectureInspectorNodeSafe.responsibilities.length > 0 || architectureInspectorNodeSafe.capabilities.length > 0 || architectureInspectorNodeSafe.tags.length > 0"
-            class="rounded-lg border border-border/60 bg-muted/20 px-2 py-1.5"
-          >
-            <p class="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Capabilities</p>
-
-            <div v-if="architectureInspectorNodeSafe.capabilities.length > 0" class="mt-1 flex flex-wrap gap-1">
-              <span
-                v-for="capability in architectureInspectorNodeSafe.capabilities"
-                :key="capability"
-                class="inline-flex items-center rounded border border-primary/35 bg-primary/10 px-1.5 py-0.5 text-[9px] text-primary"
-              >
-                {{ capability }}
-              </span>
-            </div>
-
-            <div v-if="architectureInspectorNodeSafe.tags.length > 0" class="mt-1 flex flex-wrap gap-1">
-              <span
-                v-for="tag in architectureInspectorNodeSafe.tags"
-                :key="tag"
-                class="inline-flex items-center rounded border border-border/70 bg-card/35 px-1.5 py-0.5 text-[9px] text-muted-foreground"
-              >
-                #{{ tag }}
-              </span>
-            </div>
-
-            <ul v-if="architectureInspectorNodeSafe.responsibilities.length > 0" class="mt-1 space-y-0.5 text-[10px] text-foreground">
-              <li v-for="item in architectureInspectorNodeSafe.responsibilities" :key="item">- {{ item }}</li>
-            </ul>
-          </div>
-
-          <div
-            v-if="architectureInspectorNodeSafe.interfaces.length > 0 || architectureInspectorNodeSafe.outgoing.length > 0 || architectureInspectorNodeSafe.links.length > 0 || architectureInspectorNodeSafe.operations?.runbook"
-            class="rounded-lg border border-border/60 bg-muted/20 px-2 py-1.5"
-          >
-            <p class="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Interfaces & Links</p>
-
-            <div v-if="architectureInspectorNodeSafe.interfaces.length > 0" class="mt-1 space-y-1">
-              <p
-                v-for="iface in architectureInspectorNodeSafe.interfaces"
-                :key="`${iface.name}-${iface.protocol ?? ''}-${iface.direction ?? ''}`"
-                class="text-[10px] text-foreground"
-              >
-                {{ iface.name }}<span v-if="iface.protocol"> ({{ iface.protocol }})</span><span v-if="iface.direction"> - {{ iface.direction }}</span><span v-if="iface.auth"> - auth: {{ iface.auth }}</span><span v-if="iface.contract"> - {{ iface.contract }}</span>
-              </p>
-            </div>
-
-            <p v-if="architectureInspectorNodeSafe.operations?.runbook" class="mt-1 text-[10px] text-foreground">
-              Runbook: {{ architectureInspectorNodeSafe.operations.runbook }}
-            </p>
-
-            <div v-if="architectureInspectorNodeSafe.outgoing.length > 0" class="mt-1 space-y-1">
-              <p
-                v-for="edge in architectureInspectorNodeSafe.outgoing"
-                :key="`${edge.target}-${edge.label ?? ''}-${edge.protocol ?? ''}`"
-                class="text-[10px] text-foreground"
-              >
-                {{ edge.label ?? 'Connect' }} -> {{ edge.target }}<span v-if="edge.protocol"> ({{ edge.protocol }})</span><span v-if="edge.transport"> - {{ edge.transport }}</span><span v-if="edge.auth"> - auth: {{ edge.auth }}</span><span v-if="edge.criticality"> - {{ edge.criticality }}</span>
-              </p>
-            </div>
-
-            <div v-if="architectureInspectorNodeSafe.links.length > 0" class="mt-1 flex flex-wrap gap-1">
-              <a
-                v-for="link in architectureInspectorNodeSafe.links"
-                :key="`${link.label}-${link.href}`"
-                :href="link.href"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="inline-flex items-center rounded border border-border/70 bg-card/35 px-1.5 py-0.5 text-[9px] text-foreground transition-colors hover:border-primary/45"
-              >
-                {{ link.label }}
-              </a>
-            </div>
           </div>
         </div>
+      </aside>
       </div>
     </div>
   </div>

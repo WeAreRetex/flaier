@@ -129,7 +129,7 @@ const compactTags = computed(() => (props.tags ?? []).slice(0, 3))
 
 <template>
   <div
-    class="fn-node w-[270px] rounded-xl border bg-card px-4 py-3"
+    class="fn-node w-[270px] rounded-xl border bg-card/95 px-4 py-3 shadow-sm"
     :class="kindMeta.cardClass"
     :data-active="active"
   >
