@@ -34,6 +34,7 @@ import type {
   TwoslashHtml,
 } from "../../types";
 import TimelineControls from "../controls/TimelineControls.vue";
+import ArchitectureSmoothEdge from "../edges/ArchitectureSmoothEdge.vue";
 import ArchitectureNodeVue from "../nodes/ArchitectureNode.vue";
 import CodeNodeVue from "../nodes/CodeNode.vue";
 import DecisionNodeVue from "../nodes/DecisionNode.vue";
@@ -98,6 +99,15 @@ const DEFAULT_DAGRE_EDGE_SEP = 30;
 const OVERVIEW_ENTER_ZOOM = 0.52;
 const OVERVIEW_EXIT_ZOOM = 0.62;
 const FLOW_NARRATOR_THEME_STORAGE_KEY = "flow-narrator-ui-theme";
+const ARCHITECTURE_ZONE_MIN_CONTENT_PADDING = 44;
+const ARCHITECTURE_ZONE_MIN_BOTTOM_PADDING = 88;
+const ARCHITECTURE_ZONE_LABEL_TOP = 12;
+const ARCHITECTURE_ZONE_LABEL_HEIGHT = 22;
+const ARCHITECTURE_ZONE_DESCRIPTION_HEIGHT = 16;
+const ARCHITECTURE_ZONE_LABEL_TO_DESCRIPTION_GAP = 6;
+const ARCHITECTURE_ZONE_LABEL_TO_CONTENT_GAP = 12;
+const ARCHITECTURE_ZONE_NESTED_LABEL_STEP = 18;
+const ARCHITECTURE_ZONE_CONTAINED_ZONE_GAP = 46;
 const EDGE_TRANSITION_KINDS: EdgeTransitionKind[] = [
   "default",
   "success",
@@ -218,6 +228,10 @@ interface ArchitectureZoneOverlay {
   width: number;
   height: number;
   nodeCount: number;
+  nestingDepth: number;
+  labelLane: number;
+  labelOffsetY: number;
+  descriptionOffsetY: number;
 }
 
 interface ArchitectureOutgoingEdge {
@@ -2097,7 +2111,19 @@ const architectureZoneOverlays = computed<ArchitectureZoneOverlay[]>(() => {
     return [];
   }
 
-  const overlays: ArchitectureZoneOverlay[] = [];
+  const rawOverlays: Array<{
+    id: string;
+    label: string;
+    description?: string;
+    color: string;
+    minX: number;
+    minY: number;
+    maxX: number;
+    maxY: number;
+    padding: number;
+    nodeCount: number;
+    sourceIndex: number;
+  }> = [];
 
   architectureZoneDefinitions.value.forEach((zone, index) => {
     const members = orderedNodeElements.value.filter(
@@ -2136,20 +2162,219 @@ const architectureZoneOverlays = computed<ArchitectureZoneOverlay[]>(() => {
     }
 
     const padding = zone.padding;
-    overlays.push({
+    rawOverlays.push({
       id: zone.id,
       label: zone.label,
       description: zone.description,
       color: resolveZoneColor(index, zone.color),
-      x: Math.round(minX - padding),
-      y: Math.round(minY - padding),
-      width: Math.max(120, Math.round(maxX - minX + padding * 2)),
-      height: Math.max(100, Math.round(maxY - minY + padding * 2)),
+      minX,
+      minY,
+      maxX,
+      maxY,
+      padding,
       nodeCount: members.length,
+      sourceIndex: index,
     });
   });
 
-  return overlays;
+  const provisionalBounds = rawOverlays.map((overlay) => ({
+    id: overlay.id,
+    x: overlay.minX - overlay.padding,
+    y: overlay.minY - overlay.padding,
+    width: overlay.maxX - overlay.minX + overlay.padding * 2,
+    height: overlay.maxY - overlay.minY + overlay.padding * 2,
+  }));
+
+  const nestingDepthById = new Map<string, number>();
+  const containsNestedZoneById = new Map<string, boolean>();
+
+  for (const current of provisionalBounds) {
+    const depth = provisionalBounds.reduce((count, candidate) => {
+      if (candidate.id === current.id) {
+        return count;
+      }
+
+      const containsCurrent =
+        candidate.x <= current.x + 12 &&
+        candidate.y <= current.y + 12 &&
+        candidate.x + candidate.width >= current.x + current.width - 12 &&
+        candidate.y + candidate.height >= current.y + current.height - 12;
+
+      return containsCurrent ? count + 1 : count;
+    }, 0);
+
+    nestingDepthById.set(current.id, depth);
+    containsNestedZoneById.set(
+      current.id,
+      provisionalBounds.some((candidate) => {
+        if (candidate.id === current.id) {
+          return false;
+        }
+
+        return (
+          current.x <= candidate.x + 12 &&
+          current.y <= candidate.y + 12 &&
+          current.x + current.width >= candidate.x + candidate.width - 12 &&
+          current.y + current.height >= candidate.y + candidate.height - 12
+        );
+      }),
+    );
+  }
+
+  const overlappingZoneIds = new Set<string>();
+  for (let index = 0; index < provisionalBounds.length; index += 1) {
+    const current = provisionalBounds[index];
+    if (!current) {
+      continue;
+    }
+
+    for (let compareIndex = index + 1; compareIndex < provisionalBounds.length; compareIndex += 1) {
+      const candidate = provisionalBounds[compareIndex];
+      if (!candidate) {
+        continue;
+      }
+
+      const overlaps =
+        current.x < candidate.x + candidate.width &&
+        current.x + current.width > candidate.x &&
+        current.y < candidate.y + candidate.height &&
+        current.y + current.height > candidate.y;
+
+      if (!overlaps) {
+        continue;
+      }
+
+      overlappingZoneIds.add(current.id);
+      overlappingZoneIds.add(candidate.id);
+    }
+  }
+
+  const labelLaneById = new Map<string, number>();
+  const placedLabelBoxes: Array<{
+    id: string;
+    lane: number;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }> = [];
+  const sortedForLabelPlacement = rawOverlays
+    .map((overlay) => {
+      const sidePadding = Math.max(overlay.padding, ARCHITECTURE_ZONE_MIN_CONTENT_PADDING);
+      const descriptionReserve = overlay.description
+        ? ARCHITECTURE_ZONE_DESCRIPTION_HEIGHT + ARCHITECTURE_ZONE_LABEL_TO_CONTENT_GAP
+        : 0;
+      const topPadding =
+        sidePadding +
+        ARCHITECTURE_ZONE_LABEL_HEIGHT +
+        ARCHITECTURE_ZONE_LABEL_TO_CONTENT_GAP +
+        descriptionReserve;
+      const width = Math.min(
+        Math.max(132, overlay.label.length * 7 + String(overlay.nodeCount).length * 14 + 86),
+        Math.max(148, overlay.maxX - overlay.minX + sidePadding * 2 - 28),
+      );
+
+      return {
+        id: overlay.id,
+        x: overlay.minX - sidePadding + 16,
+        y: overlay.minY - topPadding + ARCHITECTURE_ZONE_LABEL_TOP,
+        width,
+      };
+    })
+    .sort((a, b) => {
+      if (a.y !== b.y) {
+        return a.y - b.y;
+      }
+
+      return a.x - b.x;
+    });
+
+  for (const labelCandidate of sortedForLabelPlacement) {
+    let lane = 0;
+
+    while (
+      placedLabelBoxes.some((placed) => {
+        if (placed.lane !== lane) {
+          return false;
+        }
+
+        const currentY = labelCandidate.y + lane * ARCHITECTURE_ZONE_NESTED_LABEL_STEP;
+        return (
+          labelCandidate.x < placed.x + placed.width &&
+          labelCandidate.x + labelCandidate.width > placed.x &&
+          currentY < placed.y + placed.height &&
+          currentY + ARCHITECTURE_ZONE_LABEL_HEIGHT > placed.y
+        );
+      })
+    ) {
+      lane += 1;
+    }
+
+    labelLaneById.set(labelCandidate.id, lane);
+    placedLabelBoxes.push({
+      id: labelCandidate.id,
+      lane,
+      x: labelCandidate.x,
+      y: labelCandidate.y + lane * ARCHITECTURE_ZONE_NESTED_LABEL_STEP,
+      width: labelCandidate.width,
+      height: ARCHITECTURE_ZONE_LABEL_HEIGHT,
+    });
+  }
+
+  const maxLabelLane = placedLabelBoxes.reduce((max, placed) => Math.max(max, placed.lane), 0);
+
+  return rawOverlays
+    .map((overlay) => {
+      const nestingDepth = nestingDepthById.get(overlay.id) ?? 0;
+      const nestedZoneGap = containsNestedZoneById.get(overlay.id)
+        ? ARCHITECTURE_ZONE_CONTAINED_ZONE_GAP
+        : 0;
+      const baseSidePadding = Math.max(overlay.padding, ARCHITECTURE_ZONE_MIN_CONTENT_PADDING);
+      const sidePadding = baseSidePadding + nestedZoneGap;
+      const bottomPadding =
+        Math.max(baseSidePadding, ARCHITECTURE_ZONE_MIN_BOTTOM_PADDING) + nestedZoneGap;
+      const labelLane = labelLaneById.get(overlay.id) ?? 0;
+      const labelOffsetY =
+        ARCHITECTURE_ZONE_LABEL_TOP + labelLane * ARCHITECTURE_ZONE_NESTED_LABEL_STEP;
+      const showDescription = Boolean(overlay.description) && !overlappingZoneIds.has(overlay.id);
+      const descriptionOffsetY =
+        labelOffsetY + ARCHITECTURE_ZONE_LABEL_HEIGHT + ARCHITECTURE_ZONE_LABEL_TO_DESCRIPTION_GAP;
+      const descriptionReserve = showDescription
+        ? ARCHITECTURE_ZONE_DESCRIPTION_HEIGHT + ARCHITECTURE_ZONE_LABEL_TO_CONTENT_GAP
+        : 0;
+      const topPadding =
+        sidePadding +
+        ARCHITECTURE_ZONE_LABEL_HEIGHT +
+        ARCHITECTURE_ZONE_LABEL_TO_CONTENT_GAP +
+        descriptionReserve +
+        maxLabelLane * ARCHITECTURE_ZONE_NESTED_LABEL_STEP;
+
+      return {
+        id: overlay.id,
+        label: overlay.label,
+        description: showDescription ? overlay.description : undefined,
+        color: overlay.color,
+        x: Math.round(overlay.minX - sidePadding),
+        y: Math.round(overlay.minY - topPadding),
+        width: Math.max(120, Math.round(overlay.maxX - overlay.minX + sidePadding * 2)),
+        height: Math.max(100, Math.round(overlay.maxY - overlay.minY + topPadding + bottomPadding)),
+        nodeCount: overlay.nodeCount,
+        nestingDepth,
+        labelLane,
+        labelOffsetY,
+        descriptionOffsetY,
+        sourceIndex: overlay.sourceIndex,
+      };
+    })
+    .sort((a, b) => {
+      const areaDiff = b.width * b.height - a.width * a.height;
+      if (areaDiff !== 0) {
+        return areaDiff;
+      }
+
+      return a.sourceIndex - b.sourceIndex;
+    })
+    .map(({ sourceIndex: _sourceIndex, ...overlay }) => overlay);
 });
 
 function architectureZoneCardStyle(zone: ArchitectureZoneOverlay) {
@@ -2166,9 +2391,16 @@ function architectureZoneCardStyle(zone: ArchitectureZoneOverlay) {
 
 function architectureZoneLabelStyle(zone: ArchitectureZoneOverlay) {
   return {
+    top: `${zone.labelOffsetY}px`,
     borderColor: withAlpha(zone.color, 0.55),
     background: withAlpha(zone.color, 0.18),
     color: zone.color,
+  };
+}
+
+function architectureZoneDescriptionStyle(zone: ArchitectureZoneOverlay) {
+  return {
+    top: `${zone.descriptionOffsetY}px`,
   };
 }
 
@@ -2302,23 +2534,25 @@ const edges = computed<FlowEdge[]>(() => {
         id: `e-${node.key}-${target}`,
         source: node.key,
         target,
-        type: "smoothstep",
+        type: isArchitectureMode.value ? "architecture" : "smoothstep",
         animated: !isArchitectureMode.value,
         class: edgeClasses.length > 0 ? edgeClasses.join(" ") : undefined,
         label: edgeLabel,
-        labelShowBg: hasLabel,
-        labelBgPadding: hasLabel ? [6, 3] : undefined,
-        labelBgBorderRadius: hasLabel ? 6 : undefined,
-        labelBgStyle: hasLabel
-          ? { fill: "var(--color-card)", fillOpacity: 0.985, stroke: "var(--color-border)" }
-          : undefined,
-        labelStyle: hasLabel
-          ? {
-              fill: "var(--color-foreground)",
-              fontSize: "10px",
-              fontWeight: 600,
-            }
-          : undefined,
+        labelShowBg: hasLabel && !isArchitectureMode.value,
+        labelBgPadding: hasLabel && !isArchitectureMode.value ? [6, 3] : undefined,
+        labelBgBorderRadius: hasLabel && !isArchitectureMode.value ? 6 : undefined,
+        labelBgStyle:
+          hasLabel && !isArchitectureMode.value
+            ? { fill: "var(--color-card)", fillOpacity: 0.985, stroke: "var(--color-border)" }
+            : undefined,
+        labelStyle:
+          hasLabel && !isArchitectureMode.value
+            ? {
+                fill: "var(--color-foreground)",
+                fontSize: "10px",
+                fontWeight: 600,
+              }
+            : undefined,
       });
     }
   }
@@ -2979,13 +3213,16 @@ const viewportReady = computed(
 const narrativeFitSignature = ref("");
 
 watch(
-  [viewportReady, isArchitectureMode, nodes],
-  ([ready, architectureMode, currentNodes]) => {
+  [viewportReady, isArchitectureMode, nodes, containerWidth, containerHeight],
+  ([ready, architectureMode, currentNodes, width, height]) => {
     if (!ready || architectureMode || currentNodes.length === 0) return;
 
-    const signature = currentNodes
-      .map((node) => `${node.id}:${Math.round(node.position.x)}:${Math.round(node.position.y)}`)
-      .join("|");
+    const signature = [
+      `${Math.round(width)}x${Math.round(height)}`,
+      ...currentNodes.map(
+        (node) => `${node.id}:${Math.round(node.position.x)}:${Math.round(node.position.y)}`,
+      ),
+    ].join("|");
 
     if (signature === narrativeFitSignature.value) {
       return;
@@ -3007,13 +3244,16 @@ watch(
 const architectureFitSignature = ref("");
 
 watch(
-  [viewportReady, isArchitectureMode, nodes],
-  ([ready, architectureMode, currentNodes]) => {
+  [viewportReady, isArchitectureMode, nodes, containerWidth, containerHeight],
+  ([ready, architectureMode, currentNodes, width, height]) => {
     if (!ready || !architectureMode || currentNodes.length === 0) return;
 
-    const signature = currentNodes
-      .map((node) => `${node.id}:${Math.round(node.position.x)}:${Math.round(node.position.y)}`)
-      .join("|");
+    const signature = [
+      `${Math.round(width)}x${Math.round(height)}`,
+      ...currentNodes.map(
+        (node) => `${node.id}:${Math.round(node.position.x)}:${Math.round(node.position.y)}`,
+      ),
+    ].join("|");
 
     if (signature === architectureFitSignature.value) {
       return;
@@ -3024,7 +3264,7 @@ watch(
     nextTick(() => {
       void fitView({
         duration: 260,
-        padding: 0.2,
+        padding: 0.18,
         maxZoom: 1.15,
       });
     });
@@ -3086,7 +3326,7 @@ onUnmounted(() => {
             :style="architectureZoneCardStyle(zone)"
           >
             <div
-              class="absolute left-4 top-3 inline-flex items-center gap-2 rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-wider"
+              class="absolute left-4 inline-flex items-center gap-2 rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-wider"
               :style="architectureZoneLabelStyle(zone)"
             >
               <span>{{ zone.label }}</span>
@@ -3097,7 +3337,8 @@ onUnmounted(() => {
 
             <p
               v-if="zone.description"
-              class="absolute left-4 right-4 top-10 text-[10px] leading-snug text-muted-foreground"
+              class="absolute left-4 right-4 text-[10px] leading-snug text-muted-foreground"
+              :style="architectureZoneDescriptionStyle(zone)"
             >
               {{ zone.description }}
             </p>
@@ -3138,6 +3379,10 @@ onUnmounted(() => {
             :source-anchor="resolveNodeSourceAnchor(data.props)"
             :active="isActive(data.key)"
           />
+        </template>
+
+        <template #edge-architecture="edgeProps">
+          <ArchitectureSmoothEdge v-bind="edgeProps" />
         </template>
 
         <template #node-trigger="{ data }">
