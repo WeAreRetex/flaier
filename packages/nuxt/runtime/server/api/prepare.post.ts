@@ -25,7 +25,7 @@ export default defineEventHandler(async (event) => {
       baseUrl,
       fetchJson: async (url) => {
         const resolvedUrl = resolveFetchUrl(url, baseUrl);
-        return event.$fetch(resolvedUrl);
+        return fetchJsonSource(resolvedUrl);
       },
     });
   } catch (error) {
@@ -51,4 +51,14 @@ function resolveFetchUrl(value: string, baseUrl?: string) {
 
 function toOptionalString(value: unknown) {
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+async function fetchJsonSource(url: string) {
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`[${response.status}] "${url}": ${response.statusText || "Request failed"}`);
+  }
+
+  return (await response.json()) as unknown;
 }

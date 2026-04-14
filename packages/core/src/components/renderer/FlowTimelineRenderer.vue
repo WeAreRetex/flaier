@@ -3027,7 +3027,7 @@ const containerMinHeight = computed(() => {
 
 const instance = getCurrentInstance();
 const flowId = `flow-narrator-${instance?.uid ?? 0}`;
-const { fitView, onNodeClick, onViewportChange, viewport } = useVueFlow(flowId);
+const { fitView, onNodeClick, onViewportChange, setCenter, viewport } = useVueFlow(flowId);
 const nodesInitialized = useNodesInitialized();
 const paneReady = ref(false);
 const overviewMode = ref(false);
@@ -3210,6 +3210,38 @@ const viewportReady = computed(
   () => paneReady.value && nodesInitialized.value && containerReady.value && nodes.value.length > 0,
 );
 
+const narrativeFocusTarget = computed(() => {
+  if (isArchitectureMode.value || overviewMode.value || !viewportReady.value) {
+    return null;
+  }
+
+  const nodeKey = activeFrame.value?.nodeKey;
+  if (!nodeKey) {
+    return null;
+  }
+
+  const node = nodes.value.find((candidate) => candidate.id === nodeKey);
+  if (!node) {
+    return null;
+  }
+
+  const size = nodeSizes.value[node.id] ?? { width: 240, height: 120 };
+
+  return {
+    signature: [
+      node.id,
+      Math.round(node.position.x),
+      Math.round(node.position.y),
+      Math.round(size.width),
+      Math.round(size.height),
+      Math.round(containerWidth.value),
+      Math.round(containerHeight.value),
+    ].join(":"),
+    x: node.position.x + size.width / 2,
+    y: node.position.y + size.height / 2,
+  };
+});
+
 const narrativeFitSignature = ref("");
 
 watch(
@@ -3236,6 +3268,21 @@ watch(
         padding: 0.3,
         maxZoom: 0.95,
       });
+    });
+  },
+  { immediate: true },
+);
+
+watch(
+  () => narrativeFocusTarget.value?.signature ?? "",
+  () => {
+    const target = narrativeFocusTarget.value;
+    if (!target) return;
+
+    const zoom = Number.isFinite(viewport.value.zoom) ? viewport.value.zoom : 1;
+
+    nextTick(() => {
+      void setCenter(target.x, target.y, { duration: 280, zoom });
     });
   },
   { immediate: true },

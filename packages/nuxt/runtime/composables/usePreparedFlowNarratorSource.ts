@@ -1,4 +1,4 @@
-import { useAsyncData, useRequestFetch, useRequestURL } from "#imports";
+import { useAsyncData, useRequestURL } from "#imports";
 import { computed, unref, type Ref } from "vue";
 import type { FlowNarratorSource } from "flow-narrator";
 
@@ -18,7 +18,7 @@ function serializeSource(value: FlowNarratorSource) {
 
 export async function usePreparedFlowNarratorSource(source: Ref<FlowNarratorSource>) {
   const requestUrl = import.meta.server ? useRequestURL() : null;
-  const requestFetch = import.meta.server ? useRequestFetch() : null;
+  const serverBaseUrl = import.meta.server ? requestUrl?.toString() : undefined;
 
   const key = computed(() => `flow-narrator:prepared:${serializeSource(unref(source))}`);
 
@@ -28,12 +28,12 @@ export async function usePreparedFlowNarratorSource(source: Ref<FlowNarratorSour
       const current = unref(source);
 
       try {
-        if (import.meta.server && requestFetch) {
+        if (import.meta.server) {
           const { prepareFlowNarratorSource } = await import("../server/prepareFlowNarratorSource");
 
           return await prepareFlowNarratorSource(current, {
-            baseUrl: requestUrl?.toString(),
-            fetchJson: (url) => requestFetch(url),
+            baseUrl: serverBaseUrl,
+            fetchJson: (url) => fetchJsonSource(resolveFetchUrl(url, serverBaseUrl)),
           });
         }
 
@@ -45,7 +45,9 @@ export async function usePreparedFlowNarratorSource(source: Ref<FlowNarratorSour
           },
         });
       } catch (error) {
-        console.warn("[flow-narrator/nuxt] Failed to prepare flow source.", error);
+        console.warn(
+          `[flow-narrator/nuxt] Failed to prepare flow source. ${formatErrorMessage(error)}`,
+        );
         return current;
       }
     },
@@ -56,4 +58,34 @@ export async function usePreparedFlowNarratorSource(source: Ref<FlowNarratorSour
   );
 
   return computed(() => data.value ?? unref(source));
+}
+
+async function fetchJsonSource(url: string) {
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`[${response.status}] "${url}": ${response.statusText || "Request failed"}`);
+  }
+
+  return (await response.json()) as FlowNarratorSource;
+}
+
+function resolveFetchUrl(value: string, baseUrl?: string) {
+  if (!baseUrl) {
+    return value;
+  }
+
+  try {
+    return new URL(value, baseUrl).toString();
+  } catch {
+    return value;
+  }
+}
+
+function formatErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return String(error);
 }

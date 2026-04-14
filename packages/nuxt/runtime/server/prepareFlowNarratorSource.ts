@@ -162,7 +162,9 @@ async function prepareSpec(spec: FlowNarratorSpec): Promise<FlowNarratorSpec> {
         props,
       };
     } catch (error) {
-      console.warn("[flow-narrator/nuxt] Failed to pre-render twoslash HTML.", error);
+      console.warn(
+        `[flow-narrator/nuxt] Failed to pre-render twoslash HTML. ${formatErrorMessage(error)}`,
+      );
     }
   }
 
@@ -382,4 +384,12 @@ function isObject(value: unknown): value is Record<string, any> {
 
 function cloneValue<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function formatErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return String(error);
 }
