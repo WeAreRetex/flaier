@@ -26,6 +26,8 @@ Use this checklist before finalizing generated flow specs.
 - For CodeNodes that combine `magicMoveSteps` and twoslash, keep markers in the final step code so the post-animation twoslash inspection frame has visible callouts.
 - For architecture mode, use explicit edge labels (`props.transitions`) for critical links (for example async/event/retry paths) so exported diagrams stay self-explanatory.
 - Add architecture metadata where useful: `owner`, `status`, `tier`, `interfaces`, `data`, `security`, and `operations` so node inspectors become actionable.
+- For docs pages or slide decks, prefer `themeMode: "document"` and hide header/export chrome when the canvas is tight.
+- Collapse the architecture inspector by default in constrained embeds unless the story depends on its metadata immediately.
 
 ## Structural Quality
 
@@ -35,6 +37,7 @@ Use this checklist before finalizing generated flow specs.
 - Keep `state.currentStep` numeric and `state.playing` boolean.
 - Prefer one entry root child and build traversal from that node.
 - Validate `sourceAnchor` references are plausible and include line numbers where available.
+- Remember that `root` can be any key, but it must reference the single `FlowTimeline` element.
 
 ## Packaging Quality
 

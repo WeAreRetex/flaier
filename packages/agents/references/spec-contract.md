@@ -45,11 +45,13 @@ Use this contract when writing `*.flow.json` for `flow-narrator`.
 }
 ```
 
+The `root` value does not have to be literally `"timeline"`; it just needs to point to the single `FlowTimeline` element.
+
 ## Component Props
 
 - `FlowTimeline`:
   - required: `title` (string)
-  - optional: `description`, `mode` (`narrative` | `architecture`), `zones`, `direction`, `minHeight`, `layoutEngine`, `layoutRankSep`, `layoutNodeSep`, `layoutEdgeSep`
+  - optional: `description`, `mode` (`narrative` | `architecture`), `zones`, `direction`, `minHeight`, `layoutEngine`, `layoutRankSep`, `layoutNodeSep`, `layoutEdgeSep`, `themeMode` (`local` | `document`), `showHeaderOverlay`, `showExportControls`, `showThemeToggle`, `showArchitectureInspector`, `defaultArchitectureInspectorOpen`, `showArchitectureInspectorToggleText`
 - `ArchitectureNode`:
   - required: `label`
   - optional: `kind` (`service` | `database` | `queue` | `cache` | `gateway` | `external` | `compute`), `zone`, `status`, `tier`, `technology`, `runtime`, `owner`, `description`, `tags`, `responsibilities`, `capabilities`, `interfaces`, `data`, `security`, `operations`, `links`, `sourceAnchor`, `transitions`
@@ -58,10 +60,11 @@ Use this contract when writing `*.flow.json` for `flow-narrator`.
   - optional: `description`, `color`, `sourceAnchor`, `transitions`
 - `CodeNode`:
   - required: `label`, `code`
-  - optional: `file`, `language`, `comment`, `story`, `wrapLongLines`, `magicMoveSteps`, `twoslash`, `sourceAnchor`, `transitions`
+  - optional: `file`, `language`, `comment`, `story`, `wrapLongLines`, `magicMoveSteps`, `twoslash`, `twoslashHtml`, `sourceAnchor`, `transitions`
   - note: twoslash works with `language: "typescript"` or `"tsx"`; markers like `// ^?` auto-enable twoslash and `twoslash: true` can force it
   - note: keep twoslash snippets self-contained (add small inline helper types/interfaces when needed) so browser twoslash does not depend on project-global ambient declarations
   - note: when `magicMoveSteps` are present, twoslash renders as an inspection frame after the final step; place markers in the final step code
+  - note: `twoslashHtml` is runtime-rendered HTML; agents should usually omit it and let the renderer populate it
 - `DecisionNode`:
   - required: `label`
   - optional: `condition`, `description`, `sourceAnchor`, `transitions`
@@ -148,6 +151,13 @@ Use `props.transitions` on any non-root node to attach edge metadata:
 - Prefer `ArchitectureNode` for services, stores, queues, gateways, and external dependencies.
 - Assign `ArchitectureNode.props.zone` to group components inside zone containers.
 - Keep `children`/`transitions` directional so connection flow is clear for exported full-diagram views.
+
+## Embedded Docs / Slidev Rules
+
+- For docs pages or Slidev decks, prefer `FlowTimeline.props.themeMode: "document"` so the diagram follows the surrounding light/dark theme.
+- Set `showHeaderOverlay: false` when the floating title bar takes too much vertical space.
+- Set `showExportControls: false` when export UI is not useful in a constrained embed.
+- Consider `defaultArchitectureInspectorOpen: false` and `showArchitectureInspectorToggleText: false` for compact presentation layouts.
 
 ## Manifest Contract
 

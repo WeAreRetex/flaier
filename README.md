@@ -2,19 +2,30 @@
 
 Spec-driven flow visualizer for AI-generated codebase storytelling.
 
+## Workspace
+
+```text
+apps/docs       Docus-powered documentation site
+apps/slides     Slidev example deck built with flow-narrator
+apps/viewer     Nuxt viewer for local flow specs and manifests
+packages/core   Published `flow-narrator` Vue package
+packages/nuxt   `@flow-narrator/nuxt` module and wrapper components
+packages/agents CLI tools and shipped flow-generation skill
+```
+
 ## Development
 
 ```bash
 pnpm install
-vp run dev
+pnpm dev
+pnpm docs:dev
+pnpm viewer:dev
+pnpm slides:dev
 ```
 
-### Run Nuxt viewer layer
-
-```bash
-pnpm --dir ./apps/viewer install
-pnpm --dir ./apps/viewer dev
-```
+- `pnpm dev` opens the local viewer app.
+- `pnpm docs:dev` runs the docs site.
+- `pnpm slides:dev` runs the Slidev example deck.
 
 ## AI Artifact Model
 
@@ -44,6 +55,13 @@ Use the top-right export button in the renderer to download the **full diagram**
 - PDF
 
 Export captures all laid-out nodes and edges, not just the current viewport.
+
+When embedding architecture diagrams in docs pages or slide decks, you can tune the chrome directly on `FlowTimeline.props`:
+
+- `themeMode: "document"` to follow the surrounding document theme.
+- `showHeaderOverlay: false` to reclaim vertical space.
+- `showExportControls: false` when export UI would distract in a constrained embed.
+- `defaultArchitectureInspectorOpen: false` and `showArchitectureInspectorToggleText: false` for compact deck layouts.
 
 ### Recommended on-disk layout
 
@@ -85,7 +103,7 @@ Relative `src` values inside `manifest.json` are resolved against the manifest f
 ### Build manifest from disk
 
 ```bash
-vp run flows:manifest -- --dir ./flow-specs --out ./flow-specs/manifest.json
+pnpm agents:manifest -- --dir ./flow-specs --out ./flow-specs/manifest.json
 ```
 
 This scans `*.flow.json` files and writes a manifest that the viewer can load directly.
@@ -95,13 +113,17 @@ This scans `*.flow.json` files and writes a manifest that the viewer can load di
 - `flow-narrator` (published from `packages/core`): Vue component library + json-render catalog/registry exports.
 - `@flow-narrator/nuxt` (`packages/nuxt`): Nuxt/Docus/Nuxt Content integrations and wrapper components.
 - `packages/agents`: skill + CLI tools for generating, validating, and packaging flow specs.
+- `apps/docs`: docs site that exercises the Nuxt module and demo wrapper components.
+- `apps/slides`: Slidev example that embeds `FlowNarratorPanel` inside a deck.
 - `apps/viewer`: Nuxt app that reads local specs from disk and renders them through `FlowNarrator`.
 
 ### Agents package quick start
 
 ```bash
-pnpm --dir ./packages/agents install
-vp run agents:scaffold -- --title "Checkout Flow" --template branching --out ./apps/viewer/flow-specs/checkout.flow.json
-vp run agents:manifest -- --dir ./apps/viewer/flow-specs --out ./apps/viewer/flow-specs/manifest.json
-vp run agents:validate -- ./apps/viewer/flow-specs/manifest.json
+pnpm agents:scaffold -- --title "Checkout Flow" --template branching --out ./apps/viewer/flow-specs/checkout.flow.json
+pnpm agents:manifest -- --dir ./apps/viewer/flow-specs --out ./apps/viewer/flow-specs/manifest.json
+pnpm agents:validate -- ./apps/viewer/flow-specs/manifest.json
+pnpm agents:scaffold -- --title "Support Story Architecture" --template architecture --out ./apps/slides/flow-specs/story-architecture.flow.json
 ```
+
+The Slidev example in `apps/slides` shows how to present an architecture spec with `FlowNarratorPanel` and document-aware theme settings.

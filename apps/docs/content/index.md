@@ -74,6 +74,14 @@ description: Scaffold, validate, and package flow specs from the terminal. Integ
 ---
 :::
 
+:::u-page-feature
+---
+icon: i-heroicons-presentation-chart-line
+title: Nuxt and Slidev embeds
+description: Use the Nuxt module in docs sites, or drop FlowNarratorPanel into Slidev for presentation-friendly architecture walkthroughs.
+---
+:::
+
 ::
 
 ::u-page-section
@@ -97,5 +105,7 @@ import "flow-narrator/style.css";
   <FlowNarrator src="./flow-specs/manifest.json" :interval="3000" />
 </template>
 ```
+
+Need Nuxt, Docus, or Nuxt Content support? Install `@flow-narrator/nuxt` and use the wrapper components documented in the API reference.
 
 ::
