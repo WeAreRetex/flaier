@@ -104,6 +104,13 @@ export interface FlowTimelineProps {
   layoutRankSep?: number;
   layoutNodeSep?: number;
   layoutEdgeSep?: number;
+  themeMode?: "local" | "document";
+  showHeaderOverlay?: boolean;
+  showExportControls?: boolean;
+  showThemeToggle?: boolean;
+  showArchitectureInspector?: boolean;
+  defaultArchitectureInspectorOpen?: boolean;
+  showArchitectureInspectorToggleText?: boolean;
 }
 
 /** Props for architecture/infrastructure nodes */

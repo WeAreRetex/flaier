@@ -1,0 +1,243 @@
+{
+  "root": "story-architecture",
+  "state": {
+    "currentStep": 0,
+    "playing": false
+  },
+  "elements": {
+    "story-architecture": {
+      "type": "FlowTimeline",
+      "props": {
+        "title": "Support Story Architecture",
+        "description": "How a customer issue becomes a traced, durable system workflow.",
+        "mode": "architecture",
+        "zones": [
+          {
+            "id": "experience-zone",
+            "label": "Experience",
+            "description": "Where the incident story starts.",
+            "color": "#2563eb",
+            "padding": 56
+          },
+          {
+            "id": "core-zone",
+            "label": "Core Platform",
+            "description": "Orchestration and policy decisions.",
+            "color": "#6366f1",
+            "padding": 62
+          },
+          {
+            "id": "async-zone",
+            "label": "Async Layer",
+            "description": "Durable fan-out for follow-up work.",
+            "color": "#f59e0b",
+            "padding": 58
+          },
+          {
+            "id": "data-zone",
+            "label": "Data Plane",
+            "description": "Canonical state and read models.",
+            "color": "#22c55e",
+            "padding": 62
+          }
+        ],
+        "minHeight": 360,
+        "layoutEngine": "dagre",
+        "layoutRankSep": 190,
+        "layoutNodeSep": 138,
+        "layoutEdgeSep": 24,
+        "themeMode": "document",
+        "showHeaderOverlay": false,
+        "showExportControls": false,
+        "showThemeToggle": true,
+        "showArchitectureInspector": true,
+        "defaultArchitectureInspectorOpen": false,
+        "showArchitectureInspectorToggleText": false
+      },
+      "children": ["support-console"]
+    },
+    "support-console": {
+      "type": "ArchitectureNode",
+      "props": {
+        "label": "Support Console",
+        "kind": "external",
+        "zone": "experience-zone",
+        "status": "active",
+        "tier": "external",
+        "owner": "Customer Success",
+        "technology": "Browser app",
+        "runtime": "Docus runbook + form",
+        "description": "Operators turn customer symptoms into a structured story with links to the current runbook.",
+        "responsibilities": [
+          "Capture the issue in business language",
+          "Attach context before handing the story to the platform"
+        ],
+        "transitions": [
+          {
+            "to": "story-api",
+            "label": "Submit story",
+            "description": "Send the narrative payload for validation.",
+            "kind": "default",
+            "protocol": "HTTPS",
+            "transport": "sync",
+            "criticality": "high"
+          }
+        ]
+      },
+      "children": ["story-api"]
+    },
+    "story-api": {
+      "type": "ArchitectureNode",
+      "props": {
+        "label": "Story API",
+        "kind": "gateway",
+        "zone": "core-zone",
+        "status": "active",
+        "tier": "edge",
+        "owner": "Platform Edge Team",
+        "technology": "TypeScript handlers",
+        "runtime": "Node.js service",
+        "description": "Validates the request, normalizes the narrative, and forwards a typed event to the analysis layer.",
+        "capabilities": ["schema-validation", "idempotent-ingest", "auth-enforcement"],
+        "transitions": [
+          {
+            "to": "insight-engine",
+            "label": "Normalize request",
+            "description": "Create a clean incident story for analysis.",
+            "kind": "success",
+            "protocol": "HTTPS",
+            "transport": "sync",
+            "criticality": "high"
+          }
+        ]
+      },
+      "children": ["insight-engine"]
+    },
+    "insight-engine": {
+      "type": "ArchitectureNode",
+      "props": {
+        "label": "Insight Engine",
+        "kind": "service",
+        "zone": "core-zone",
+        "status": "active",
+        "tier": "application",
+        "owner": "Flow Team",
+        "technology": "Narrative orchestration",
+        "runtime": "Vue + service workers",
+        "description": "Converts the incident story into architecture signals, owner hints, and next-step recommendations.",
+        "responsibilities": [
+          "Link symptoms to runtime boundaries",
+          "Generate an architecture-ready story model"
+        ],
+        "transitions": [
+          {
+            "to": "state-store",
+            "label": "Persist state",
+            "description": "Store the canonical narrative and enrichment output.",
+            "kind": "success",
+            "protocol": "SQL",
+            "transport": "sync",
+            "criticality": "high"
+          },
+          {
+            "to": "event-stream",
+            "label": "Emit follow-ups",
+            "description": "Queue async work for indexing, search, and notifications.",
+            "kind": "async",
+            "protocol": "Kafka",
+            "transport": "async",
+            "criticality": "medium"
+          }
+        ]
+      },
+      "children": ["state-store", "event-stream"]
+    },
+    "event-stream": {
+      "type": "ArchitectureNode",
+      "props": {
+        "label": "Event Stream",
+        "kind": "queue",
+        "zone": "async-zone",
+        "status": "active",
+        "tier": "integration",
+        "owner": "Messaging Platform",
+        "technology": "Kafka topic",
+        "runtime": "Managed event bus",
+        "description": "Buffers downstream work so the story capture path stays fast and resilient.",
+        "capabilities": ["durable-replay", "consumer-isolation"],
+        "transitions": [
+          {
+            "to": "worker-pool",
+            "label": "Dispatch jobs",
+            "description": "Fan out indexing, notification, and cache refresh jobs.",
+            "kind": "async",
+            "protocol": "Kafka",
+            "transport": "async",
+            "criticality": "medium"
+          }
+        ]
+      },
+      "children": ["worker-pool"]
+    },
+    "worker-pool": {
+      "type": "ArchitectureNode",
+      "props": {
+        "label": "Worker Pool",
+        "kind": "compute",
+        "zone": "async-zone",
+        "status": "active",
+        "tier": "platform",
+        "owner": "Automation Team",
+        "technology": "Job runners",
+        "runtime": "Queue consumers",
+        "description": "Builds search indexes, sends notifications, and refreshes the read path after each story lands.",
+        "responsibilities": [
+          "Retry transient failures",
+          "Project enriched stories into the read model"
+        ],
+        "transitions": [
+          {
+            "to": "read-cache",
+            "label": "Refresh views",
+            "description": "Keep the support dashboard fast for repeated lookups.",
+            "kind": "retry",
+            "protocol": "Redis",
+            "transport": "sync",
+            "criticality": "medium"
+          }
+        ]
+      },
+      "children": ["read-cache"]
+    },
+    "state-store": {
+      "type": "ArchitectureNode",
+      "props": {
+        "label": "State Store",
+        "kind": "database",
+        "zone": "data-zone",
+        "status": "active",
+        "tier": "data",
+        "owner": "Data Platform",
+        "technology": "Postgres",
+        "runtime": "Managed database",
+        "description": "Source of truth for the story, routing hints, and incident decisions.",
+        "capabilities": ["point-in-time-recovery", "auditable-history"]
+      }
+    },
+    "read-cache": {
+      "type": "ArchitectureNode",
+      "props": {
+        "label": "Read Cache",
+        "kind": "cache",
+        "zone": "data-zone",
+        "status": "active",
+        "tier": "data",
+        "owner": "Experience Platform",
+        "technology": "Redis",
+        "runtime": "Cache cluster",
+        "description": "Serves the latest architecture story back to support with low latency.",
+        "capabilities": ["fast-lookups", "temporary-projections"]
+      }
+    }
+  }
+}

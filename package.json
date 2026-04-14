@@ -12,6 +12,8 @@
     "flows:manifest": "vp exec tsx ./scripts/build-flow-manifest.ts",
     "docs:dev": "vp run @flow-narrator/docs#dev",
     "docs:build": "vp run @flow-narrator/docs#build",
+    "slides:dev": "vp run @flow-narrator/slides#dev",
+    "slides:build": "vp run @flow-narrator/slides#build",
     "viewer:dev": "vp run @flow-narrator/viewer#dev",
     "viewer:build": "vp run @flow-narrator/viewer#build",
     "agents:scaffold": "FLOW_NARRATOR_ROOT=$PWD vp run @flow-narrator/agents#scaffold",

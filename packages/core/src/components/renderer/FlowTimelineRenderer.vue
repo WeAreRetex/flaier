@@ -55,11 +55,25 @@ const props = withDefaults(
     layoutRankSep?: number;
     layoutNodeSep?: number;
     layoutEdgeSep?: number;
+    themeMode?: "local" | "document";
+    showHeaderOverlay?: boolean;
+    showExportControls?: boolean;
+    showThemeToggle?: boolean;
+    showArchitectureInspector?: boolean;
+    defaultArchitectureInspectorOpen?: boolean;
+    showArchitectureInspectorToggleText?: boolean;
   }>(),
   {
     mode: "narrative",
     direction: "horizontal",
     layoutEngine: "dagre",
+    themeMode: "local",
+    showHeaderOverlay: true,
+    showExportControls: true,
+    showThemeToggle: true,
+    showArchitectureInspector: true,
+    defaultArchitectureInspectorOpen: true,
+    showArchitectureInspectorToggleText: true,
   },
 );
 
@@ -273,6 +287,7 @@ const activeFlow = computed(() => {
   return availableFlows.value.find((flow) => flow.id === activeId);
 });
 const showFlowSelector = computed(() => availableFlows.value.length > 1);
+const showHeaderOverlay = computed(() => props.showHeaderOverlay !== false);
 const overlayTitle = computed(() => activeFlow.value?.title ?? props.title);
 const overlayDescription = computed(() => activeFlow.value?.description ?? props.description);
 const headerModeLabel = computed(() => {
@@ -295,8 +310,25 @@ const containerWidth = ref(0);
 const containerHeight = ref(0);
 const uiTheme = ref<"dark" | "light">("dark");
 const isLightTheme = computed(() => uiTheme.value === "light");
+const themeMode = computed(() => (props.themeMode === "document" ? "document" : "local"));
 const isArchitectureMode = computed(() => props.mode === "architecture");
-const architectureInspectorOpen = ref(true);
+const showExportControls = computed(() => props.showExportControls !== false);
+const showThemeToggle = computed(() => props.showThemeToggle !== false);
+const showArchitectureInspectorPanel = computed(() => props.showArchitectureInspector !== false);
+const defaultArchitectureInspectorOpen = computed(
+  () => props.defaultArchitectureInspectorOpen !== false,
+);
+const showArchitectureInspectorToggleText = computed(
+  () => props.showArchitectureInspectorToggleText !== false,
+);
+const showTopRightControls = computed(() => {
+  return (
+    showExportControls.value ||
+    showThemeToggle.value ||
+    (showExportControls.value && Boolean(exportError.value))
+  );
+});
+const architectureInspectorOpen = ref(props.defaultArchitectureInspectorOpen !== false);
 const themeToggleLabel = computed(() => {
   return isLightTheme.value ? "Switch to dark mode" : "Switch to light mode";
 });
@@ -320,6 +352,11 @@ const exportButtonLabel = computed(() => {
 });
 
 function toggleTheme() {
+  if (themeMode.value === "document") {
+    applyDocumentTheme(isLightTheme.value ? "dark" : "light");
+    return;
+  }
+
   uiTheme.value = isLightTheme.value ? "dark" : "light";
 }
 
@@ -353,6 +390,24 @@ function getPreferredSystemTheme(): "dark" | "light" {
   }
 
   return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+}
+
+function getDocumentTheme(): "dark" | "light" | null {
+  if (typeof document === "undefined") {
+    return null;
+  }
+
+  return document.documentElement.classList.contains("dark") ? "dark" : "light";
+}
+
+function applyDocumentTheme(theme: "dark" | "light") {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  const root = document.documentElement;
+  root.classList.toggle("dark", theme === "dark");
+  root.style.colorScheme = theme;
 }
 
 function persistTheme(theme: "dark" | "light") {
@@ -409,7 +464,18 @@ watch(activeFlowId, () => {
 });
 
 watch(uiTheme, (theme) => {
+  if (themeMode.value === "document") {
+    return;
+  }
+
   persistTheme(theme);
+});
+
+watch(themeMode, (mode) => {
+  uiTheme.value =
+    mode === "document"
+      ? (getDocumentTheme() ?? getPreferredSystemTheme())
+      : (readStoredTheme() ?? getPreferredSystemTheme());
 });
 
 const rootElement = computed(() => {
@@ -2732,6 +2798,7 @@ const nodesInitialized = useNodesInitialized();
 const paneReady = ref(false);
 const overviewMode = ref(false);
 let resizeObserver: ResizeObserver | null = null;
+let documentThemeObserver: MutationObserver | null = null;
 
 const architectureZoneLayerStyle = computed(() => {
   const x = Number.isFinite(viewport.value.x) ? viewport.value.x : 0;
@@ -2865,11 +2932,25 @@ const sceneStyle = computed<Record<string, string>>(() => ({
 }));
 
 onMounted(() => {
-  uiTheme.value = readStoredTheme() ?? getPreferredSystemTheme();
+  uiTheme.value =
+    themeMode.value === "document"
+      ? (getDocumentTheme() ?? getPreferredSystemTheme())
+      : (readStoredTheme() ?? getPreferredSystemTheme());
 
   if (typeof document !== "undefined") {
     document.addEventListener("pointerdown", handleDocumentPointerDown);
     document.addEventListener("keydown", handleDocumentKeydown);
+
+    if (themeMode.value === "document" && typeof MutationObserver !== "undefined") {
+      documentThemeObserver = new MutationObserver(() => {
+        uiTheme.value = getDocumentTheme() ?? getPreferredSystemTheme();
+      });
+
+      documentThemeObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["class", "style", "data-theme"],
+      });
+    }
   }
 
   nextTick(() => {
@@ -2955,13 +3036,13 @@ watch(isArchitectureMode, (architectureMode) => {
   if (architectureMode) {
     playing.value = false;
     narrativeFitSignature.value = "";
-    architectureInspectorOpen.value = true;
+    architectureInspectorOpen.value = defaultArchitectureInspectorOpen.value;
     return;
   }
 
   narrativeFitSignature.value = "";
   architectureFitSignature.value = "";
-  architectureInspectorOpen.value = true;
+  architectureInspectorOpen.value = defaultArchitectureInspectorOpen.value;
 });
 
 onUnmounted(() => {
@@ -2975,6 +3056,11 @@ onUnmounted(() => {
   if (resizeObserver) {
     resizeObserver.disconnect();
     resizeObserver = null;
+  }
+
+  if (documentThemeObserver) {
+    documentThemeObserver.disconnect();
+    documentThemeObserver = null;
   }
 });
 </script>
@@ -3142,7 +3228,7 @@ onUnmounted(() => {
     </div>
 
     <div
-      v-if="showFlowSelector || overlayTitle || overlayDescription"
+      v-if="showHeaderOverlay && (showFlowSelector || overlayTitle || overlayDescription)"
       ref="headerDropdownRef"
       class="absolute top-4 left-4 z-20 w-[min(90vw,430px)]"
     >
@@ -3230,9 +3316,13 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div class="absolute top-4 right-4 z-20 flex flex-col items-end gap-2">
+    <div
+      v-if="showTopRightControls"
+      class="fn-architecture-controls absolute top-4 right-4 z-20 flex flex-col items-end gap-2"
+    >
       <div ref="exportMenuRef" class="relative">
         <button
+          v-if="showExportControls"
           type="button"
           class="group inline-flex h-9 items-center gap-2 rounded-full border border-border/70 bg-card/85 px-3 text-[11px] text-muted-foreground shadow-lg backdrop-blur-md transition-colors hover:text-foreground disabled:cursor-default disabled:opacity-55"
           :aria-label="exportButtonLabel"
@@ -3258,7 +3348,7 @@ onUnmounted(() => {
         </button>
 
         <div
-          v-if="exportMenuOpen"
+          v-if="showExportControls && exportMenuOpen"
           class="absolute right-0 top-[calc(100%+8px)] w-44 rounded-lg border border-border/70 bg-card/95 p-1 shadow-2xl backdrop-blur-md"
         >
           <button
@@ -3281,8 +3371,9 @@ onUnmounted(() => {
       </div>
 
       <button
+        v-if="showThemeToggle"
         type="button"
-        class="group inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-card/85 text-muted-foreground shadow-lg backdrop-blur-md transition-colors hover:text-foreground"
+        class="fn-theme-toggle group inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-card/85 text-muted-foreground shadow-lg backdrop-blur-md transition-colors hover:text-foreground"
         :aria-label="themeToggleLabel"
         :title="themeToggleLabel"
         @click="toggleTheme"
@@ -3333,7 +3424,7 @@ onUnmounted(() => {
       </button>
 
       <p
-        v-if="exportError"
+        v-if="showExportControls && exportError"
         class="max-w-[260px] rounded-md border border-red-500/45 bg-red-500/12 px-2 py-1 text-[10px] leading-relaxed text-red-200"
       >
         {{ exportError }}
@@ -3366,8 +3457,8 @@ onUnmounted(() => {
     </div>
 
     <div
-      v-if="isArchitectureMode && architectureInspector"
-      class="pointer-events-none absolute bottom-3 right-0 top-16 z-30 w-[min(92vw,430px)]"
+      v-if="isArchitectureMode && showArchitectureInspectorPanel && architectureInspector"
+      class="fn-architecture-inspector pointer-events-none absolute bottom-3 right-0 top-16 z-30 w-[min(92vw,430px)]"
       style="
         padding-right: max(env(safe-area-inset-right), 0px);
         padding-bottom: max(env(safe-area-inset-bottom), 0px);
@@ -3380,7 +3471,7 @@ onUnmounted(() => {
         >
           <button
             type="button"
-            class="absolute right-full top-1/2 z-30 inline-flex h-20 w-8 -translate-y-1/2 translate-x-px flex-col items-center justify-center gap-1 rounded-l-lg rounded-r-none border border-border/70 border-r-0 bg-gradient-to-b from-card/95 via-card/88 to-card/78 px-0.5 text-[8px] font-semibold uppercase tracking-[0.12em] text-muted-foreground shadow-2xl backdrop-blur-xl transition-all duration-200 hover:text-foreground"
+            class="fn-architecture-inspector__toggle absolute right-full top-1/2 z-30 inline-flex h-20 w-8 -translate-y-1/2 translate-x-px flex-col items-center justify-center gap-1 rounded-l-lg rounded-r-none border border-border/70 border-r-0 bg-gradient-to-b from-card/95 via-card/88 to-card/78 px-0.5 text-[8px] font-semibold uppercase tracking-[0.12em] text-muted-foreground shadow-2xl backdrop-blur-xl transition-all duration-200 hover:text-foreground"
             :aria-label="architectureInspectorToggleLabel"
             :title="architectureInspectorToggleLabel"
             @click="toggleArchitectureInspector"
@@ -3399,6 +3490,7 @@ onUnmounted(() => {
               <path v-else d="m9.5 6 5.5 6-5.5 6" />
             </svg>
             <span
+              v-if="showArchitectureInspectorToggleText"
               class="inline-block font-semibold leading-none"
               style="writing-mode: vertical-rl; transform: rotate(180deg); letter-spacing: 0.1em"
             >
@@ -3407,7 +3499,7 @@ onUnmounted(() => {
           </button>
 
           <div
-            class="flex h-full flex-col overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-b from-card/95 via-card/90 to-card/82 shadow-2xl backdrop-blur-xl"
+            class="fn-architecture-inspector__panel flex h-full flex-col overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-b from-card/95 via-card/90 to-card/82 shadow-2xl backdrop-blur-xl"
           >
             <div class="border-b border-border/60 px-3 py-2.5">
               <div class="flex flex-wrap items-start justify-between gap-2">

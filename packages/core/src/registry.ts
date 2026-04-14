@@ -16,6 +16,13 @@ const FlowTimelineComponent: ComponentFn<typeof catalog, "FlowTimeline"> = ({ pr
     layoutRankSep: props.layoutRankSep,
     layoutNodeSep: props.layoutNodeSep,
     layoutEdgeSep: props.layoutEdgeSep,
+    themeMode: props.themeMode,
+    showHeaderOverlay: props.showHeaderOverlay,
+    showExportControls: props.showExportControls,
+    showThemeToggle: props.showThemeToggle,
+    showArchitectureInspector: props.showArchitectureInspector,
+    defaultArchitectureInspectorOpen: props.defaultArchitectureInspectorOpen,
+    showArchitectureInspectorToggleText: props.showArchitectureInspectorToggleText,
   });
 
 const ArchitectureNodeComponent: ComponentFn<typeof catalog, "ArchitectureNode"> = () => null;

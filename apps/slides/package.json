@@ -1,0 +1,19 @@
+{
+  "name": "@flow-narrator/slides",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --dir ../../packages/core build && slidev --open",
+    "build": "pnpm --dir ../../packages/core build && slidev build",
+    "export": "pnpm --dir ../../packages/core build && slidev export"
+  },
+  "dependencies": {
+    "flow-narrator": "workspace:*",
+    "vue": "^3.5.0"
+  },
+  "devDependencies": {
+    "@slidev/cli": "^52.14.2",
+    "@slidev/theme-default": "^0.25.0",
+    "typescript": "^6.0.2"
+  }
+}
