@@ -1,5 +1,5 @@
 {
-  "name": "@flow-narrator/slides",
+  "name": "@flaier/slides",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,7 +8,7 @@
     "export": "pnpm --dir ../../packages/core build && slidev export"
   },
   "dependencies": {
-    "flow-narrator": "workspace:*",
+    "@flaier/core": "workspace:*",
     "vue": "^3.5.0"
   },
   "devDependencies": {

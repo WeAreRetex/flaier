@@ -2,17 +2,17 @@ import { createTransformerFactory, rendererRich } from "@shikijs/twoslash/core";
 import { createHighlighter, type HighlighterCore } from "shiki";
 import { createTwoslasher } from "twoslash";
 import type {
-  FlowNarratorManifest,
-  FlowNarratorManifestFlow,
-  FlowNarratorSource,
-  FlowNarratorSpec,
+  FlaierManifest,
+  FlaierManifestFlow,
+  FlaierSource,
+  FlaierSpec,
   MagicMoveStep,
   TwoslashHtml,
-} from "flow-narrator";
+} from "@flaier/core";
 
 type SupportedTwoslashLanguage = "ts" | "tsx";
 
-interface PrepareFlowNarratorSourceOptions {
+interface PrepareFlaierSourceOptions {
   baseUrl?: string;
   fetchJson: (url: string) => Promise<unknown>;
 }
@@ -46,10 +46,10 @@ const twoslasher = createTwoslasher({
 });
 const renderedTwoslashCache = new Map<string, Promise<TwoslashHtml>>();
 
-export async function prepareFlowNarratorSource(
-  source: FlowNarratorSource,
-  options: PrepareFlowNarratorSourceOptions,
-): Promise<FlowNarratorSource> {
+export async function prepareFlaierSource(
+  source: FlaierSource,
+  options: PrepareFlaierSourceOptions,
+): Promise<FlaierSource> {
   if (typeof source === "string") {
     const { payload, resolvedUrl } = await fetchJsonSource(
       source,
@@ -57,25 +57,25 @@ export async function prepareFlowNarratorSource(
       options.fetchJson,
     );
 
-    if (isFlowNarratorManifest(payload)) {
+    if (isFlaierManifest(payload)) {
       return prepareManifest(cloneValue(payload), {
         ...options,
         baseUrl: resolvedUrl,
       });
     }
 
-    if (isFlowNarratorSpec(payload)) {
+    if (isFlaierSpec(payload)) {
       return prepareSpec(cloneValue(payload));
     }
 
     throw new Error(`Fetched JSON from "${source}" is neither a flow spec nor a manifest.`);
   }
 
-  if (isFlowNarratorManifest(source)) {
+  if (isFlaierManifest(source)) {
     return prepareManifest(cloneValue(source), options);
   }
 
-  if (isFlowNarratorSpec(source)) {
+  if (isFlaierSpec(source)) {
     return prepareSpec(cloneValue(source));
   }
 
@@ -83,9 +83,9 @@ export async function prepareFlowNarratorSource(
 }
 
 async function prepareManifest(
-  manifest: FlowNarratorManifest,
-  options: PrepareFlowNarratorSourceOptions,
-): Promise<FlowNarratorManifest> {
+  manifest: FlaierManifest,
+  options: PrepareFlaierSourceOptions,
+): Promise<FlaierManifest> {
   const flows = await Promise.all(
     manifest.flows.map((entry) => prepareManifestFlow(entry, options)),
   );
@@ -97,11 +97,11 @@ async function prepareManifest(
 }
 
 async function prepareManifestFlow(
-  entry: FlowNarratorManifestFlow,
-  options: PrepareFlowNarratorSourceOptions,
-): Promise<FlowNarratorManifestFlow> {
+  entry: FlaierManifestFlow,
+  options: PrepareFlaierSourceOptions,
+): Promise<FlaierManifestFlow> {
   if (typeof entry.src !== "string") {
-    if (isFlowNarratorSpec(entry.src)) {
+    if (isFlaierSpec(entry.src)) {
       return {
         ...entry,
         src: await prepareSpec(cloneValue(entry.src)),
@@ -114,7 +114,7 @@ async function prepareManifestFlow(
   const resolvedSource = resolveRelativeSource(entry.src, options.baseUrl);
   const { payload } = await fetchJsonSource(resolvedSource, options.baseUrl, options.fetchJson);
 
-  if (!isFlowNarratorSpec(payload)) {
+  if (!isFlaierSpec(payload)) {
     throw new Error(`Fetched JSON from "${resolvedSource}" is not a valid flow spec.`);
   }
 
@@ -124,7 +124,7 @@ async function prepareManifestFlow(
   };
 }
 
-async function prepareSpec(spec: FlowNarratorSpec): Promise<FlowNarratorSpec> {
+async function prepareSpec(spec: FlaierSpec): Promise<FlaierSpec> {
   const entries = Object.entries(spec.elements);
 
   for (const [key, element] of entries) {
@@ -163,7 +163,7 @@ async function prepareSpec(spec: FlowNarratorSpec): Promise<FlowNarratorSpec> {
       };
     } catch (error) {
       console.warn(
-        `[flow-narrator/nuxt] Failed to pre-render twoslash HTML. ${formatErrorMessage(error)}`,
+        `[flaier/nuxt] Failed to pre-render twoslash HTML. ${formatErrorMessage(error)}`,
       );
     }
   }
@@ -246,7 +246,7 @@ function hasTwoslashHtml(value: TwoslashHtml | undefined) {
   return Boolean(value?.dark || value?.light);
 }
 
-function isCodeNodeElement(value: unknown): value is FlowNarratorSpec["elements"][string] & {
+function isCodeNodeElement(value: unknown): value is FlaierSpec["elements"][string] & {
   type: "CodeNode";
   props: Record<string, unknown>;
 } {
@@ -370,11 +370,11 @@ function resolveRelativeSource(value: string, baseUrl?: string) {
   }
 }
 
-function isFlowNarratorManifest(value: unknown): value is FlowNarratorManifest {
+function isFlaierManifest(value: unknown): value is FlaierManifest {
   return isObject(value) && Array.isArray(value.flows);
 }
 
-function isFlowNarratorSpec(value: unknown): value is FlowNarratorSpec {
+function isFlaierSpec(value: unknown): value is FlaierSpec {
   return isObject(value) && typeof value.root === "string" && isObject(value.elements);
 }
 

@@ -1,7 +1,7 @@
 import { mkdir, readdir } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { autoFixSpec, formatSpecIssues, type Spec, validateSpec } from "@json-render/core";
-import { validateFlowNarratorReadiness } from "./flow-ready-validation";
+import { validateFlaierReadiness } from "./flow-ready-validation";
 import {
   asNonEmptyString,
   ensureUniqueId,
@@ -136,7 +136,7 @@ function assertSpecValidity(spec: FlowSpec, filePath: string) {
     );
   }
 
-  const readiness = validateFlowNarratorReadiness(spec);
+  const readiness = validateFlaierReadiness(spec);
   if (readiness.errors.length > 0) {
     throw new Error(`Flow readiness errors in "${filePath}":\n${formatIssues(readiness.errors)}`);
   }

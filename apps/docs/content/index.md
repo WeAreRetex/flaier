@@ -1,5 +1,5 @@
 ---
-title: flow-narrator
+title: Flaier
 navigation: false
 ---
 
@@ -23,7 +23,7 @@ links:
 ::u-page-section
 ---
 title: Everything in one component
-description: Drop `<FlowNarrator>` into any Vue app and point it at a spec file. No configuration needed.
+description: Drop `<Flaier>` into any Vue app and point it at a spec file. No configuration needed.
 ---
 
 :::u-page-feature
@@ -78,7 +78,7 @@ description: Scaffold, validate, and package flow specs from the terminal. Integ
 ---
 icon: i-heroicons-presentation-chart-line
 title: Nuxt and Slidev embeds
-description: Use the Nuxt module in docs sites, or drop FlowNarratorPanel into Slidev for presentation-friendly architecture walkthroughs.
+description: Use the Nuxt module in docs sites, or drop FlaierPanel into Slidev for presentation-friendly architecture walkthroughs.
 ---
 :::
 
@@ -92,20 +92,20 @@ class: bg-gray-50 dark:bg-gray-900
 ---
 
 ```bash
-pnpm add flow-narrator
+pnpm add @flaier/core
 ```
 
 ```vue
 <script setup lang="ts">
-import { FlowNarrator } from "flow-narrator";
-import "flow-narrator/style.css";
+import { Flaier } from "@flaier/core";
+import "@flaier/core/style.css";
 </script>
 
 <template>
-  <FlowNarrator src="./flow-specs/manifest.json" :interval="3000" />
+  <Flaier src="./flow-specs/manifest.json" :interval="3000" />
 </template>
 ```
 
-Need Nuxt, Docus, or Nuxt Content support? Install `@flow-narrator/nuxt` and use the wrapper components documented in the API reference.
+Need Nuxt, Docus, or Nuxt Content support? Install `@flaier/nuxt` and use the wrapper components documented in the API reference.
 
 ::

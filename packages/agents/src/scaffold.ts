@@ -1,7 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { type Spec, validateSpec } from "@json-render/core";
-import { validateFlowNarratorReadiness } from "./flow-ready-validation";
+import { validateFlaierReadiness } from "./flow-ready-validation";
 import {
   getInvocationCwd,
   hasFlag,
@@ -60,7 +60,7 @@ function assertGeneratedSpec(spec: FlowSpec) {
     throw new Error("Internal error: generated scaffold does not pass schema validation.");
   }
 
-  const readiness = validateFlowNarratorReadiness(spec);
+  const readiness = validateFlaierReadiness(spec);
   if (readiness.errors.length > 0) {
     throw new Error(
       `Internal error: generated scaffold is not flow-visualizer ready:\n${formatIssues(readiness.errors)}`,

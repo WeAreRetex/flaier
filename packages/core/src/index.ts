@@ -1,14 +1,14 @@
 import "./style.css";
 
-export { default as FlowNarrator } from "./components/FlowNarrator.vue";
-export { default as FlowNarratorPanel } from "./components/FlowNarratorPanel.vue";
+export { default as Flaier } from "./components/Flaier.vue";
+export { default as FlaierPanel } from "./components/FlaierPanel.vue";
 export { catalog } from "./catalog";
 export { registry } from "./registry";
 
 export { useShiki } from "./composables/useShiki";
 export { useTimeline } from "./composables/useTimeline";
-export { useFlowNarratorRuntime } from "./composables/useFlowNarratorRuntime";
-export { useFlowNarratorFullscreen } from "./composables/useFlowNarratorFullscreen";
+export { useFlaierRuntime } from "./composables/useFlaierRuntime";
+export { useFlaierFullscreen } from "./composables/useFlaierFullscreen";
 export {
   hasTwoslashHints,
   hasTwoslashHtml,
@@ -18,13 +18,13 @@ export {
 } from "./twoslash";
 
 export type {
-  FlowNarratorSpec,
-  FlowNarratorManifest,
-  FlowNarratorManifestFlow,
-  FlowNarratorFlowOption,
-  FlowNarratorSource,
-  FlowNarratorProps,
-  FlowNarratorPanelProps,
+  FlaierSpec,
+  FlaierManifest,
+  FlaierManifestFlow,
+  FlaierFlowOption,
+  FlaierSource,
+  FlaierProps,
+  FlaierPanelProps,
   FlowTimelineProps,
   ArchitectureNodeProps,
   TriggerNodeProps,

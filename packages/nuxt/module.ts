@@ -1,14 +1,14 @@
 import { addComponentsDir, addServerHandler, createResolver, defineNuxtModule } from "@nuxt/kit";
 
-export interface FlowNarratorNuxtOptions {
+export interface FlaierNuxtOptions {
   css?: boolean;
   components?: boolean;
 }
 
-export default defineNuxtModule<FlowNarratorNuxtOptions>({
+export default defineNuxtModule<FlaierNuxtOptions>({
   meta: {
-    name: "@flow-narrator/nuxt",
-    configKey: "flowNarrator",
+    name: "@flaier/nuxt",
+    configKey: "flaier",
     compatibility: {
       nuxt: ">=4.4.0",
     },
@@ -22,7 +22,7 @@ export default defineNuxtModule<FlowNarratorNuxtOptions>({
 
     if (options.css !== false) {
       nuxt.options.css ||= [];
-      const stylePath = "flow-narrator/style.css";
+      const stylePath = "@flaier/core/style.css";
 
       if (!nuxt.options.css.includes(stylePath)) {
         nuxt.options.css.push(stylePath);
@@ -38,7 +38,7 @@ export default defineNuxtModule<FlowNarratorNuxtOptions>({
     }
 
     addServerHandler({
-      route: "/_flow-narrator/prepare",
+      route: "/_flaier/prepare",
       handler: resolver.resolve("./runtime/server/api/prepare.post"),
     });
   },

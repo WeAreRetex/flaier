@@ -3,7 +3,7 @@
     <div class="docs-nav">
       <div class="docs-brand">
         <span class="docs-brand__mark"></span>
-        <span>flow-narrator</span>
+        <span>Flaier</span>
       </div>
     </div>
 

@@ -1,11 +1,11 @@
 ---
 name: flow-visualizer-flow-generator
-description: Generate, repair, and validate flow-visualizer ready flows for flow-narrator. Use when converting code paths into `*.flow.json` specs, scaffolding new flow files, fixing invalid flow specs, adding branching narrative paths, modeling architecture diagrams, tuning specs for docs or Slidev embeds, or producing/updating `manifest.json` for disk-based viewer workflows.
+description: Generate, repair, and validate flow-visualizer ready flows for flaier. Use when converting code paths into `*.flow.json` specs, scaffolding new flow files, fixing invalid flow specs, adding branching narrative paths, modeling architecture diagrams, tuning specs for docs or Slidev embeds, or producing/updating `manifest.json` for disk-based viewer workflows.
 ---
 
 # Flow Visualizer Flow Generator
 
-Use this package to create and enforce high-quality `flow-narrator` artifacts on disk.
+Use this package to create and enforce high-quality `flaier` artifacts on disk.
 
 ## Fast Path
 

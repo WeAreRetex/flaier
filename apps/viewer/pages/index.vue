@@ -36,7 +36,7 @@ function reloadFromDisk() {
   <div class="viewer-page">
     <header class="viewer-header">
       <div>
-        <p class="kicker">Flow Narrator Viewer Layer</p>
+        <p class="kicker">Flaier Viewer Layer</p>
         <h1 class="title">Local Spec Explorer</h1>
         <p class="subtitle">
           {{ flowCount }} flow{{ flowCount === 1 ? "" : "s" }} discovered from disk.
@@ -57,7 +57,7 @@ function reloadFromDisk() {
         Loading local flow manifest...
       </div>
 
-      <FlowNarratorMdc v-else :src="manifestSource" :interval="3200" />
+      <FlaierMdc v-else :src="manifestSource" :interval="3200" />
     </main>
   </div>
 </template>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { FlowNarratorPanel } from "flow-narrator";
+import { FlaierPanel } from "@flaier/core";
 import architectureSpec from "../flow-specs/story-architecture.flow.json";
 </script>
 
@@ -10,7 +10,7 @@ import architectureSpec from "../flow-specs/story-architecture.flow.json";
     </div>
 
     <div class="architecture-flow__canvas">
-      <FlowNarratorPanel
+      <FlaierPanel
         class="architecture-flow__viewer"
         :src="architectureSpec"
         height="100%"
@@ -71,7 +71,7 @@ import architectureSpec from "../flow-specs/story-architecture.flow.json";
   min-height: 0;
 }
 
-.architecture-flow__viewer :deep(.flow-narrator) {
+.architecture-flow__viewer :deep(.flaier) {
   line-height: 1.4;
 }
 

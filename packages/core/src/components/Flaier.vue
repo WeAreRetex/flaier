@@ -2,24 +2,24 @@
 import { ActionProvider, Renderer, StateProvider, VisibilityProvider } from "@json-render/vue";
 import { autoFixSpec, formatSpecIssues, type Spec, validateSpec } from "@json-render/core";
 import { computed, provide, ref, toRef, watch } from "vue";
-import { flowNarratorRuntimeKey } from "../context";
+import { flaierRuntimeKey } from "../context";
 import { registry } from "../registry";
 import type {
-  FlowNarratorFlowOption,
-  FlowNarratorManifest,
-  FlowNarratorManifestFlow,
-  FlowNarratorProps,
-  FlowNarratorSource,
-  FlowNarratorSpec,
+  FlaierFlowOption,
+  FlaierManifest,
+  FlaierManifestFlow,
+  FlaierProps,
+  FlaierSource,
+  FlaierSpec,
 } from "../types";
 
-const props = withDefaults(defineProps<FlowNarratorProps>(), {
+const props = withDefaults(defineProps<FlaierProps>(), {
   autoPlay: false,
   interval: 3000,
 });
 
 const emit = defineEmits<{
-  loaded: [spec: FlowNarratorSpec];
+  loaded: [spec: FlaierSpec];
   "load-error": [message: string];
   "state-change": [changes: Array<{ path: string; value: unknown }>];
 }>();
@@ -30,21 +30,21 @@ interface ResolvedFlowDocument {
   description?: string;
   tags?: string[];
   entrypoints?: string[];
-  source: FlowNarratorSpec | string;
+  source: FlaierSpec | string;
 }
 
-const resolvedSpec = ref<FlowNarratorSpec | null>(null);
+const resolvedSpec = ref<FlaierSpec | null>(null);
 const loading = ref(false);
 const loadError = ref<string | null>(null);
 const specVersion = ref(0);
 const flowDocuments = ref<ResolvedFlowDocument[]>([]);
-const flowOptions = ref<FlowNarratorFlowOption[]>([]);
+const flowOptions = ref<FlaierFlowOption[]>([]);
 const activeFlowId = ref<string | null>(null);
 
 let sourceRequestId = 0;
 let flowRequestId = 0;
 
-provide(flowNarratorRuntimeKey, {
+provide(flaierRuntimeKey, {
   spec: resolvedSpec,
   interval: toRef(props, "interval"),
   flowOptions,
@@ -75,7 +75,7 @@ const initialState = computed<Record<string, unknown>>(() => {
 
 const providerKey = computed(() => {
   const spec = resolvedSpec.value;
-  if (!spec) return "flow-narrator-empty";
+  if (!spec) return "flaier-empty";
   return `${specVersion.value}-${spec.root}-${Object.keys(spec.elements).length}-${props.autoPlay ? "auto" : "manual"}`;
 });
 
@@ -109,7 +109,7 @@ async function loadSourceCollection() {
   } catch (error) {
     if (requestId !== sourceRequestId) return;
 
-    const message = error instanceof Error ? error.message : "Failed to load flow narrator source.";
+    const message = error instanceof Error ? error.message : "Failed to load flaier source.";
 
     loadError.value = message;
     resolvedSpec.value = null;
@@ -185,10 +185,10 @@ async function loadFlowSpec(flowId: string, sourceIdAtStart: number) {
   const validation = validateSpec(fixed.spec);
 
   if (!validation.valid) {
-    console.warn(`[flow-narrator] Invalid spec:\n${formatSpecIssues(validation.issues)}`);
+    console.warn(`[flaier] Invalid spec:\n${formatSpecIssues(validation.issues)}`);
   }
 
-  const nextSpec = fixed.spec as FlowNarratorSpec;
+  const nextSpec = fixed.spec as FlaierSpec;
   resolvedSpec.value = nextSpec;
   specVersion.value += 1;
 
@@ -196,46 +196,46 @@ async function loadFlowSpec(flowId: string, sourceIdAtStart: number) {
   emit("loaded", nextSpec);
 }
 
-async function resolveFlowDocuments(source: FlowNarratorSource) {
+async function resolveFlowDocuments(source: FlaierSource) {
   if (typeof source !== "string") {
-    if (isFlowNarratorManifest(source)) {
+    if (isFlaierManifest(source)) {
       return normalizeManifest(source);
     }
 
-    if (isFlowNarratorSpec(source)) {
+    if (isFlaierSpec(source)) {
       return normalizeSingleSpec(cloneSpec(source));
     }
 
-    throw new Error("Invalid flow-narrator source object.");
+    throw new Error("Invalid flaier source object.");
   }
 
   const { payload, resolvedUrl } = await fetchJsonSource(source);
 
-  if (isFlowNarratorManifest(payload)) {
+  if (isFlaierManifest(payload)) {
     return normalizeManifest(payload, resolvedUrl);
   }
 
-  if (isFlowNarratorSpec(payload)) {
+  if (isFlaierSpec(payload)) {
     return normalizeSingleSpec(cloneSpec(payload));
   }
 
   throw new Error(`Fetched JSON from "${source}" is neither a flow spec nor a manifest.`);
 }
 
-async function resolveSpecSource(source: FlowNarratorSpec | string): Promise<FlowNarratorSpec> {
+async function resolveSpecSource(source: FlaierSpec | string): Promise<FlaierSpec> {
   if (typeof source !== "string") {
     return cloneSpec(source);
   }
 
   const { payload } = await fetchJsonSource(source);
-  if (!isFlowNarratorSpec(payload)) {
+  if (!isFlaierSpec(payload)) {
     throw new Error(`Fetched JSON from "${source}" is not a valid flow spec.`);
   }
 
   return cloneSpec(payload);
 }
 
-function normalizeSingleSpec(spec: FlowNarratorSpec) {
+function normalizeSingleSpec(spec: FlaierSpec) {
   const metadata = getSpecMetadata(spec);
 
   return {
@@ -251,7 +251,7 @@ function normalizeSingleSpec(spec: FlowNarratorSpec) {
   };
 }
 
-function normalizeManifest(manifest: FlowNarratorManifest, baseUrl?: string) {
+function normalizeManifest(manifest: FlaierManifest, baseUrl?: string) {
   const seenIds = new Set<string>();
   const flows: ResolvedFlowDocument[] = [];
 
@@ -283,7 +283,7 @@ function normalizeManifest(manifest: FlowNarratorManifest, baseUrl?: string) {
 }
 
 function normalizeManifestEntry(
-  entry: FlowNarratorManifestFlow,
+  entry: FlaierManifestFlow,
   baseUrl?: string,
 ): ResolvedFlowDocument | null {
   const id = typeof entry.id === "string" ? entry.id.trim() : "";
@@ -304,12 +304,12 @@ function normalizeManifestEntry(
   };
 }
 
-function normalizeFlowSource(value: unknown, baseUrl?: string): FlowNarratorSpec | string | null {
+function normalizeFlowSource(value: unknown, baseUrl?: string): FlaierSpec | string | null {
   if (typeof value === "string") {
     return resolveRelativeSource(value, baseUrl);
   }
 
-  if (isFlowNarratorSpec(value)) {
+  if (isFlaierSpec(value)) {
     return cloneSpec(value);
   }
 
@@ -326,7 +326,7 @@ function syncFlowOptions() {
   }));
 }
 
-function patchFlowMetadata(flowId: string, spec: FlowNarratorSpec) {
+function patchFlowMetadata(flowId: string, spec: FlaierSpec) {
   const metadata = getSpecMetadata(spec);
   let changed = false;
 
@@ -353,7 +353,7 @@ function patchFlowMetadata(flowId: string, spec: FlowNarratorSpec) {
   }
 }
 
-function getSpecMetadata(spec: FlowNarratorSpec) {
+function getSpecMetadata(spec: FlaierSpec) {
   const rootElement = spec.elements[spec.root];
   const rootProps = isObject(rootElement?.props) ? rootElement.props : {};
   const title = toOptionalString(rootProps.title);
@@ -457,16 +457,16 @@ async function fetchJsonSource(source: string) {
   throw lastError ?? new Error(`Failed to load source "${source}".`);
 }
 
-function cloneSpec(spec: FlowNarratorSpec): FlowNarratorSpec {
-  return JSON.parse(JSON.stringify(spec)) as FlowNarratorSpec;
+function cloneSpec(spec: FlaierSpec): FlaierSpec {
+  return JSON.parse(JSON.stringify(spec)) as FlaierSpec;
 }
 
-function isFlowNarratorManifest(value: unknown): value is FlowNarratorManifest {
+function isFlaierManifest(value: unknown): value is FlaierManifest {
   if (!isObject(value)) return false;
   return Array.isArray(value.flows);
 }
 
-function isFlowNarratorSpec(value: unknown): value is FlowNarratorSpec {
+function isFlaierSpec(value: unknown): value is FlaierSpec {
   if (!isObject(value)) return false;
   if (typeof value.root !== "string") return false;
   if (!isObject(value.elements)) return false;
@@ -496,7 +496,7 @@ function handleStateChange(changes: Array<{ path: string; value: unknown }>) {
 </script>
 
 <template>
-  <div class="relative h-full w-full min-h-[320px]">
+  <div class="flaier relative h-full w-full min-h-[320px]">
     <div
       v-if="loading"
       class="flex h-full w-full items-center justify-center text-sm text-muted-foreground"

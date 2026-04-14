@@ -1,6 +1,6 @@
 import { onUnmounted, ref, watch } from "vue";
 
-export function useFlowNarratorFullscreen() {
+export function useFlaierFullscreen() {
   const fullscreen = ref(false);
   let previousBodyOverflow = "";
 

@@ -1,4 +1,7 @@
-@import "tailwindcss";
+@config "../tailwind.config.ts";
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
 @import "@vue-flow/core/dist/style.css";
 @import "@vue-flow/core/dist/theme-default.css";
 @import "shiki-magic-move/dist/style.css";
@@ -18,7 +21,7 @@
   --color-primary-foreground: oklch(1 0 0);
 }
 
-.flow-narrator {
+.flaier {
   --color-border: oklch(0.25 0.005 260);
   --color-ring: oklch(0.55 0.12 270);
   --color-background: oklch(0.098 0.005 260);
@@ -71,7 +74,7 @@
   color-scheme: dark;
 }
 
-.flow-narrator[data-theme="light"] {
+.flaier[data-theme="light"] {
   --color-border: oklch(0.84 0.006 260);
   --color-ring: oklch(0.59 0.15 250);
   --color-background: oklch(0.98 0.003 260);
@@ -256,15 +259,15 @@
   margin: 0 !important;
 }
 
-.flow-narrator .twoslash {
+.flaier .twoslash {
   font-family: var(--twoslash-code-font);
 }
 
-.flow-narrator .twoslash .twoslash-popup-container {
+.flaier .twoslash .twoslash-popup-container {
   backdrop-filter: blur(8px);
 }
 
-.flow-narrator .twoslash .twoslash-popup-code .line {
+.flaier .twoslash .twoslash-popup-code .line {
   white-space: pre;
 }
 
@@ -287,12 +290,12 @@
   filter: none;
 }
 
-.flow-narrator[data-focus-mode="overview"] .fn-node[data-active="false"] {
+.flaier[data-focus-mode="overview"] .fn-node[data-active="false"] {
   opacity: 1;
   filter: none;
 }
 
-.flow-narrator[data-focus-mode="overview"] .vue-flow__edge-path {
+.flaier[data-focus-mode="overview"] .vue-flow__edge-path {
   stroke: var(--fn-edge-overview) !important;
   stroke-width: 1.8px !important;
 }

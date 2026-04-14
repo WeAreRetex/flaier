@@ -1,7 +1,7 @@
 import tailwindcss from "@tailwindcss/vite";
 
 export default defineNuxtConfig({
-  modules: ["@flow-narrator/nuxt"],
+  modules: ["@flaier/nuxt"],
   vite: {
     plugins: [tailwindcss()],
     optimizeDeps: {

@@ -1,13 +1,12 @@
 import type { InjectionKey, Ref } from "vue";
-import type { FlowNarratorFlowOption, FlowNarratorSpec } from "./types";
+import type { FlaierFlowOption, FlaierSpec } from "./types";
 
-export interface FlowNarratorRuntimeContext {
-  spec: Ref<FlowNarratorSpec | null>;
+export interface FlaierRuntimeContext {
+  spec: Ref<FlaierSpec | null>;
   interval: Ref<number>;
-  flowOptions: Ref<FlowNarratorFlowOption[]>;
+  flowOptions: Ref<FlaierFlowOption[]>;
   activeFlowId: Ref<string | null>;
   setActiveFlow: (flowId: string) => void;
 }
 
-export const flowNarratorRuntimeKey: InjectionKey<FlowNarratorRuntimeContext> =
-  Symbol("flow-narrator-runtime");
+export const flaierRuntimeKey: InjectionKey<FlaierRuntimeContext> = Symbol("flaier-runtime");

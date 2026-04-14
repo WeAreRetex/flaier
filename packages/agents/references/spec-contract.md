@@ -1,6 +1,6 @@
 # Spec Contract
 
-Use this contract when writing `*.flow.json` for `flow-narrator`.
+Use this contract when writing `*.flow.json` for `flaier`.
 
 ## Minimal Valid Shape
 

@@ -1,5 +1,5 @@
 {
-  "name": "@flow-narrator/viewer",
+  "name": "@flaier/viewer",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,8 +10,8 @@
     "prepare": "nuxt prepare"
   },
   "dependencies": {
-    "@flow-narrator/nuxt": "workspace:*",
-    "flow-narrator": "workspace:*",
+    "@flaier/nuxt": "workspace:*",
+    "@flaier/core": "workspace:*",
     "nuxt": "^4.4.0",
     "vue": "^3.5.0"
   }

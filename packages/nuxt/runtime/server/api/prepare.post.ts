@@ -1,9 +1,9 @@
 import { createError, defineEventHandler, getRequestURL, readBody } from "h3";
-import type { FlowNarratorSource } from "flow-narrator";
-import { prepareFlowNarratorSource } from "../prepareFlowNarratorSource";
+import type { FlaierSource } from "@flaier/core";
+import { prepareFlaierSource } from "../prepareFlaierSource";
 
 interface PrepareRequestBody {
-  source?: FlowNarratorSource;
+  source?: FlaierSource;
   baseUrl?: string;
 }
 
@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
   const baseUrl = toOptionalString(body?.baseUrl) ?? getRequestURL(event).toString();
 
   try {
-    return await prepareFlowNarratorSource(source, {
+    return await prepareFlaierSource(source, {
       baseUrl,
       fetchJson: async (url) => {
         const resolvedUrl = resolveFetchUrl(url, baseUrl);
@@ -31,8 +31,7 @@ export default defineEventHandler(async (event) => {
   } catch (error) {
     throw createError({
       statusCode: 500,
-      statusMessage:
-        error instanceof Error ? error.message : "Failed to prepare flow narrator source.",
+      statusMessage: error instanceof Error ? error.message : "Failed to prepare flaier source.",
     });
   }
 });

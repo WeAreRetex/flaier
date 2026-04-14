@@ -1,5 +1,5 @@
 {
-  "name": "@flow-narrator/docs",
+  "name": "@flaier/docs",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,9 +9,9 @@
     "preview": "nuxt preview --extends docus"
   },
   "dependencies": {
-    "@flow-narrator/nuxt": "../../packages/nuxt",
+    "@flaier/nuxt": "../../packages/nuxt",
     "docus": "latest",
-    "flow-narrator": "../../packages/core",
+    "@flaier/core": "../../packages/core",
     "nuxt": "latest",
     "zod": "^3.25.0",
     "zod-to-json-schema": "^3.25.2"

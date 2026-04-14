@@ -1,4 +1,4 @@
-@import "flow-narrator/style.css";
+@import "@flaier/core/style.css";
 
 .slidev-layout.docs-slide {
   --docs-bg: #f8fafc;

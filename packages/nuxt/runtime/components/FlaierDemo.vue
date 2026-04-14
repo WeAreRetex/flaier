@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { FlowNarratorPanel } from "flow-narrator";
-import type { FlowNarratorSource } from "flow-narrator";
+import { FlaierPanel } from "@flaier/core";
+import type { FlaierSource } from "@flaier/core";
 import { toRef } from "vue";
-import { usePreparedFlowNarratorSource } from "../composables/usePreparedFlowNarratorSource";
+import { usePreparedFlaierSource } from "../composables/usePreparedFlaierSource";
 
 const props = withDefaults(
   defineProps<{
-    src: FlowNarratorSource;
+    src: FlaierSource;
     autoPlay?: boolean;
     interval?: number;
     height?: number | string;
@@ -18,12 +18,12 @@ const props = withDefaults(
   },
 );
 
-const preparedSource = await usePreparedFlowNarratorSource(toRef(props, "src"));
+const preparedSource = await usePreparedFlaierSource(toRef(props, "src"));
 </script>
 
 <template>
   <ClientOnly>
-    <FlowNarratorPanel
+    <FlaierPanel
       class="fn-demo"
       :src="preparedSource"
       :auto-play="autoPlay"

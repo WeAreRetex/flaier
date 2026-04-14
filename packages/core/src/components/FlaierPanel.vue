@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { watch } from "vue";
 import { computed } from "vue";
-import FlowNarrator from "./FlowNarrator.vue";
-import { useFlowNarratorFullscreen } from "../composables/useFlowNarratorFullscreen";
-import type { FlowNarratorPanelProps } from "../types";
+import Flaier from "./Flaier.vue";
+import { useFlaierFullscreen } from "../composables/useFlaierFullscreen";
+import type { FlaierPanelProps } from "../types";
 
 defineOptions({
   inheritAttrs: false,
 });
 
-const props = withDefaults(defineProps<FlowNarratorPanelProps>(), {
+const props = withDefaults(defineProps<FlaierPanelProps>(), {
   autoPlay: false,
   interval: 3000,
   height: "min(72vh, 760px)",
@@ -18,7 +18,7 @@ const props = withDefaults(defineProps<FlowNarratorPanelProps>(), {
   fullscreenEnabled: true,
 });
 
-const { fullscreen, closeFullscreen, toggleFullscreen } = useFlowNarratorFullscreen();
+const { fullscreen, closeFullscreen, toggleFullscreen } = useFlaierFullscreen();
 
 const fullscreenActive = computed(() => props.fullscreenEnabled && fullscreen.value);
 
@@ -64,12 +64,7 @@ watch(
       />
 
       <div class="fn-panel__surface">
-        <FlowNarrator
-          class="fn-panel__viewer"
-          :src="src"
-          :auto-play="autoPlay"
-          :interval="interval"
-        />
+        <Flaier class="fn-panel__viewer" :src="src" :auto-play="autoPlay" :interval="interval" />
 
         <button
           v-if="fullscreenEnabled"

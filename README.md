@@ -1,4 +1,4 @@
-# flow-narrator
+# Flaier
 
 Spec-driven flow visualizer for AI-generated codebase storytelling.
 
@@ -6,10 +6,10 @@ Spec-driven flow visualizer for AI-generated codebase storytelling.
 
 ```text
 apps/docs       Docus-powered documentation site
-apps/slides     Slidev example deck built with flow-narrator
+apps/slides     Slidev example deck built with Flaier
 apps/viewer     Nuxt viewer for local flow specs and manifests
-packages/core   Published `flow-narrator` Vue package
-packages/nuxt   `@flow-narrator/nuxt` module and wrapper components
+packages/core   Published `@flaier/core` Vue package
+packages/nuxt   `@flaier/nuxt` module and wrapper components
 packages/agents CLI tools and shipped flow-generation skill
 ```
 
@@ -29,7 +29,7 @@ pnpm slides:dev
 
 ## AI Artifact Model
 
-`FlowNarrator` accepts:
+`Flaier` accepts:
 
 - a single flow spec object,
 - a single flow spec JSON path/URL,
@@ -95,7 +95,7 @@ flow-specs/
 ### Vue usage
 
 ```vue
-<FlowNarrator src="./flow-specs/manifest.json" :interval="3000" />
+<Flaier src="./flow-specs/manifest.json" :interval="3000" />
 ```
 
 Relative `src` values inside `manifest.json` are resolved against the manifest file location, so AI harnesses can generate each `*.flow.json` in separate sessions and append/update the manifest incrementally.
@@ -110,12 +110,12 @@ This scans `*.flow.json` files and writes a manifest that the viewer can load di
 
 ## Packages and apps
 
-- `flow-narrator` (published from `packages/core`): Vue component library + json-render catalog/registry exports.
-- `@flow-narrator/nuxt` (`packages/nuxt`): Nuxt/Docus/Nuxt Content integrations and wrapper components.
+- `@flaier/core` (`packages/core`): Vue component library + json-render catalog/registry exports.
+- `@flaier/nuxt` (`packages/nuxt`): Nuxt/Docus/Nuxt Content integrations and wrapper components.
 - `packages/agents`: skill + CLI tools for generating, validating, and packaging flow specs.
 - `apps/docs`: docs site that exercises the Nuxt module and demo wrapper components.
-- `apps/slides`: Slidev example that embeds `FlowNarratorPanel` inside a deck.
-- `apps/viewer`: Nuxt app that reads local specs from disk and renders them through `FlowNarrator`.
+- `apps/slides`: Slidev example that embeds `FlaierPanel` inside a deck.
+- `apps/viewer`: Nuxt app that reads local specs from disk and renders them through `Flaier`.
 
 ### Agents package quick start
 
@@ -126,4 +126,4 @@ pnpm agents:validate -- ./apps/viewer/flow-specs/manifest.json
 pnpm agents:scaffold -- --title "Support Story Architecture" --template architecture --out ./apps/slides/flow-specs/story-architecture.flow.json
 ```
 
-The Slidev example in `apps/slides` shows how to present an architecture spec with `FlowNarratorPanel` and document-aware theme settings.
+The Slidev example in `apps/slides` shows how to present an architecture spec with `FlaierPanel` and document-aware theme settings.

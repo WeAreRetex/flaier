@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { FlowNarrator } from "flow-narrator";
-import type { FlowNarratorSource } from "flow-narrator";
+import { Flaier } from "@flaier/core";
+import type { FlaierSource } from "@flaier/core";
 import { toRef } from "vue";
-import { usePreparedFlowNarratorSource } from "../composables/usePreparedFlowNarratorSource";
+import { usePreparedFlaierSource } from "../composables/usePreparedFlaierSource";
 
 defineOptions({
   inheritAttrs: false,
@@ -10,7 +10,7 @@ defineOptions({
 
 const props = withDefaults(
   defineProps<{
-    src: FlowNarratorSource;
+    src: FlaierSource;
     autoPlay?: boolean;
     interval?: number;
     fallbackText?: string;
@@ -22,17 +22,12 @@ const props = withDefaults(
   },
 );
 
-const preparedSource = await usePreparedFlowNarratorSource(toRef(props, "src"));
+const preparedSource = await usePreparedFlaierSource(toRef(props, "src"));
 </script>
 
 <template>
   <ClientOnly>
-    <FlowNarrator
-      v-bind="$attrs"
-      :src="preparedSource"
-      :auto-play="autoPlay"
-      :interval="interval"
-    />
+    <Flaier v-bind="$attrs" :src="preparedSource" :auto-play="autoPlay" :interval="interval" />
 
     <template #fallback>
       <slot name="fallback">

@@ -1,6 +1,6 @@
 import { dirname, resolve } from "node:path";
 import { autoFixSpec, formatSpecIssues, type Spec, validateSpec } from "@json-render/core";
-import { validateFlowNarratorReadiness } from "./flow-ready-validation";
+import { validateFlaierReadiness } from "./flow-ready-validation";
 import {
   asNonEmptyString,
   getInvocationCwd,
@@ -124,7 +124,7 @@ function validateAndPrintSpec(spec: FlowSpec, label: string, flowId?: string) {
     throw new Error(`${header} invalid (${label}):\n${formatSpecIssues(schemaValidation.issues)}`);
   }
 
-  const readiness = validateFlowNarratorReadiness(normalizedSpec);
+  const readiness = validateFlaierReadiness(normalizedSpec);
   if (readiness.errors.length > 0) {
     const header = flowId ? `Flow ${flowId}` : "Spec";
     throw new Error(

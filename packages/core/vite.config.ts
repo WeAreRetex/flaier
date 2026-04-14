@@ -12,7 +12,7 @@ export default defineConfig({
   build: {
     lib: {
       entry: resolve(__dirname, "src/index.ts"),
-      name: "FlowNarrator",
+      name: "Flaier",
       formats: ["es"],
       fileName: "index",
       cssFileName: "style",

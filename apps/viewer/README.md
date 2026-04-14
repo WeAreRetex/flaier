@@ -1,6 +1,6 @@
-# @flow-narrator/viewer
+# @flaier/viewer
 
-Nuxt viewer layer/app for browsing local Flow Narrator specs.
+Nuxt viewer layer/app for browsing local Flaier specs.
 
 ## Run
 
@@ -48,7 +48,7 @@ The app serves:
 - `GET /api/flows/manifest`
 - `GET /api/flows/spec/:id`
 
-`FlowNarrator` consumes `/api/flows/manifest`, and each flow is loaded on demand.
+`Flaier` consumes `/api/flows/manifest`, and each flow is loaded on demand.
 
 Manifest entries may point at:
 
@@ -64,18 +64,18 @@ This package is structured as a Nuxt layer (contains `nuxt.config.ts`, `pages/`,
 
 ## Nuxt wrappers
 
-The viewer uses `@flow-narrator/nuxt`, which globally registers:
+The viewer uses `@flaier/nuxt`, which globally registers:
 
-- `FlowNarratorClient`
-- `FlowNarratorDemo`
-- `FlowNarratorMdc`
+- `FlaierClient`
+- `FlaierDemo`
+- `FlaierMdc`
 
 ### MDC component (Nuxt Content / Docus)
 
-Install `@flow-narrator/nuxt`, enable the module, and use the globally registered `FlowNarratorMdc` component in `.md`/`.mdc`:
+Install `@flaier/nuxt`, enable the module, and use the globally registered `FlaierMdc` component in `.md`/`.mdc`:
 
 ```md
-## ::FlowNarratorMdc
+## ::FlaierMdc
 
 src: /api/flows/manifest
 interval: 3200
@@ -88,4 +88,4 @@ height: min(70vh, 780px)
 
 It includes a bottom-right fullscreen toggle button. When enabled, the component teleports to `body` and renders in a fixed-position modal, so it is not clipped by docs-page layout borders.
 
-For regular Nuxt pages, use `FlowNarratorClient` or `FlowNarratorDemo` instead.
+For regular Nuxt pages, use `FlaierClient` or `FlaierDemo` instead.

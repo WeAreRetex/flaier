@@ -10,7 +10,7 @@ import {
   estimateCodeNodeWidth,
 } from "../../code-node-sizing";
 import { exportFlowDiagram, type DiagramExportFormat } from "../../composables/useDiagramExport";
-import { useFlowNarratorRuntime } from "../../composables/useFlowNarratorRuntime";
+import { useFlaierRuntime } from "../../composables/useFlaierRuntime";
 import {
   hasTwoslashHints,
   hasTwoslashHtml,
@@ -98,7 +98,7 @@ const DEFAULT_DAGRE_NODE_SEP_VERTICAL = 120;
 const DEFAULT_DAGRE_EDGE_SEP = 30;
 const OVERVIEW_ENTER_ZOOM = 0.52;
 const OVERVIEW_EXIT_ZOOM = 0.62;
-const FLOW_NARRATOR_THEME_STORAGE_KEY = "flow-narrator-ui-theme";
+const FLAIER_THEME_STORAGE_KEY = "flaier-ui-theme";
 const ARCHITECTURE_ZONE_MIN_CONTENT_PADDING = 44;
 const ARCHITECTURE_ZONE_MIN_BOTTOM_PADDING = 88;
 const ARCHITECTURE_ZONE_LABEL_TOP = 12;
@@ -291,7 +291,7 @@ const EMPTY_ARCHITECTURE_INSPECTOR_NODE: ArchitectureInspectorArchitectureView =
   outgoing: [],
 };
 
-const runtime = useFlowNarratorRuntime();
+const runtime = useFlaierRuntime();
 const spec = computed(() => runtime.spec.value);
 const availableFlows = computed(() => runtime.flowOptions.value);
 const activeFlowId = computed(() => runtime.activeFlowId.value);
@@ -392,7 +392,7 @@ function readStoredTheme() {
   }
 
   try {
-    return normalizeTheme(window.localStorage.getItem(FLOW_NARRATOR_THEME_STORAGE_KEY));
+    return normalizeTheme(window.localStorage.getItem(FLAIER_THEME_STORAGE_KEY));
   } catch {
     return null;
   }
@@ -430,7 +430,7 @@ function persistTheme(theme: "dark" | "light") {
   }
 
   try {
-    window.localStorage.setItem(FLOW_NARRATOR_THEME_STORAGE_KEY, theme);
+    window.localStorage.setItem(FLAIER_THEME_STORAGE_KEY, theme);
   } catch {
     // no-op when storage is unavailable
   }
@@ -3016,7 +3016,7 @@ const containerMinHeight = computed(() => {
 });
 
 const instance = getCurrentInstance();
-const flowId = `flow-narrator-${instance?.uid ?? 0}`;
+const flowId = `flaier-${instance?.uid ?? 0}`;
 const { fitView, onNodeClick, onViewportChange, setCenter, viewport } = useVueFlow(flowId);
 const nodesInitialized = useNodesInitialized();
 const paneReady = ref(false);
@@ -3355,7 +3355,7 @@ onUnmounted(() => {
 <template>
   <div
     ref="containerRef"
-    class="flow-narrator relative h-full w-full font-sans antialiased bg-background transition-[min-height] duration-300 ease-out"
+    class="flaier relative h-full w-full font-sans antialiased bg-background transition-[min-height] duration-300 ease-out"
     :style="{ minHeight: `${containerMinHeight}px` }"
     :data-focus-mode="overviewMode ? 'overview' : 'focus'"
     :data-theme="uiTheme"

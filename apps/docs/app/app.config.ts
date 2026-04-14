@@ -1,6 +1,6 @@
 export default defineAppConfig({
   docus: {
-    name: "flow-narrator",
+    name: "Flaier",
     description: "Spec-driven flow visualizer for AI-generated codebase storytelling.",
     socials: {
       github: "Rigo-m/flow-visualizer",

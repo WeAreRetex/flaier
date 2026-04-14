@@ -37,7 +37,7 @@ export interface FlowSpecMetadata {
 }
 
 export function getInvocationCwd() {
-  return process.env.FLOW_NARRATOR_ROOT ?? process.env.INIT_CWD ?? process.cwd();
+  return process.env.FLAIER_ROOT ?? process.env.INIT_CWD ?? process.cwd();
 }
 
 export function resolveFromInvocationCwd(value: string, invocationCwd = getInvocationCwd()) {

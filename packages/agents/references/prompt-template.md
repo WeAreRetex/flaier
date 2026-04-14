@@ -3,7 +3,7 @@
 Use this prompt when asking an LLM to generate a new flow spec from code context.
 
 ```text
-Generate a single `flow-narrator` flow spec JSON file.
+Generate a single `flaier` flow spec JSON file.
 
 Requirements:
 - Output only JSON.

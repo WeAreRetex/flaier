@@ -52,7 +52,7 @@ interface NormalizedTransition {
   criticality?: string;
 }
 
-export function validateFlowNarratorReadiness(spec: FlowSpec): FlowReadinessResult {
+export function validateFlaierReadiness(spec: FlowSpec): FlowReadinessResult {
   const errors: string[] = [];
   const warnings: string[] = [];
   const entries = Object.entries(spec.elements);

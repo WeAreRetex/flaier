@@ -28,7 +28,7 @@
       "type": "DescriptionNode",
       "props": {
         "label": "Documented by AI",
-        "body": "The viewer layer loads flow specs from disk through /api/flows and renders them with FlowNarrator."
+        "body": "The viewer layer loads flow specs from disk through /api/flows and renders them with Flaier."
       },
       "children": ["node-3"]
     },

@@ -1,5 +1,5 @@
 {
-  "name": "@flow-narrator/nuxt",
+  "name": "@flaier/nuxt",
   "version": "0.1.0",
   "files": [
     "module.ts",
@@ -17,7 +17,7 @@
     "typescript": "^5.9.3"
   },
   "peerDependencies": {
-    "flow-narrator": "workspace:*",
+    "@flaier/core": "workspace:*",
     "nuxt": "^4.4.0",
     "vue": "^3.5.0"
   }

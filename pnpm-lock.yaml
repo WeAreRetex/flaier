@@ -75,15 +75,15 @@ importers:
 
   apps/docs:
     dependencies:
-      '@flow-narrator/nuxt':
+      '@flaier/core':
+        specifier: ../../packages/core
+        version: link:../../packages/core
+      '@flaier/nuxt':
         specifier: ../../packages/nuxt
         version: link:../../packages/nuxt
       docus:
         specifier: latest
         version: 5.9.0(ec990e35e192d3b22543aa474b6efe41)
-      flow-narrator:
-        specifier: ../../packages/core
-        version: link:../../packages/core
       nuxt:
         specifier: latest
         version: 4.4.2(@babel/core@7.29.0)(@babel/plugin-syntax-jsx@7.28.6(@babel/core@7.29.0))(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@parcel/watcher@2.5.6)(@types/node@25.6.0)(@vue/compiler-sfc@3.5.32)(better-sqlite3@12.9.0)(cac@6.7.14)(db0@0.3.4(better-sqlite3@12.9.0))(eslint@10.2.0(jiti@2.6.1))(ioredis@5.10.1)(lightningcss@1.32.0)(magicast@0.5.2)(optionator@0.9.4)(oxlint@1.58.0(oxlint-tsgolint@0.20.0))(rollup-plugin-visualizer@7.0.1(rollup@4.60.1))(rollup@4.60.1)(srvx@0.11.15)(terser@5.46.1)(tsx@4.21.0)(typescript@6.0.2)(vite@7.3.2(@types/node@25.6.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))(vue-tsc@2.2.12(typescript@6.0.2))(yaml@2.8.3)
@@ -106,7 +106,7 @@ importers:
 
   apps/slides:
     dependencies:
-      flow-narrator:
+      '@flaier/core':
         specifier: workspace:*
         version: link:../../packages/core
       vue:
@@ -125,12 +125,12 @@ importers:
 
   apps/viewer:
     dependencies:
-      '@flow-narrator/nuxt':
-        specifier: workspace:*
-        version: link:../../packages/nuxt
-      flow-narrator:
+      '@flaier/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@flaier/nuxt':
+        specifier: workspace:*
+        version: link:../../packages/nuxt
       nuxt:
         specifier: ^4.4.0
         version: 4.4.2(@babel/core@7.29.0)(@babel/plugin-syntax-jsx@7.28.6(@babel/core@7.29.0))(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@parcel/watcher@2.5.6)(@types/node@25.6.0)(@vue/compiler-sfc@3.5.32)(better-sqlite3@12.9.0)(cac@6.7.14)(db0@0.3.4(better-sqlite3@12.9.0))(eslint@10.2.0(jiti@2.6.1))(ioredis@5.10.1)(lightningcss@1.32.0)(magicast@0.5.2)(optionator@0.9.4)(oxlint@1.58.0(oxlint-tsgolint@0.20.0))(rollup-plugin-visualizer@7.0.1(rollup@4.60.1))(rollup@4.60.1)(terser@5.46.1)(tsx@4.21.0)(typescript@6.0.2)(vite@7.3.2(@types/node@25.6.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))(vue-tsc@2.2.12(typescript@6.0.2))(yaml@2.8.3)
@@ -211,15 +211,15 @@ importers:
 
   packages/nuxt:
     dependencies:
+      '@flaier/core':
+        specifier: workspace:*
+        version: link:../core
       '@nuxt/kit':
         specifier: ^4.4.0
         version: 4.4.2(magicast@0.5.2)
       '@shikijs/twoslash':
         specifier: ^3
         version: 3.23.0(typescript@5.9.3)
-      flow-narrator:
-        specifier: workspace:*
-        version: link:../core
       nuxt:
         specifier: ^4.4.0
         version: 4.4.2(@babel/core@7.29.0)(@babel/plugin-syntax-jsx@7.28.6(@babel/core@7.29.0))(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@parcel/watcher@2.5.6)(@types/node@25.6.0)(@vue/compiler-sfc@3.5.32)(better-sqlite3@12.9.0)(cac@6.7.14)(db0@0.3.4(better-sqlite3@12.9.0))(eslint@10.2.0(jiti@2.6.1))(ioredis@5.10.1)(lightningcss@1.32.0)(magicast@0.5.2)(optionator@0.9.4)(oxlint@1.58.0(oxlint-tsgolint@0.20.0))(rollup-plugin-visualizer@7.0.1(rollup@4.60.1))(rollup@4.60.1)(terser@5.46.1)(tsx@4.21.0)(typescript@5.9.3)(vite@7.3.2(@types/node@25.6.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))(vue-tsc@2.2.12(typescript@5.9.3))(yaml@2.8.3)

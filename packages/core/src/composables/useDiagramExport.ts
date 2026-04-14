@@ -75,7 +75,7 @@ function createCaptureStage({
 }) {
   const width = Math.ceil(bounds.width + EXPORT_PADDING_PX * 2);
   const height = Math.ceil(bounds.height + EXPORT_PADDING_PX * 2);
-  const sourceRoot = flowElement.closest(".flow-narrator") as HTMLElement | null;
+  const sourceRoot = flowElement.closest(".flaier") as HTMLElement | null;
   const sourceStyles = getComputedStyle(sourceRoot ?? flowElement);
   const wrapper = document.createElement("div");
   wrapper.style.position = "fixed";
@@ -87,7 +87,7 @@ function createCaptureStage({
   wrapper.style.pointerEvents = "none";
 
   const stage = document.createElement("div");
-  stage.className = "flow-narrator";
+  stage.className = "flaier";
   stage.dataset.theme = theme;
   stage.style.position = "relative";
   stage.style.width = `${width}px`;

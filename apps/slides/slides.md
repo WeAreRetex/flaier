@@ -1,7 +1,7 @@
 ---
 theme: default
-title: Flow Narrator Story Deck
-titleTemplate: "%s · flow-narrator"
+title: Flaier Story Deck
+titleTemplate: "%s · Flaier"
 colorSchema: auto
 drawings:
   enabled: false
