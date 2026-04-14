@@ -2602,16 +2602,6 @@ const diagramBounds = computed(() => {
   };
 });
 
-const canExportDiagram = computed(() => {
-  return Boolean(containerReady.value && nodes.value.length > 0 && diagramBounds.value);
-});
-
-watch(canExportDiagram, (canExport) => {
-  if (!canExport) {
-    closeExportMenu();
-  }
-});
-
 function createExportFileBaseName() {
   const rawName = activeFlow.value?.id ?? overlayTitle.value ?? props.title ?? "flow-diagram";
 
@@ -3209,6 +3199,16 @@ function onInit() {
 const viewportReady = computed(
   () => paneReady.value && nodesInitialized.value && containerReady.value && nodes.value.length > 0,
 );
+
+const canExportDiagram = computed(() => {
+  return Boolean(viewportReady.value && diagramBounds.value);
+});
+
+watch(canExportDiagram, (canExport) => {
+  if (!canExport) {
+    closeExportMenu();
+  }
+});
 
 const narrativeFocusTarget = computed(() => {
   if (isArchitectureMode.value || overviewMode.value || !viewportReady.value) {

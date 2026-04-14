@@ -40,6 +40,8 @@ export async function exportFlowDiagram(options: ExportFlowDiagramOptions) {
   try {
     const { toPng } = await import("html-to-image");
 
+    await settleCaptureStage();
+
     pngDataUrl = await toPng(capture.stage, {
       width: capture.width,
       height: capture.height,
@@ -75,19 +77,23 @@ function createCaptureStage({
   const height = Math.ceil(bounds.height + EXPORT_PADDING_PX * 2);
   const sourceRoot = flowElement.closest(".flow-narrator") as HTMLElement | null;
   const sourceStyles = getComputedStyle(sourceRoot ?? flowElement);
+  const wrapper = document.createElement("div");
+  wrapper.style.position = "fixed";
+  wrapper.style.left = "-100000px";
+  wrapper.style.top = "0";
+  wrapper.style.width = "0";
+  wrapper.style.height = "0";
+  wrapper.style.overflow = "hidden";
+  wrapper.style.pointerEvents = "none";
 
   const stage = document.createElement("div");
   stage.className = "flow-narrator";
   stage.dataset.theme = theme;
-  stage.style.position = "fixed";
-  stage.style.left = "0";
-  stage.style.top = "0";
+  stage.style.position = "relative";
   stage.style.width = `${width}px`;
   stage.style.height = `${height}px`;
   stage.style.overflow = "hidden";
   stage.style.pointerEvents = "none";
-  stage.style.opacity = "0";
-  stage.style.zIndex = "-1";
 
   for (let index = 0; index < sourceStyles.length; index += 1) {
     const key = sourceStyles.item(index);
@@ -106,6 +112,8 @@ function createCaptureStage({
   flowClone.style.height = `${height}px`;
   flowClone.style.margin = "0";
 
+  inlineSvgPresentationStyles(flowElement, flowClone);
+
   const transformPane = (flowClone.querySelector(".vue-flow__transformationpane") ??
     flowClone.querySelector(".vue-flow__viewport")) as HTMLElement | null;
   const exportTransform = `translate(${Math.round(EXPORT_PADDING_PX - bounds.x)}px, ${Math.round(EXPORT_PADDING_PX - bounds.y)}px) scale(1)`;
@@ -116,12 +124,6 @@ function createCaptureStage({
     transformPane.style.opacity = "1";
   }
 
-  const edgeLabelLayers = flowClone.querySelectorAll<HTMLElement>(".vue-flow__edge-labels");
-  for (const layer of edgeLabelLayers) {
-    layer.style.transformOrigin = "0 0";
-    layer.style.transform = exportTransform;
-  }
-
   const zoneOverlays = flowClone.querySelectorAll<HTMLElement>('[data-zone-overlay="true"]');
   for (const overlay of zoneOverlays) {
     overlay.style.transformOrigin = "0 0";
@@ -129,7 +131,8 @@ function createCaptureStage({
   }
 
   stage.appendChild(flowClone);
-  document.body.appendChild(stage);
+  wrapper.appendChild(stage);
+  document.body.appendChild(wrapper);
 
   return {
     stage,
@@ -137,7 +140,7 @@ function createCaptureStage({
     height,
     backgroundColor,
     destroy() {
-      stage.remove();
+      wrapper.remove();
     },
   };
 }
@@ -179,6 +182,63 @@ function resolveExportPixelRatio(width: number, height: number) {
   }
 
   return Math.max(0.45, ratio);
+}
+
+function inlineSvgPresentationStyles(sourceRoot: HTMLElement, clonedRoot: HTMLElement) {
+  copyComputedSvgStyles(sourceRoot, clonedRoot, ".vue-flow__edge-path", [
+    "fill",
+    "stroke",
+    "stroke-width",
+    "stroke-linecap",
+    "stroke-linejoin",
+    "vector-effect",
+    "filter",
+    "opacity",
+  ]);
+}
+
+function copyComputedSvgStyles(
+  sourceRoot: HTMLElement,
+  clonedRoot: HTMLElement,
+  selector: string,
+  properties: string[],
+) {
+  const sourceElements = sourceRoot.querySelectorAll<SVGElement>(selector);
+  const clonedElements = clonedRoot.querySelectorAll<SVGElement>(selector);
+  const total = Math.min(sourceElements.length, clonedElements.length);
+
+  for (let index = 0; index < total; index += 1) {
+    const sourceElement = sourceElements[index];
+    const clonedElement = clonedElements[index];
+    if (!sourceElement || !clonedElement) continue;
+
+    const computedStyle = getComputedStyle(sourceElement);
+
+    for (const property of properties) {
+      const value = computedStyle.getPropertyValue(property);
+      if (!value) continue;
+      clonedElement.style.setProperty(property, value);
+    }
+  }
+}
+
+async function settleCaptureStage() {
+  if (typeof document !== "undefined" && "fonts" in document) {
+    try {
+      await document.fonts.ready;
+    } catch {
+      // Ignore font readiness failures and continue with the best available render.
+    }
+  }
+
+  await waitForAnimationFrame();
+  await waitForAnimationFrame();
+}
+
+function waitForAnimationFrame() {
+  return new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => resolve());
+  });
 }
 
 async function renderPdfBlob(pngDataUrl: string, widthPx: number, heightPx: number) {
