@@ -1,0 +1,68 @@
+{
+  "root": "timeline",
+  "state": { "currentStep": 0, "playing": false },
+  "elements": {
+    "timeline": {
+      "type": "FlowTimeline",
+      "props": {
+        "title": "User Login",
+        "description": "HTTP request to session issuance",
+        "mode": "narrative",
+        "minHeight": 440,
+        "layoutEngine": "dagre",
+        "layoutRankSep": 240,
+        "layoutNodeSep": 160
+      },
+      "children": ["trigger-entry"]
+    },
+    "trigger-entry": {
+      "type": "TriggerNode",
+      "props": {
+        "label": "POST /api/login",
+        "description": "Accepts email + password JSON body",
+        "color": "#22c55e",
+        "sourceAnchor": { "path": "src/api/login.post.ts", "line": 1 },
+        "transitions": [
+          { "to": "code-validate", "label": "Validate credentials", "kind": "default" }
+        ]
+      },
+      "children": ["code-validate"]
+    },
+    "code-validate": {
+      "type": "CodeNode",
+      "props": {
+        "label": "Validate credentials",
+        "file": "src/auth/validate.ts",
+        "language": "typescript",
+        "code": "export async function validateCredentials(\n  email: string,\n  password: string\n) {\n  const user = await db.user.findByEmail(email)\n  if (!user) throw new AuthError('USER_NOT_FOUND')\n  const valid = await bcrypt.compare(password, user.passwordHash)\n  if (!valid) throw new AuthError('INVALID_PASSWORD')\n  return user\n}",
+        "comment": "Uses constant-time comparison to prevent timing attacks.",
+        "story": "Fetches the user record and compares the submitted password against the stored hash.",
+        "sourceAnchor": { "path": "src/auth/validate.ts", "line": 4 },
+        "transitions": [{ "to": "code-session", "label": "Issue session", "kind": "success" }]
+      },
+      "children": ["code-session"]
+    },
+    "code-session": {
+      "type": "CodeNode",
+      "props": {
+        "label": "Issue session token",
+        "file": "src/auth/session.ts",
+        "language": "typescript",
+        "code": "export async function issueSession(userId: string) {\n  const token = await signJwt({ sub: userId, iat: Date.now() })\n  await redis.set(`session:${userId}`, token, { ttl: 604800 })\n  return token\n}",
+        "comment": "Signs a JWT and persists it in Redis with a 7-day TTL.",
+        "story": "The session token is returned in the response body and cached for fast validation on future requests.",
+        "sourceAnchor": { "path": "src/auth/session.ts", "line": 3 },
+        "transitions": [{ "to": "describe-outcome", "label": "Return token", "kind": "success" }]
+      },
+      "children": ["describe-outcome"]
+    },
+    "describe-outcome": {
+      "type": "DescriptionNode",
+      "props": {
+        "label": "Session issued",
+        "body": "A signed JWT is returned in the `200 OK` response body. The session is cached in Redis with a 7-day TTL. Subsequent requests validate the token directly from cache.",
+        "sourceAnchor": "docs/auth/sessions.md:24"
+      }
+    }
+  }
+}

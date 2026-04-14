@@ -1,0 +1,51 @@
+{
+  "name": "flow-narrator",
+  "version": "0.1.0",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./style.css": "./dist/style.css"
+  },
+  "scripts": {
+    "build": "vite build",
+    "check": "vp check",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "@dagrejs/dagre": "^2.0.4",
+    "@json-render/core": "latest",
+    "@json-render/vue": "latest",
+    "@shikijs/twoslash": "^3",
+    "@vue-flow/core": "^1",
+    "html-to-image": "^1.11.11",
+    "jspdf": "^2.5.2",
+    "shiki": "^3",
+    "shiki-magic-move": "^0.5",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4",
+    "@vitejs/plugin-vue": "^6.0.6",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vite": "^6.4.1",
+    "vite-plugin-dts": "^4.5.4",
+    "vite-plus": "^0.1.16",
+    "vue": "^3.5",
+    "vue-tsc": "^2"
+  },
+  "peerDependencies": {
+    "vue": "^3.5"
+  }
+}

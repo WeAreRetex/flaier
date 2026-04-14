@@ -5,15 +5,15 @@ Spec-driven flow visualizer for AI-generated codebase storytelling.
 ## Development
 
 ```bash
-bun install
-bun run dev
+pnpm install
+vp run dev
 ```
 
 ### Run Nuxt viewer layer
 
 ```bash
-bun --cwd ./apps/viewer install
-bun run viewer:dev
+pnpm --dir ./apps/viewer install
+pnpm --dir ./apps/viewer dev
 ```
 
 ## AI Artifact Model
@@ -85,22 +85,23 @@ Relative `src` values inside `manifest.json` are resolved against the manifest f
 ### Build manifest from disk
 
 ```bash
-bun run flows:manifest -- --dir ./flow-specs --out ./flow-specs/manifest.json
+vp run flows:manifest -- --dir ./flow-specs --out ./flow-specs/manifest.json
 ```
 
 This scans `*.flow.json` files and writes a manifest that the viewer can load directly.
 
 ## Packages and apps
 
-- `flow-narrator` (this package): Vue component library + json-render catalog/registry exports.
+- `flow-narrator` (published from `packages/core`): Vue component library + json-render catalog/registry exports.
+- `@flow-narrator/nuxt` (`packages/nuxt`): Nuxt/Docus/Nuxt Content integrations and wrapper components.
 - `packages/agents`: skill + CLI tools for generating, validating, and packaging flow specs.
-- `apps/viewer`: Nuxt layer/app that reads local specs from disk and renders them through `FlowNarrator`.
+- `apps/viewer`: Nuxt app that reads local specs from disk and renders them through `FlowNarrator`.
 
 ### Agents package quick start
 
 ```bash
-bun --cwd ./packages/agents install
-bun run agents:scaffold -- --title "Checkout Flow" --template branching --out ./dev/flow-specs/checkout.flow.json
-bun run agents:manifest -- --dir ./dev/flow-specs --out ./dev/flow-specs/manifest.json
-bun run agents:validate -- ./dev/flow-specs/manifest.json
+pnpm --dir ./packages/agents install
+vp run agents:scaffold -- --title "Checkout Flow" --template branching --out ./apps/viewer/flow-specs/checkout.flow.json
+vp run agents:manifest -- --dir ./apps/viewer/flow-specs --out ./apps/viewer/flow-specs/manifest.json
+vp run agents:validate -- ./apps/viewer/flow-specs/manifest.json
 ```

@@ -15,9 +15,7 @@
         "layoutRankSep": 280,
         "layoutNodeSep": 180
       },
-      "children": [
-        "node-1"
-      ]
+      "children": ["node-1"]
     },
     "node-1": {
       "type": "TriggerNode",
@@ -26,9 +24,7 @@
         "description": "Webhook receives JSON from checkout service",
         "color": "#0ea5e9"
       },
-      "children": [
-        "node-2"
-      ]
+      "children": ["node-2"]
     },
     "node-2": {
       "type": "CodeNode",
@@ -59,9 +55,7 @@
           }
         ]
       },
-      "children": [
-        "node-3"
-      ]
+      "children": ["node-3"]
     },
     "node-3": {
       "type": "DescriptionNode",

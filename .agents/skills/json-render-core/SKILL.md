@@ -19,19 +19,22 @@ Core package for schema definition, catalog creation, and spec streaming.
 ```typescript
 import { defineSchema } from "@json-render/core";
 
-export const schema = defineSchema((s) => ({
-  spec: s.object({
-    // Define spec structure
-  }),
-  catalog: s.object({
-    components: s.map({
-      props: s.zod(),
-      description: s.string(),
+export const schema = defineSchema(
+  (s) => ({
+    spec: s.object({
+      // Define spec structure
+    }),
+    catalog: s.object({
+      components: s.map({
+        props: s.zod(),
+        description: s.string(),
+      }),
     }),
   }),
-}), {
-  promptTemplate: myPromptTemplate, // Optional custom AI prompt
-});
+  {
+    promptTemplate: myPromptTemplate, // Optional custom AI prompt
+  },
+);
 ```
 
 ## Creating a Catalog
@@ -125,7 +128,10 @@ Elements can declare a `watch` field (top-level, sibling of type/props/children)
   "type": "Select",
   "props": { "value": { "$bindState": "/form/country" }, "options": ["US", "Canada"] },
   "watch": {
-    "/form/country": { "action": "loadCities", "params": { "country": { "$state": "/form/country" } } }
+    "/form/country": {
+      "action": "loadCities",
+      "params": { "country": { "$state": "/form/country" } }
+    }
   },
   "children": []
 }
@@ -206,9 +212,7 @@ Schemas can declare `builtInActions` -- actions that are always available at run
 
 ```typescript
 const schema = defineSchema(builder, {
-  builtInActions: [
-    { name: "setState", description: "Update a value in the state model" },
-  ],
+  builtInActions: [{ name: "setState", description: "Update a value in the state model" }],
 });
 ```
 
@@ -223,8 +227,8 @@ import { createStateStore, type StateStore } from "@json-render/core";
 
 const store = createStateStore({ count: 0 });
 
-store.get("/count");         // 0
-store.set("/count", 1);      // updates and notifies subscribers
+store.get("/count"); // 0
+store.set("/count", 1); // updates and notifies subscribers
 store.update({ "/a": 1, "/b": 2 }); // batch update
 
 store.subscribe(() => {
@@ -236,22 +240,22 @@ The `StateStore` interface: `get(path)`, `set(path, value)`, `update(updates)`, 
 
 ## Key Exports
 
-| Export | Purpose |
-|--------|---------|
-| `defineSchema` | Create a new schema |
-| `defineCatalog` | Create a catalog from schema |
-| `createStateStore` | Create a framework-agnostic in-memory `StateStore` |
-| `resolvePropValue` | Resolve a single prop expression against data |
-| `resolveElementProps` | Resolve all prop expressions in an element |
-| `buildUserPrompt` | Build user prompts with refinement and state context |
-| `validateSpec` | Validate spec structure |
-| `autoFixSpec` | Auto-fix common spec issues |
-| `createSpecStreamCompiler` | Stream JSONL patches into spec |
-| `createJsonRenderTransform` | TransformStream separating text from JSONL in mixed streams |
-| `parseSpecStreamLine` | Parse single JSONL line |
-| `applySpecStreamPatch` | Apply patch to object |
-| `StateStore` | Interface for plugging in external state management |
-| `ComputedFunction` | Function signature for `$computed` expressions |
-| `check` | TypeScript helpers for creating validation checks |
-| `BuiltInAction` | Type for built-in action definitions (`name` + `description`) |
-| `ActionBinding` | Action binding type (includes `preventDefault` field) |
+| Export                      | Purpose                                                       |
+| --------------------------- | ------------------------------------------------------------- |
+| `defineSchema`              | Create a new schema                                           |
+| `defineCatalog`             | Create a catalog from schema                                  |
+| `createStateStore`          | Create a framework-agnostic in-memory `StateStore`            |
+| `resolvePropValue`          | Resolve a single prop expression against data                 |
+| `resolveElementProps`       | Resolve all prop expressions in an element                    |
+| `buildUserPrompt`           | Build user prompts with refinement and state context          |
+| `validateSpec`              | Validate spec structure                                       |
+| `autoFixSpec`               | Auto-fix common spec issues                                   |
+| `createSpecStreamCompiler`  | Stream JSONL patches into spec                                |
+| `createJsonRenderTransform` | TransformStream separating text from JSONL in mixed streams   |
+| `parseSpecStreamLine`       | Parse single JSONL line                                       |
+| `applySpecStreamPatch`      | Apply patch to object                                         |
+| `StateStore`                | Interface for plugging in external state management           |
+| `ComputedFunction`          | Function signature for `$computed` expressions                |
+| `check`                     | TypeScript helpers for creating validation checks             |
+| `BuiltInAction`             | Type for built-in action definitions (`name` + `description`) |
+| `ActionBinding`             | Action binding type (includes `preventDefault` field)         |

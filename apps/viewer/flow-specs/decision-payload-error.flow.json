@@ -16,9 +16,7 @@
         "layoutNodeSep": 170,
         "layoutEdgeSep": 36
       },
-      "children": [
-        "trigger-webhook"
-      ]
+      "children": ["trigger-webhook"]
     },
     "trigger-webhook": {
       "type": "TriggerNode",
@@ -28,9 +26,7 @@
         "color": "#22c55e",
         "sourceAnchor": "apps/api/src/routes/signup.ts:14"
       },
-      "children": [
-        "decision-validate"
-      ]
+      "children": ["decision-validate"]
     },
     "decision-validate": {
       "type": "DecisionNode",
@@ -58,10 +54,7 @@
           }
         ]
       },
-      "children": [
-        "payload-normalized",
-        "error-invalid"
-      ]
+      "children": ["payload-normalized", "error-invalid"]
     },
     "payload-normalized": {
       "type": "PayloadNode",
@@ -81,9 +74,7 @@
           }
         ]
       },
-      "children": [
-        "code-persist"
-      ]
+      "children": ["code-persist"]
     },
     "code-persist": {
       "type": "CodeNode",
@@ -99,9 +90,7 @@
         "comment": "Idempotent write keeps retries safe",
         "story": "On success, emit signup completed event for downstream services"
       },
-      "children": [
-        "link-runbook"
-      ]
+      "children": ["link-runbook"]
     },
     "error-invalid": {
       "type": "ErrorNode",
@@ -121,9 +110,7 @@
           }
         ]
       },
-      "children": [
-        "link-runbook"
-      ]
+      "children": ["link-runbook"]
     },
     "link-runbook": {
       "type": "LinkNode",

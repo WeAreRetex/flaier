@@ -1,32 +1,25 @@
 {
-  "name": "flow-narrator",
+  "name": "flow-visualizer",
   "version": "0.1.0",
-  "type": "module",
   "private": true,
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    },
-    "./style.css": "./dist/index.css"
-  },
-  "sideEffects": [
-    "**/*.css"
-  ],
-  "files": ["dist"],
+  "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "BUILD_LIB=1 vite build",
-    "test": "bun test",
-    "typecheck": "vue-tsc --noEmit",
-    "flows:manifest": "bun ./scripts/build-flow-manifest.ts",
-    "viewer:dev": "bun run --cwd ./apps/viewer dev",
-    "viewer:build": "bun run --cwd ./apps/viewer build",
-    "agents:scaffold": "FLOW_NARRATOR_ROOT=$PWD bun run --cwd ./packages/agents scaffold",
-    "agents:manifest": "FLOW_NARRATOR_ROOT=$PWD bun run --cwd ./packages/agents manifest",
-    "agents:validate": "FLOW_NARRATOR_ROOT=$PWD bun run --cwd ./packages/agents validate"
+    "dev": "vp run @flow-narrator/viewer#dev",
+    "build": "vp run flow-narrator#build",
+    "test": "vp test",
+    "check": "vp run flow-narrator#check",
+    "typecheck": "vp run flow-narrator#typecheck",
+    "flows:manifest": "vp exec tsx ./scripts/build-flow-manifest.ts",
+    "docs:dev": "vp run @flow-narrator/docs#dev",
+    "docs:build": "vp run @flow-narrator/docs#build",
+    "viewer:dev": "vp run @flow-narrator/viewer#dev",
+    "viewer:build": "vp run @flow-narrator/viewer#build",
+    "agents:scaffold": "FLOW_NARRATOR_ROOT=$PWD vp run @flow-narrator/agents#scaffold",
+    "agents:manifest": "FLOW_NARRATOR_ROOT=$PWD vp run @flow-narrator/agents#manifest",
+    "agents:validate": "FLOW_NARRATOR_ROOT=$PWD vp run @flow-narrator/agents#validate",
+    "release": "vp exec changelogen --bump --output && git push --follow-tags",
+    "release:minor": "vp exec changelogen --bump --minor --output && git push --follow-tags",
+    "release:major": "vp exec changelogen --bump --major --output && git push --follow-tags"
   },
   "dependencies": {
     "@dagrejs/dagre": "^2.0.4",
@@ -38,21 +31,20 @@
     "jspdf": "^2.5.2",
     "shiki": "^3",
     "shiki-magic-move": "^0.5",
-    "twoslash-cdn": "^0.3",
-    "zod": "^4.3.6"
+    "twoslash-cdn": "^0.3"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4",
-    "@types/bun": "latest",
-    "@vitejs/plugin-vue": "^5",
+    "@vitejs/plugin-vue": "^6.0.6",
+    "changelogen": "^0.6.2",
+    "nuxt": "latest",
     "tailwindcss": "^4",
-    "vite": "^6",
-    "vite-plugin-dts": "^4",
+    "tsx": "^4.20.6",
+    "typescript": "^5",
+    "vite-plugin-dts": "^4.5.4",
+    "vite-plus": "^0.1.16",
     "vue": "^3.5",
-    "vue-tsc": "^2",
-    "typescript": "^5"
+    "vue-tsc": "^2"
   },
-  "peerDependencies": {
-    "vue": "^3.5"
-  }
+  "packageManager": "pnpm@10.33.0"
 }

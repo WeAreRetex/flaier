@@ -1,14 +1,17 @@
 {
   "name": "@flow-narrator/agents",
   "version": "0.1.0",
-  "type": "module",
   "private": true,
+  "type": "module",
   "scripts": {
-    "manifest": "bun ./src/manifest.ts",
-    "validate": "bun ./src/validate.ts",
-    "scaffold": "bun ./src/scaffold.ts"
+    "manifest": "tsx ./src/manifest.ts",
+    "validate": "tsx ./src/validate.ts",
+    "scaffold": "tsx ./src/scaffold.ts"
   },
   "dependencies": {
     "@json-render/core": "latest"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.6"
   }
 }

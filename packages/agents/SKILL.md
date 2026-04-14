@@ -12,19 +12,19 @@ Use this package to create and enforce high-quality `flow-narrator` artifacts on
 Run from repo root:
 
 ```bash
-bun run agents:scaffold -- --title "Checkout Flow" --template branching --out ./flow-specs/checkout.flow.json
-bun run agents:scaffold -- --title "Platform Architecture" --template architecture --out ./flow-specs/platform-architecture.flow.json
-bun run agents:validate -- ./flow-specs/checkout.flow.json
-bun run agents:manifest -- --dir ./flow-specs --out ./flow-specs/manifest.json
+vp run agents:scaffold -- --title "Checkout Flow" --template branching --out ./flow-specs/checkout.flow.json
+vp run agents:scaffold -- --title "Platform Architecture" --template architecture --out ./flow-specs/platform-architecture.flow.json
+vp run agents:validate -- ./flow-specs/checkout.flow.json
+vp run agents:manifest -- --dir ./flow-specs --out ./flow-specs/manifest.json
 ```
 
 Run directly inside this folder:
 
 ```bash
-bun run scaffold -- --title "Checkout Flow" --template branching --out ./flow-specs/checkout.flow.json
-bun run scaffold -- --title "Platform Architecture" --template architecture --out ./flow-specs/platform-architecture.flow.json
-bun run validate -- ./flow-specs/checkout.flow.json
-bun run manifest -- --dir ./flow-specs --out ./flow-specs/manifest.json
+pnpm run scaffold -- --title "Checkout Flow" --template branching --out ./flow-specs/checkout.flow.json
+pnpm run scaffold -- --title "Platform Architecture" --template architecture --out ./flow-specs/platform-architecture.flow.json
+pnpm run validate -- ./flow-specs/checkout.flow.json
+pnpm run manifest -- --dir ./flow-specs --out ./flow-specs/manifest.json
 ```
 
 ## Workflow
@@ -33,11 +33,11 @@ bun run manifest -- --dir ./flow-specs --out ./flow-specs/manifest.json
 2. Replace placeholders with real node labels, code snippets, descriptions, links, and branch paths from the target codebase.
 3. Keep one `FlowTimeline` root; for architecture diagrams set `FlowTimeline.props.mode` to `"architecture"` and prefer `ArchitectureNode` for infrastructure components.
 4. Use `FlowTimeline.props.zones` + `ArchitectureNode.props.zone` when you need explicit group containers (edge/core/data/ops boundaries).
-4. Add edge metadata with `props.transitions` on branching nodes to label branch choices (`label`, `description`) and semantics (`kind`: `success`, `error`, `warning`, `retry`, `async`, `default`).
-5. Add `sourceAnchor` on key nodes so readers can jump from story to exact code locations (`path:line` or `{ path, line, column, href }`).
-6. For architecture nodes, include operational metadata where available (`owner`, `status`, `tier`, `interfaces`, `data`, `security`, `operations`, `links`).
-7. Validate each generated spec or full manifest with `validate`.
-8. Build or refresh `manifest.json` with `manifest` after adding/removing flow files.
+5. Add edge metadata with `props.transitions` on branching nodes to label branch choices (`label`, `description`) and semantics (`kind`: `success`, `error`, `warning`, `retry`, `async`, `default`).
+6. Add `sourceAnchor` on key nodes so readers can jump from story to exact code locations (`path:line` or `{ path, line, column, href }`).
+7. For architecture nodes, include operational metadata where available (`owner`, `status`, `tier`, `interfaces`, `data`, `security`, `operations`, `links`).
+8. Validate each generated spec or full manifest with `validate`.
+9. Build or refresh `manifest.json` with `manifest` after adding/removing flow files.
 
 ## Non-Negotiable Output Rules
 

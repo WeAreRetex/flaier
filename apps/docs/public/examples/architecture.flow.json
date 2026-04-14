@@ -1,0 +1,179 @@
+{
+  "root": "timeline",
+  "state": { "currentStep": 0, "playing": false },
+  "elements": {
+    "timeline": {
+      "type": "FlowTimeline",
+      "props": {
+        "title": "API Platform",
+        "description": "Edge → core services → async processing → data plane",
+        "mode": "architecture",
+        "minHeight": 440,
+        "layoutEngine": "dagre",
+        "layoutRankSep": 240,
+        "layoutNodeSep": 160,
+        "zones": [
+          { "id": "edge", "label": "Edge", "color": "#6366f1", "padding": 56 },
+          { "id": "core", "label": "Core Services", "color": "#0ea5e9", "padding": 60 },
+          { "id": "async", "label": "Async", "color": "#f59e0b", "padding": 56 },
+          { "id": "data", "label": "Data Plane", "color": "#22c55e", "padding": 56 }
+        ]
+      },
+      "children": ["gateway"]
+    },
+    "gateway": {
+      "type": "ArchitectureNode",
+      "props": {
+        "label": "API Gateway",
+        "kind": "gateway",
+        "zone": "edge",
+        "tier": "edge",
+        "status": "active",
+        "technology": "Bun.serve",
+        "owner": "Platform Team",
+        "description": "Public ingress. Terminates TLS, enforces auth, rate-limits, and routes to internal services.",
+        "capabilities": ["jwt-validation", "rate-limit", "request-routing"],
+        "security": { "auth": "JWT", "encryption": "TLS 1.3", "pii": false },
+        "operations": { "slo": "99.95% availability", "alert": "5xx-rate > 1%" },
+        "sourceAnchor": { "path": "src/server/index.ts", "line": 1 },
+        "transitions": [
+          {
+            "to": "api-service",
+            "label": "Route request",
+            "kind": "default",
+            "protocol": "HTTPS",
+            "transport": "sync",
+            "criticality": "high"
+          }
+        ]
+      },
+      "children": ["api-service"]
+    },
+    "api-service": {
+      "type": "ArchitectureNode",
+      "props": {
+        "label": "API Service",
+        "kind": "service",
+        "zone": "core",
+        "tier": "application",
+        "status": "active",
+        "technology": "TypeScript",
+        "owner": "Core Team",
+        "description": "Validates commands, enforces domain invariants, persists state, and publishes domain events.",
+        "capabilities": ["idempotent-upsert", "domain-events"],
+        "operations": { "slo": "p95 < 200ms", "alert": "latency-p95 > 250ms" },
+        "sourceAnchor": { "path": "src/services/api.ts", "line": 1 },
+        "transitions": [
+          {
+            "to": "event-queue",
+            "label": "Publish events",
+            "kind": "async",
+            "protocol": "Kafka",
+            "transport": "async"
+          },
+          {
+            "to": "database",
+            "label": "Persist state",
+            "kind": "success",
+            "protocol": "SQL",
+            "transport": "sync",
+            "criticality": "high"
+          }
+        ]
+      },
+      "children": ["event-queue", "database"]
+    },
+    "event-queue": {
+      "type": "ArchitectureNode",
+      "props": {
+        "label": "Event Queue",
+        "kind": "queue",
+        "zone": "async",
+        "tier": "integration",
+        "status": "active",
+        "technology": "Kafka",
+        "owner": "Messaging Team",
+        "description": "Buffers async jobs. Protects core services from burst traffic.",
+        "capabilities": ["backpressure", "dead-letter-routing"],
+        "operations": { "slo": "99.9% durability", "alert": "consumer-lag > 2m" },
+        "transitions": [
+          {
+            "to": "worker",
+            "label": "Dispatch jobs",
+            "kind": "async",
+            "protocol": "Kafka",
+            "transport": "async"
+          }
+        ]
+      },
+      "children": ["worker"]
+    },
+    "worker": {
+      "type": "ArchitectureNode",
+      "props": {
+        "label": "Worker Pool",
+        "kind": "compute",
+        "zone": "async",
+        "tier": "platform",
+        "status": "active",
+        "technology": "Bun workers",
+        "owner": "Automation Team",
+        "description": "Executes side effects, retries transient failures, warms the read cache.",
+        "capabilities": ["retry-orchestration", "idempotency-keys"],
+        "operations": { "slo": "Retry success > 98% in 10m", "alert": "error-rate > 2%" },
+        "transitions": [
+          { "to": "cache", "label": "Warm cache", "kind": "retry", "protocol": "Redis" }
+        ]
+      },
+      "children": ["cache"]
+    },
+    "database": {
+      "type": "ArchitectureNode",
+      "props": {
+        "label": "Primary DB",
+        "kind": "database",
+        "zone": "data",
+        "tier": "data",
+        "status": "active",
+        "technology": "Postgres 16",
+        "owner": "Data Platform",
+        "description": "Source of truth for transactional writes.",
+        "data": [
+          {
+            "name": "Core entities",
+            "kind": "relational",
+            "classification": "confidential",
+            "retention": "7 years"
+          }
+        ],
+        "security": { "auth": "IAM roles", "encryption": "at rest + in transit", "pii": true },
+        "operations": { "slo": "RPO < 5m", "alert": "replication-lag > 60s" },
+        "transitions": [
+          { "to": "cache", "label": "Project reads", "kind": "success", "protocol": "Redis" }
+        ]
+      },
+      "children": ["cache"]
+    },
+    "cache": {
+      "type": "ArchitectureNode",
+      "props": {
+        "label": "Read Cache",
+        "kind": "cache",
+        "zone": "data",
+        "tier": "data",
+        "status": "active",
+        "technology": "Redis",
+        "owner": "Data Platform",
+        "description": "Accelerates reads. Absorbs repeated query traffic with TTL-based projections.",
+        "data": [
+          {
+            "name": "Read models",
+            "kind": "key-value",
+            "classification": "internal",
+            "retention": "24 hours"
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,35 +1,34 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { FlowNarrator } from 'flow-narrator'
+import { computed, ref } from "vue";
 
 interface ViewerManifestFlow {
-  id: string
-  title?: string
-  description?: string
-  src: string
+  id: string;
+  title?: string;
+  description?: string;
+  src: string;
 }
 
 interface ViewerManifest {
-  version?: number
-  defaultFlowId?: string
-  flows: ViewerManifestFlow[]
+  version?: number;
+  defaultFlowId?: string;
+  flows: ViewerManifestFlow[];
 }
 
-const reloadToken = ref(0)
-const manifestSource = computed(() => `/api/flows/manifest?reload=${reloadToken.value}`)
+const reloadToken = ref(0);
+const manifestSource = computed(() => `/api/flows/manifest?reload=${reloadToken.value}`);
 
 const {
   data: manifest,
   pending,
   error,
   refresh,
-} = await useFetch<ViewerManifest>(() => manifestSource.value)
+} = await useFetch<ViewerManifest>(() => manifestSource.value);
 
-const flowCount = computed(() => manifest.value?.flows?.length ?? 0)
+const flowCount = computed(() => manifest.value?.flows?.length ?? 0);
 
 function reloadFromDisk() {
-  reloadToken.value += 1
-  void refresh()
+  reloadToken.value += 1;
+  void refresh();
 }
 </script>
 
@@ -40,12 +39,12 @@ function reloadFromDisk() {
         <p class="kicker">Flow Narrator Viewer Layer</p>
         <h1 class="title">Local Spec Explorer</h1>
         <p class="subtitle">
-          {{ flowCount }} flow{{ flowCount === 1 ? '' : 's' }} discovered from disk.
+          {{ flowCount }} flow{{ flowCount === 1 ? "" : "s" }} discovered from disk.
         </p>
       </div>
 
       <button class="reload-button" type="button" :disabled="pending" @click="reloadFromDisk">
-        {{ pending ? 'Reloading...' : 'Reload from Disk' }}
+        {{ pending ? "Reloading..." : "Reload from Disk" }}
       </button>
     </header>
 
@@ -58,11 +57,7 @@ function reloadFromDisk() {
         Loading local flow manifest...
       </div>
 
-      <FlowNarrator
-        v-else
-        :src="manifestSource"
-        :interval="3200"
-      />
+      <FlowNarratorMdc v-else :src="manifestSource" :interval="3200" />
     </main>
   </div>
 </template>
@@ -112,7 +107,9 @@ function reloadFromDisk() {
   font-size: 0.8rem;
   padding: 0.55rem 0.75rem;
   cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
+  transition:
+    border-color 0.2s,
+    background 0.2s;
 }
 
 .reload-button:hover:not(:disabled) {

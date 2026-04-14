@@ -1,0 +1,24 @@
+{
+  "name": "@flow-narrator/docs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev --extends docus",
+    "build": "nuxt build --extends docus",
+    "generate": "nuxt generate --extends docus",
+    "preview": "nuxt preview --extends docus"
+  },
+  "dependencies": {
+    "@flow-narrator/nuxt": "../../packages/nuxt",
+    "docus": "latest",
+    "flow-narrator": "../../packages/core",
+    "nuxt": "latest",
+    "zod": "^3.25.0",
+    "zod-to-json-schema": "^3.25.2"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.2",
+    "tailwindcss": "^4.2.2",
+    "typescript": "^6.0.2"
+  }
+}

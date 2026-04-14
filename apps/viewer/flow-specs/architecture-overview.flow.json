@@ -54,9 +54,7 @@
         "layoutNodeSep": 180,
         "layoutEdgeSep": 34
       },
-      "children": [
-        "gateway-edge"
-      ]
+      "children": ["gateway-edge"]
     },
     "gateway-edge": {
       "type": "ArchitectureNode",
@@ -74,11 +72,7 @@
           "Terminate TLS and validate authentication",
           "Apply perimeter rate limits before core services"
         ],
-        "capabilities": [
-          "jwt-validation",
-          "rate-limit",
-          "request-routing"
-        ],
+        "capabilities": ["jwt-validation", "rate-limit", "request-routing"],
         "interfaces": [
           {
             "name": "Public HTTPS API",
@@ -121,9 +115,7 @@
           }
         ]
       },
-      "children": [
-        "service-api"
-      ]
+      "children": ["service-api"]
     },
     "service-api": {
       "type": "ArchitectureNode",
@@ -141,11 +133,7 @@
           "Validate commands and enforce domain invariants",
           "Persist canonical state and publish events"
         ],
-        "capabilities": [
-          "idempotent-upsert",
-          "domain-events",
-          "command-validation"
-        ],
+        "capabilities": ["idempotent-upsert", "domain-events", "command-validation"],
         "interfaces": [
           {
             "name": "Gateway RPC",
@@ -204,11 +192,7 @@
           }
         ]
       },
-      "children": [
-        "database-primary",
-        "queue-events",
-        "cache-read"
-      ]
+      "children": ["database-primary", "queue-events", "cache-read"]
     },
     "database-primary": {
       "type": "ArchitectureNode",
@@ -222,10 +206,7 @@
         "technology": "Postgres",
         "runtime": "Managed Postgres 16",
         "description": "Source of truth for transactional entities.",
-        "capabilities": [
-          "point-in-time-recovery",
-          "read-replicas"
-        ],
+        "capabilities": ["point-in-time-recovery", "read-replicas"],
         "data": [
           {
             "name": "Orders + Accounts",
@@ -261,10 +242,7 @@
         "technology": "SQS / Kafka topic",
         "runtime": "Managed Kafka",
         "description": "Durable buffer for asynchronous jobs and retries.",
-        "capabilities": [
-          "backpressure",
-          "dead-letter-routing"
-        ],
+        "capabilities": ["backpressure", "dead-letter-routing"],
         "data": [
           {
             "name": "Domain Event Envelope",
@@ -292,9 +270,7 @@
           }
         ]
       },
-      "children": [
-        "compute-workers"
-      ]
+      "children": ["compute-workers"]
     },
     "compute-workers": {
       "type": "ArchitectureNode",
@@ -312,10 +288,7 @@
           "Apply retries for transient failures",
           "Project async writes into cache"
         ],
-        "capabilities": [
-          "retry-orchestration",
-          "idempotency-keys"
-        ],
+        "capabilities": ["retry-orchestration", "idempotency-keys"],
         "interfaces": [
           {
             "name": "Queue consumer",
@@ -356,10 +329,7 @@
           }
         ]
       },
-      "children": [
-        "cache-read",
-        "external-observability"
-      ]
+      "children": ["cache-read", "external-observability"]
     },
     "cache-read": {
       "type": "ArchitectureNode",
@@ -373,10 +343,7 @@
         "technology": "Redis",
         "runtime": "Redis cluster",
         "description": "Low-latency read path for frequently requested aggregates.",
-        "capabilities": [
-          "ttl-projections",
-          "hot-key-protection"
-        ],
+        "capabilities": ["ttl-projections", "hot-key-protection"],
         "data": [
           {
             "name": "Read models",
@@ -399,10 +366,7 @@
         "technology": "Metrics + traces + alerts",
         "runtime": "Managed observability SaaS",
         "description": "Receives telemetry from gateway, API, and workers.",
-        "capabilities": [
-          "service-level-alerting",
-          "distributed-tracing"
-        ],
+        "capabilities": ["service-level-alerting", "distributed-tracing"],
         "links": [
           {
             "label": "Ops Dashboard",

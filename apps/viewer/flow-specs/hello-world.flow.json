@@ -13,9 +13,7 @@
         "minHeight": 520,
         "layoutEngine": "dagre"
       },
-      "children": [
-        "node-1"
-      ]
+      "children": ["node-1"]
     },
     "node-1": {
       "type": "TriggerNode",
@@ -24,9 +22,7 @@
         "description": "Entrypoint discovered from the codebase",
         "color": "#22c55e"
       },
-      "children": [
-        "node-2"
-      ]
+      "children": ["node-2"]
     },
     "node-2": {
       "type": "DescriptionNode",
@@ -34,9 +30,7 @@
         "label": "Documented by AI",
         "body": "The viewer layer loads flow specs from disk through /api/flows and renders them with FlowNarrator."
       },
-      "children": [
-        "node-3"
-      ]
+      "children": ["node-3"]
     },
     "node-3": {
       "type": "LinkNode",

@@ -1,47 +1,19 @@
-import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
-import tailwindcss from '@tailwindcss/vite'
-import dts from 'vite-plugin-dts'
-import { resolve } from 'path'
+import { defineConfig } from "vite-plus";
+import vue from "@vitejs/plugin-vue";
+import tailwindcss from "@tailwindcss/vite";
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
 
-const isLib = process.env.BUILD_LIB === '1'
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
-  root: isLib ? undefined : 'dev',
-  plugins: [
-    vue(),
-    tailwindcss(),
-    ...(isLib ? [dts({ include: ['src'] })] : []),
-  ],
-  build: isLib
-    ? {
-        lib: {
-          entry: resolve(__dirname, 'src/index.ts'),
-          name: 'FlowNarrator',
-          formats: ['es'],
-          fileName: 'index',
-        },
-        rollupOptions: {
-          external: [
-            'vue',
-            '@vue-flow/core',
-            '@json-render/core',
-            '@json-render/vue',
-            'shiki',
-            'shiki-magic-move',
-            'shiki-magic-move/vue',
-            'html-to-image',
-            'jspdf',
-            'zod',
-          ],
-        },
-      }
-    : {
-        outDir: resolve(__dirname, 'dev-dist'),
-      },
+  plugins: [vue(), tailwindcss()],
   resolve: {
     alias: {
-      '@': resolve(__dirname, 'src'),
+      "@": resolve(__dirname, "packages/core/src"),
     },
   },
-})
+  staged: {
+    "*.{js,ts,tsx,vue}": "vp check --fix",
+  },
+});

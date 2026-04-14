@@ -1,0 +1,277 @@
+@import "tailwindcss";
+@import "@vue-flow/core/dist/style.css";
+@import "@vue-flow/core/dist/theme-default.css";
+@import "shiki-magic-move/dist/style.css";
+@import "@shikijs/twoslash/style-rich.css";
+@source "./**/*.{vue,ts,js,tsx,jsx}";
+
+@theme {
+  --color-border: oklch(0.25 0.005 260);
+  --color-ring: oklch(0.55 0.12 270);
+  --color-background: oklch(0.098 0.005 260);
+  --color-foreground: oklch(0.93 0 0);
+  --color-card: oklch(0.145 0.006 260);
+  --color-card-foreground: oklch(0.93 0 0);
+  --color-muted: oklch(0.2 0.005 260);
+  --color-muted-foreground: oklch(0.55 0 0);
+  --color-primary: oklch(0.65 0.15 270);
+  --color-primary-foreground: oklch(1 0 0);
+}
+
+.flow-narrator {
+  --color-border: oklch(0.25 0.005 260);
+  --color-ring: oklch(0.55 0.12 270);
+  --color-background: oklch(0.098 0.005 260);
+  --color-foreground: oklch(0.93 0 0);
+  --color-card: oklch(0.145 0.006 260);
+  --color-card-foreground: oklch(0.93 0 0);
+  --color-muted: oklch(0.2 0.005 260);
+  --color-muted-foreground: oklch(0.55 0 0);
+  --color-primary: oklch(0.65 0.15 270);
+  --color-primary-foreground: oklch(1 0 0);
+  --fn-grid-dot: oklch(0.22 0.005 260);
+  --fn-edge: oklch(0.3 0.015 260);
+  --fn-edge-overview: oklch(0.42 0.03 260);
+  --fn-edge-active: oklch(0.55 0.12 270);
+  --fn-edge-active-glow: oklch(0.55 0.12 270 / 0.4);
+  --fn-edge-success: oklch(0.74 0.13 155);
+  --fn-edge-error: oklch(0.67 0.2 24);
+  --fn-edge-warning: oklch(0.78 0.12 92);
+  --fn-edge-retry: oklch(0.7 0.11 240);
+  --fn-edge-async: oklch(0.73 0.13 305);
+  --fn-handle-border: oklch(0.2 0.005 260);
+  --fn-handle-bg: oklch(0.35 0.02 260);
+  --fn-inactive-filter: saturate(0.2) brightness(0.7);
+  --twoslash-border-color: oklch(0.34 0.01 260 / 0.85);
+  --twoslash-underline-color: oklch(0.65 0.15 270);
+  --twoslash-highlighted-border: oklch(0.72 0.14 95 / 0.35);
+  --twoslash-highlighted-bg: oklch(0.72 0.14 95 / 0.16);
+  --twoslash-popup-bg: oklch(0.17 0.01 260);
+  --twoslash-popup-color: var(--color-foreground);
+  --twoslash-popup-shadow: rgba(0, 0, 0, 0.4) 0 12px 30px;
+  --twoslash-docs-color: var(--color-muted-foreground);
+  --twoslash-docs-font: ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --twoslash-code-font:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+    monospace;
+  --twoslash-code-font-size: 0.95em;
+  --twoslash-matched-color: var(--color-foreground);
+  --twoslash-unmatched-color: oklch(0.62 0.008 260);
+  --twoslash-cursor-color: oklch(0.62 0.008 260 / 0.55);
+  --twoslash-error-color: oklch(0.68 0.18 20);
+  --twoslash-error-bg: oklch(0.68 0.18 20 / 0.16);
+  --twoslash-warn-color: oklch(0.76 0.13 75);
+  --twoslash-warn-bg: oklch(0.76 0.13 75 / 0.16);
+  --twoslash-tag-color: oklch(0.66 0.16 250);
+  --twoslash-tag-bg: oklch(0.66 0.16 250 / 0.18);
+  --twoslash-tag-warn-color: var(--twoslash-warn-color);
+  --twoslash-tag-warn-bg: var(--twoslash-warn-bg);
+  --twoslash-tag-annotate-color: oklch(0.74 0.11 170);
+  --twoslash-tag-annotate-bg: oklch(0.74 0.11 170 / 0.16);
+  color-scheme: dark;
+}
+
+.flow-narrator[data-theme="light"] {
+  --color-border: oklch(0.84 0.006 260);
+  --color-ring: oklch(0.59 0.15 250);
+  --color-background: oklch(0.98 0.003 260);
+  --color-foreground: oklch(0.24 0.012 260);
+  --color-card: oklch(1 0 0);
+  --color-card-foreground: oklch(0.24 0.012 260);
+  --color-muted: oklch(0.95 0.005 260);
+  --color-muted-foreground: oklch(0.5 0.01 260);
+  --color-primary: oklch(0.59 0.15 250);
+  --color-primary-foreground: oklch(0.99 0 0);
+  --fn-grid-dot: oklch(0.86 0.006 260);
+  --fn-edge: oklch(0.72 0.02 260);
+  --fn-edge-overview: oklch(0.64 0.025 260);
+  --fn-edge-active: oklch(0.59 0.15 250);
+  --fn-edge-active-glow: oklch(0.59 0.15 250 / 0.3);
+  --fn-edge-success: oklch(0.58 0.15 155);
+  --fn-edge-error: oklch(0.61 0.2 26);
+  --fn-edge-warning: oklch(0.7 0.14 92);
+  --fn-edge-retry: oklch(0.57 0.14 240);
+  --fn-edge-async: oklch(0.6 0.16 305);
+  --fn-handle-border: oklch(0.76 0.01 260);
+  --fn-handle-bg: oklch(0.67 0.05 250);
+  --fn-inactive-filter: saturate(0.4) brightness(0.94);
+  --twoslash-border-color: oklch(0.8 0.01 260 / 0.9);
+  --twoslash-underline-color: oklch(0.59 0.15 250);
+  --twoslash-highlighted-border: oklch(0.75 0.13 95 / 0.5);
+  --twoslash-highlighted-bg: oklch(0.75 0.13 95 / 0.2);
+  --twoslash-popup-bg: oklch(1 0 0);
+  --twoslash-popup-color: var(--color-foreground);
+  --twoslash-popup-shadow: rgba(15, 23, 42, 0.14) 0 10px 24px;
+  --twoslash-docs-color: oklch(0.52 0.012 260);
+  --twoslash-docs-font: ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --twoslash-code-font:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+    monospace;
+  --twoslash-code-font-size: 0.95em;
+  --twoslash-matched-color: var(--color-foreground);
+  --twoslash-unmatched-color: oklch(0.62 0.015 260);
+  --twoslash-cursor-color: oklch(0.62 0.015 260 / 0.5);
+  --twoslash-error-color: oklch(0.64 0.2 20);
+  --twoslash-error-bg: oklch(0.64 0.2 20 / 0.12);
+  --twoslash-warn-color: oklch(0.7 0.15 75);
+  --twoslash-warn-bg: oklch(0.7 0.15 75 / 0.14);
+  --twoslash-tag-color: oklch(0.59 0.15 250);
+  --twoslash-tag-bg: oklch(0.59 0.15 250 / 0.14);
+  --twoslash-tag-warn-color: var(--twoslash-warn-color);
+  --twoslash-tag-warn-bg: var(--twoslash-warn-bg);
+  --twoslash-tag-annotate-color: oklch(0.62 0.13 170);
+  --twoslash-tag-annotate-bg: oklch(0.62 0.13 170 / 0.12);
+  color-scheme: light;
+}
+
+/* ── VueFlow: clean slate ──────────────────────────────────── */
+
+.vue-flow {
+  --vf-node-bg: transparent;
+  --vf-node-color: var(--color-foreground);
+  --vf-box-shadow: none;
+  background-image: radial-gradient(circle, var(--fn-grid-dot) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.vue-flow__node {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+/* Edges */
+.vue-flow__edge-path {
+  stroke: var(--fn-edge) !important;
+  stroke-width: 1.5px !important;
+}
+
+.vue-flow__edge.animated path {
+  stroke-dasharray: 6 4;
+  animation: edge-flow 2s linear infinite;
+}
+
+.vue-flow__edge.edge-kind-success .vue-flow__edge-path,
+.vue-flow__edge-path.edge-kind-success {
+  stroke: var(--fn-edge-success) !important;
+}
+
+.vue-flow__edge.edge-kind-error .vue-flow__edge-path,
+.vue-flow__edge-path.edge-kind-error {
+  stroke: var(--fn-edge-error) !important;
+}
+
+.vue-flow__edge.edge-kind-warning .vue-flow__edge-path,
+.vue-flow__edge-path.edge-kind-warning {
+  stroke: var(--fn-edge-warning) !important;
+}
+
+.vue-flow__edge.edge-kind-retry .vue-flow__edge-path,
+.vue-flow__edge-path.edge-kind-retry {
+  stroke: var(--fn-edge-retry) !important;
+}
+
+.vue-flow__edge.edge-kind-async .vue-flow__edge-path,
+.vue-flow__edge-path.edge-kind-async {
+  stroke: var(--fn-edge-async) !important;
+}
+
+.vue-flow__edge-text {
+  fill: var(--color-foreground);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.vue-flow__edge-textbg {
+  fill: var(--color-card);
+  stroke: var(--color-border);
+}
+
+.vue-flow__edge.selected .vue-flow__edge-path,
+.vue-flow__edge.active-edge .vue-flow__edge-path,
+.vue-flow__edge-path.active-edge {
+  stroke: var(--fn-edge-active) !important;
+  stroke-width: 2px !important;
+  filter: drop-shadow(0 0 4px var(--fn-edge-active-glow));
+}
+
+@keyframes edge-flow {
+  to {
+    stroke-dashoffset: -20;
+  }
+}
+
+/* Handles: tiny and subtle */
+.vue-flow__handle {
+  width: 6px !important;
+  height: 6px !important;
+  border: 1.5px solid var(--fn-handle-border) !important;
+  background: var(--fn-handle-bg) !important;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.vue-flow__node:hover .vue-flow__handle {
+  opacity: 1;
+}
+
+/* Background dots */
+.vue-flow__background pattern circle {
+  fill: var(--fn-grid-dot) !important;
+}
+
+/* ── Shiki ─────────────────────────────────────────────────── */
+
+.shiki-magic-move-container {
+  background: transparent !important;
+  font-size: 12px !important;
+  line-height: 1.65 !important;
+}
+
+.shiki-magic-move-container pre {
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.flow-narrator .twoslash {
+  font-family: var(--twoslash-code-font);
+}
+
+.flow-narrator .twoslash .twoslash-popup-container {
+  backdrop-filter: blur(8px);
+}
+
+.flow-narrator .twoslash .twoslash-popup-code .line {
+  white-space: pre;
+}
+
+/* ── Node cards ────────────────────────────────────────────── */
+
+.fn-node {
+  transition:
+    opacity 0.4s ease,
+    filter 0.4s ease,
+    transform 0.3s ease;
+}
+
+.fn-node[data-active="false"] {
+  opacity: 0.35;
+  filter: var(--fn-inactive-filter);
+}
+
+.fn-node[data-active="true"] {
+  opacity: 1;
+  filter: none;
+}
+
+.flow-narrator[data-focus-mode="overview"] .fn-node[data-active="false"] {
+  opacity: 1;
+  filter: none;
+}
+
+.flow-narrator[data-focus-mode="overview"] .vue-flow__edge-path {
+  stroke: var(--fn-edge-overview) !important;
+  stroke-width: 1.8px !important;
+}

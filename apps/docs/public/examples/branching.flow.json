@@ -1,0 +1,94 @@
+{
+  "root": "timeline",
+  "state": { "currentStep": 0, "playing": false },
+  "elements": {
+    "timeline": {
+      "type": "FlowTimeline",
+      "props": {
+        "title": "Webhook Dispatch",
+        "description": "Inbound webhook → validate → route → deliver or quarantine",
+        "mode": "narrative",
+        "minHeight": 440,
+        "layoutEngine": "dagre",
+        "layoutRankSep": 260,
+        "layoutNodeSep": 180
+      },
+      "children": ["trigger-entry"]
+    },
+    "trigger-entry": {
+      "type": "TriggerNode",
+      "props": {
+        "label": "POST /webhooks/inbound",
+        "description": "Third-party event delivery endpoint",
+        "color": "#6366f1",
+        "sourceAnchor": { "path": "src/webhooks/inbound.ts", "line": 1 },
+        "transitions": [
+          { "to": "decision-validate", "label": "Verify signature", "kind": "default" }
+        ]
+      },
+      "children": ["decision-validate"]
+    },
+    "decision-validate": {
+      "type": "DecisionNode",
+      "props": {
+        "label": "Signature valid?",
+        "condition": "hmac(secret, rawBody) === header['x-signature']",
+        "description": "HMAC-SHA256 verification against the registered webhook secret.",
+        "sourceAnchor": { "path": "src/webhooks/verify.ts", "line": 12 },
+        "transitions": [
+          { "to": "payload-normalize", "label": "Valid", "kind": "success" },
+          { "to": "error-rejected", "label": "Invalid", "kind": "error" }
+        ]
+      },
+      "children": ["payload-normalize", "error-rejected"]
+    },
+    "payload-normalize": {
+      "type": "PayloadNode",
+      "props": {
+        "label": "Normalized event",
+        "description": "Coerce vendor-specific envelope into internal event shape.",
+        "format": "json",
+        "before": "{\n  \"event\": \"customer.updated\",\n  \"data\": { \"id\": \"cus_123\", \"email\": \"USER@EXAMPLE.COM\" },\n  \"created\": 1714000000\n}",
+        "after": "{\n  \"type\": \"customer.updated\",\n  \"customerId\": \"cus_123\",\n  \"email\": \"user@example.com\",\n  \"timestamp\": \"2024-04-25T00:00:00Z\"\n}",
+        "sourceAnchor": { "path": "src/webhooks/normalize.ts", "line": 8 },
+        "transitions": [{ "to": "code-deliver", "label": "Queue delivery", "kind": "async" }]
+      },
+      "children": ["code-deliver"]
+    },
+    "code-deliver": {
+      "type": "CodeNode",
+      "props": {
+        "label": "Queue for delivery",
+        "file": "src/webhooks/queue.ts",
+        "language": "typescript",
+        "code": "export async function enqueueDelivery(event: NormalizedEvent) {\n  await queue.publish('webhook.deliver', {\n    ...event,\n    deliveryId: crypto.randomUUID(),\n    attempts: 0,\n  })\n}",
+        "comment": "Publishes to the delivery queue with idempotency key.",
+        "story": "The normalized event enters the retry-capable delivery queue. Workers attempt delivery up to 5 times with exponential backoff.",
+        "sourceAnchor": { "path": "src/webhooks/queue.ts", "line": 3 },
+        "transitions": [{ "to": "link-dashboard", "label": "Monitor delivery", "kind": "default" }]
+      },
+      "children": ["link-dashboard"]
+    },
+    "error-rejected": {
+      "type": "ErrorNode",
+      "props": {
+        "label": "Signature mismatch",
+        "message": "Webhook rejected — HMAC verification failed",
+        "code": "WEBHOOK-401",
+        "cause": "Signature in header does not match expected HMAC-SHA256 digest.",
+        "mitigation": "Return 401, log the rejection with raw headers, and alert if rejection rate exceeds 1%.",
+        "sourceAnchor": { "path": "src/webhooks/verify.ts", "line": 28 },
+        "transitions": [{ "to": "link-dashboard", "label": "View rejections", "kind": "warning" }]
+      },
+      "children": ["link-dashboard"]
+    },
+    "link-dashboard": {
+      "type": "LinkNode",
+      "props": {
+        "label": "Webhook delivery dashboard",
+        "href": "https://example.com/dashboards/webhooks",
+        "description": "Tracks delivery success rate, retry queue depth, and rejection events."
+      }
+    }
+  }
+}

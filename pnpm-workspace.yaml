@@ -1,0 +1,4 @@
+packages:
+  - apps/docs
+  - apps/viewer
+  - packages/*

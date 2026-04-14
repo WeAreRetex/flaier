@@ -5,8 +5,8 @@ Nuxt viewer layer/app for browsing local Flow Narrator specs.
 ## Run
 
 ```bash
-bun install
-bun run dev
+pnpm install
+pnpm dev
 ```
 
 ## Local specs directory
@@ -20,7 +20,7 @@ By default, the app reads specs from:
 Override with:
 
 ```bash
-FLOW_SPECS_DIR=/absolute/or/relative/path bun run dev
+FLOW_SPECS_DIR=/absolute/or/relative/path pnpm dev
 ```
 
 The app serves:
@@ -36,17 +36,17 @@ This package is structured as a Nuxt layer (contains `nuxt.config.ts`, `pages/`,
 
 ## MDC component (Nuxt Content / Docus)
 
-The layer ships a markdown component at `components/content/FlowNarratorMdc.vue`.
-
-Use it in `.md`/`.mdc`:
+Install `@flow-narrator/nuxt`, enable the module, and use the globally registered `FlowNarratorMdc` component in `.md`/`.mdc`:
 
 ```md
-::FlowNarratorMdc
----
+## ::FlowNarratorMdc
+
 src: /api/flows/manifest
 interval: 3200
 height: min(70vh, 780px)
+
 ---
+
 ::
 ```
 
