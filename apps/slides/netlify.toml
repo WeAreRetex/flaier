@@ -1,0 +1,6 @@
+[build]
+  command = "pnpm install --frozen-lockfile && pnpm --dir apps/slides build"
+  publish = "apps/slides/dist"
+
+[build.environment]
+  NODE_VERSION = "22"

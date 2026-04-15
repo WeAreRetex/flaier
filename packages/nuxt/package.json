@@ -1,13 +1,36 @@
 {
   "name": "@flaier/nuxt",
   "version": "0.1.0",
+  "description": "Nuxt module and wrapper components for Flaier flows in Nuxt and Docus.",
+  "license": "MIT",
+  "keywords": [
+    "flaier",
+    "nuxt",
+    "docus",
+    "flow",
+    "diagram"
+  ],
+  "homepage": "https://github.com/Rigo-m/flow-visualizer/tree/main/packages/nuxt#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Rigo-m/flow-visualizer.git",
+    "directory": "packages/nuxt"
+  },
+  "bugs": {
+    "url": "https://github.com/Rigo-m/flow-visualizer/issues"
+  },
   "files": [
     "module.ts",
     "runtime"
   ],
   "type": "module",
+  "types": "./module.ts",
   "exports": {
     ".": "./module.ts"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   },
   "dependencies": {
     "@nuxt/kit": "^4.4.0",

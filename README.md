@@ -27,6 +27,22 @@ pnpm slides:dev
 - `pnpm docs:dev` runs the docs site.
 - `pnpm slides:dev` runs the Slidev example deck.
 
+## Release
+
+```bash
+pnpm release
+pnpm release:minor
+pnpm release:major
+```
+
+These commands use `changelogen` to bump the root version and changelog, sync the same version into every workspace app/package, create a `chore(release): vX.Y.Z` commit, and tag `vX.Y.Z`. Pushing that tag triggers the npm release workflow for `@flaier/core` and `@flaier/nuxt`.
+
+## Netlify
+
+- `apps/docs` deploys with `pnpm --dir apps/docs build`. On Netlify, Nitro detects the platform automatically. Set the Netlify package directory to `apps/docs`.
+- `apps/slides` ships an app-local `netlify.toml` that builds the Slidev deck to `apps/slides/dist`.
+- For each Netlify site, set the app directory as the package directory and leave the base directory at the repo root.
+
 ## AI Artifact Model
 
 `Flaier` accepts:

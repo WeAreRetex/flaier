@@ -3,6 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "description": "Spec-driven flow visualizer for AI-generated codebase storytelling.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Rigo-m/flow-visualizer.git"
+  },
+  "homepage": "https://github.com/Rigo-m/flow-visualizer#readme",
+  "bugs": {
+    "url": "https://github.com/Rigo-m/flow-visualizer/issues"
+  },
+  "changelog": {
+    "repo": "Rigo-m/flow-visualizer"
+  },
   "scripts": {
     "dev": "vp run @flaier/viewer#dev",
     "build": "vp run @flaier/core#build",
@@ -19,14 +32,15 @@
     "agents:scaffold": "FLAIER_ROOT=$PWD vp run @flaier/agents#scaffold",
     "agents:manifest": "FLAIER_ROOT=$PWD vp run @flaier/agents#manifest",
     "agents:validate": "FLAIER_ROOT=$PWD vp run @flaier/agents#validate",
-    "release": "vp exec changelogen --bump --output && git push --follow-tags",
-    "release:minor": "vp exec changelogen --bump --minor --output && git push --follow-tags",
-    "release:major": "vp exec changelogen --bump --major --output && git push --follow-tags"
+    "version:sync": "node ./scripts/sync-workspace-version.mjs",
+    "release": "node ./scripts/release.mjs && git push --follow-tags",
+    "release:minor": "node ./scripts/release.mjs minor && git push --follow-tags",
+    "release:major": "node ./scripts/release.mjs major && git push --follow-tags"
   },
   "dependencies": {
     "@dagrejs/dagre": "^2.0.4",
-    "@json-render/core": "latest",
-    "@json-render/vue": "latest",
+    "@json-render/core": "^0.17.0",
+    "@json-render/vue": "^0.17.0",
     "@shikijs/twoslash": "^3",
     "@vue-flow/core": "^1",
     "html-to-image": "^1.11.11",
@@ -39,7 +53,7 @@
     "@tailwindcss/vite": "^4",
     "@vitejs/plugin-vue": "^6.0.6",
     "changelogen": "^0.6.2",
-    "nuxt": "latest",
+    "nuxt": "^4.4.2",
     "tailwindcss": "^4",
     "tsx": "^4.20.6",
     "typescript": "^5",

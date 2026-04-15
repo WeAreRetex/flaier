@@ -14,6 +14,7 @@ import {
   defineComponent,
   getCurrentInstance,
   h,
+  markRaw,
   nextTick,
   onMounted,
   onUnmounted,
@@ -1212,12 +1213,16 @@ function resolveNodeSourceAnchor(nodeProps: Record<string, unknown>) {
   } satisfies ParsedSourceAnchor;
 }
 
-function createCustomNodeContext(node: OrderedNodeElement): FlaierCustomNodeContext<Record<string, unknown>> {
+function createCustomNodeContext(
+  node: OrderedNodeElement,
+): FlaierCustomNodeContext<Record<string, unknown>> {
   return {
     key: node.key,
     elementType: node.element.type,
     props: node.element.props,
-    sourceAnchor: resolveNodeSourceAnchor(node.element.props) as FlaierResolvedSourceAnchor | undefined,
+    sourceAnchor: resolveNodeSourceAnchor(node.element.props) as
+      | FlaierResolvedSourceAnchor
+      | undefined,
   };
 }
 
@@ -1296,40 +1301,42 @@ function createCustomNodeRenderer(
   definition: FlaierCustomNodeDefinition,
   displayName: string,
 ) {
-  return defineComponent<NodeProps<FlowNodeData>>({
-    name: `Flaier${displayName}Node`,
-    props: [
-      "id",
-      "type",
-      "selected",
-      "connectable",
-      "position",
-      "dimensions",
-      "label",
-      "isValidTargetPos",
-      "isValidSourcePos",
-      "parent",
-      "parentNodeId",
-      "dragging",
-      "resizing",
-      "zIndex",
-      "targetPosition",
-      "sourcePosition",
-      "dragHandle",
-      "data",
-      "events",
-    ],
-    setup(nodeProps) {
-      return () =>
-        h(definition.component, {
-          ...(nodeProps.data?.props ?? {}),
-          active: nodeProps.data?.active,
-          nodeKey: nodeProps.data?.key,
-          elementType: nodeProps.data?.elementType ?? elementType,
-          sourceAnchor: nodeProps.data?.sourceAnchor,
-        });
-    },
-  });
+  return markRaw(
+    defineComponent<NodeProps<FlowNodeData>>({
+      name: `Flaier${displayName}Node`,
+      props: [
+        "id",
+        "type",
+        "selected",
+        "connectable",
+        "position",
+        "dimensions",
+        "label",
+        "isValidTargetPos",
+        "isValidSourcePos",
+        "parent",
+        "parentNodeId",
+        "dragging",
+        "resizing",
+        "zIndex",
+        "targetPosition",
+        "sourcePosition",
+        "dragHandle",
+        "data",
+        "events",
+      ],
+      setup(nodeProps) {
+        return () =>
+          h(definition.component, {
+            ...nodeProps.data?.props,
+            active: nodeProps.data?.active,
+            nodeKey: nodeProps.data?.key,
+            elementType: nodeProps.data?.elementType ?? elementType,
+            sourceAnchor: nodeProps.data?.sourceAnchor,
+          });
+      },
+    }),
+  );
 }
 
 const customNodeTypes = computed<NodeTypesObject>(() => {
@@ -3581,6 +3588,8 @@ onUnmounted(() => {
         :edges="edges"
         :node-types="customNodeTypes"
         :fit-view-on-init="false"
+        :elements-selectable="false"
+        :nodes-focusable="false"
         :nodes-draggable="false"
         :nodes-connectable="false"
         :zoom-on-scroll="true"

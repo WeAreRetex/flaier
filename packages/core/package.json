@@ -1,6 +1,24 @@
 {
   "name": "@flaier/core",
   "version": "0.1.0",
+  "description": "Vue components and registry helpers for rendering Flaier flow specs.",
+  "license": "MIT",
+  "keywords": [
+    "flaier",
+    "flow",
+    "diagram",
+    "visualizer",
+    "vue"
+  ],
+  "homepage": "https://github.com/Rigo-m/flow-visualizer/tree/main/packages/core#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Rigo-m/flow-visualizer.git",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/Rigo-m/flow-visualizer/issues"
+  },
   "files": [
     "dist"
   ],
@@ -17,15 +35,20 @@
     },
     "./style.css": "./dist/style.css"
   },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "scripts": {
-    "build": "vite build",
+    "build": "vp pack && vue-tsc --project tsconfig.build.json",
+    "dev": "vp pack --watch",
     "check": "vp check",
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
     "@dagrejs/dagre": "^2.0.4",
-    "@json-render/core": "latest",
-    "@json-render/vue": "latest",
+    "@json-render/core": "^0.17.0",
+    "@json-render/vue": "^0.17.0",
     "@shikijs/twoslash": "^3",
     "@vue-flow/core": "^1",
     "html-to-image": "^1.11.11",
@@ -35,12 +58,13 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4",
+    "@tailwindcss/postcss": "^4.2.2",
+    "@tsdown/css": "^0.21.7",
     "@vitejs/plugin-vue": "^6.0.6",
+    "postcss": "^8.5.9",
+    "postcss-import": "^16.1.1",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vite": "^6.4.1",
-    "vite-plugin-dts": "^4.5.4",
     "vite-plus": "^0.1.16",
     "vue": "^3.5",
     "vue-tsc": "^2"

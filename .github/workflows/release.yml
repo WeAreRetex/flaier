@@ -17,6 +17,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - run: corepack enable
+
       - uses: voidzero-dev/setup-vp@v1
         with:
           cache: true
@@ -25,18 +32,25 @@ jobs:
 
       - run: vp check
 
-      - run: BUILD_LIB=1 vp build
+      - run: pnpm --dir apps/viewer build
 
-      - name: Generate changelog
-        run: bunx changelogen --from=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || git rev-list --max-parents=0 HEAD) --to=${{ github.ref_name }} --output CHANGELOG.md
+      - run: pnpm --dir apps/docs build
+
+      - run: pnpm --dir apps/slides build
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          body_path: CHANGELOG.md
-          generate_release_notes: false
+        run: vp exec changelogen gh release ${{ github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
-      - name: Publish to npm
+      - name: Publish @flaier/core
+        working-directory: packages/core
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish @flaier/nuxt
+        working-directory: packages/nuxt
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

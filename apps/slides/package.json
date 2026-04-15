@@ -1,11 +1,16 @@
 {
   "name": "@flaier/slides",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
+  "license": "MIT",
   "scripts": {
-    "dev": "pnpm --dir ../../packages/core build && slidev --open",
-    "build": "pnpm --dir ../../packages/core build && slidev build",
-    "export": "pnpm --dir ../../packages/core build && slidev export"
+    "predev": "pnpm --dir ../../packages/core build",
+    "dev": "slidev --open",
+    "prebuild": "pnpm --dir ../../packages/core build",
+    "build": "slidev build",
+    "preexport": "pnpm --dir ../../packages/core build",
+    "export": "slidev export"
   },
   "dependencies": {
     "@flaier/core": "workspace:*",

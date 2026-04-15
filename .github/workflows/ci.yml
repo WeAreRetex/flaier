@@ -12,6 +12,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: corepack enable
+
       - uses: voidzero-dev/setup-vp@v1
         with:
           cache: true
@@ -20,4 +26,8 @@ jobs:
 
       - run: vp check
 
-      - run: BUILD_LIB=1 vp build
+      - run: pnpm --dir apps/viewer build
+
+      - run: pnpm --dir apps/docs build
+
+      - run: pnpm --dir apps/slides build

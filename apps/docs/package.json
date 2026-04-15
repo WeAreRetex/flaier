@@ -1,18 +1,22 @@
 {
   "name": "@flaier/docs",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
+  "license": "MIT",
   "scripts": {
     "dev": "nuxt dev --extends docus",
-    "build": "nuxt build --extends docus",
-    "generate": "nuxt generate --extends docus",
-    "preview": "nuxt preview --extends docus"
+    "prebuild": "pnpm --dir ../../packages/core build",
+    "build": "NUXT_CONTENT_LOCAL_DB=.data/content/build.sqlite nuxt build --extends docus",
+    "pregenerate": "pnpm --dir ../../packages/core build",
+    "generate": "NUXT_CONTENT_LOCAL_DB=.data/content/generate.sqlite nuxt generate --extends docus",
+    "preview": "NUXT_CONTENT_LOCAL_DB=.data/content/preview.sqlite nuxt preview --extends docus"
   },
   "dependencies": {
-    "@flaier/nuxt": "../../packages/nuxt",
-    "docus": "latest",
-    "@flaier/core": "../../packages/core",
-    "nuxt": "latest",
+    "@flaier/nuxt": "workspace:*",
+    "docus": "^5.9.0",
+    "@flaier/core": "workspace:*",
+    "nuxt": "^4.4.2",
     "zod": "^3.25.0",
     "zod-to-json-schema": "^3.25.2"
   },
