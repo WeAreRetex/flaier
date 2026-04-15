@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.1.7
+
+[compare changes](https://github.com/WeAreRetex/flaier/compare/v0.1.6...v0.1.7)
+
+### 🩹 Fixes
+
+- Allow CI publishes from tag checkouts ([355cc29](https://github.com/WeAreRetex/flaier/commit/355cc29))
+
+### ❤️ Contributors
+
+- Rigo-m ([@Rigo-m](https://github.com/Rigo-m))
+
 ## v0.1.6
 
 [compare changes](https://github.com/WeAreRetex/flaier/compare/v0.1.5...v0.1.6)
