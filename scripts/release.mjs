@@ -34,6 +34,21 @@ function run(command, args) {
   }
 }
 
+function readReleaseNotes(version) {
+  const changelog = readFileSync(resolve(rootDir, "CHANGELOG.md"), "utf8");
+  const heading = `## v${version}`;
+  const start = changelog.indexOf(heading);
+
+  if (start === -1) {
+    throw new Error(`Unable to find ${heading} in CHANGELOG.md`);
+  }
+
+  const remaining = changelog.slice(start).trim();
+  const nextHeading = remaining.indexOf("\n## ", heading.length);
+
+  return (nextHeading === -1 ? remaining : remaining.slice(0, nextHeading)).trim();
+}
+
 const changelogenArgs = ["exec", "changelogen", "--bump", "--output"];
 
 if (releaseType !== "patch") {
@@ -44,7 +59,8 @@ run("vp", changelogenArgs);
 run("node", ["./scripts/sync-workspace-version.mjs"]);
 
 const version = JSON.parse(readFileSync(resolve(rootDir, "package.json"), "utf8")).version;
+const releaseNotes = readReleaseNotes(version);
 
 run("git", ["add", ...releaseFiles]);
 run("git", ["commit", "-m", `chore(release): v${version}`]);
-run("git", ["tag", `v${version}`]);
+run("git", ["tag", "-a", `v${version}`, "-m", releaseNotes]);

@@ -8,8 +8,6 @@ const siteUrl =
   process.env.NUXT_SITE_URL ??
   "https://flaier.local";
 const siteDomain = new URL(siteUrl).hostname;
-const localContentDatabase =
-  process.env.NUXT_CONTENT_LOCAL_DB ?? `.data/content/dev-${process.pid}.sqlite`;
 const coreSourceAliases =
   process.env.NODE_ENV === "production"
     ? []
@@ -26,10 +24,16 @@ const coreSourceAliases =
 
 export default defineNuxtConfig({
   modules: ["@flaier/nuxt"],
-  content: {
-    _localDatabase: {
-      type: "sqlite",
-      filename: localContentDatabase,
+  ogImage: {
+    zeroRuntime: true,
+    compatibility: {
+      // Prefer the WASM Takumi binding in CI/deploy builds to avoid native renderer crashes.
+      prerender: {
+        takumi: "wasm",
+      },
+      runtime: {
+        takumi: "wasm",
+      },
     },
   },
   site: {

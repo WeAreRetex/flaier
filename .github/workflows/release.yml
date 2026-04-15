@@ -32,14 +32,17 @@ jobs:
 
       - run: vp check
 
-      - run: pnpm --dir apps/viewer build
+      - run: pnpm --dir packages/core build
 
-      - run: pnpm --dir apps/docs build
-
-      - run: pnpm --dir apps/slides build
-
-      - name: Create GitHub Release
-        run: vp exec changelogen gh release ${{ github.ref_name }}
+      - name: Create or update GitHub Release
+        run: |
+          NOTES_FILE="$(mktemp)"
+          git tag -l --format='%(contents)' "${{ github.ref_name }}" > "$NOTES_FILE"
+          if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
+            gh release edit "${{ github.ref_name }}" --title "${{ github.ref_name }}" --notes-file "$NOTES_FILE"
+          else
+            gh release create "${{ github.ref_name }}" --verify-tag --title "${{ github.ref_name }}" --notes-file "$NOTES_FILE"
+          fi
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
