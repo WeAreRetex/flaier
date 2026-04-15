@@ -133,6 +133,10 @@ const DEFAULT_DAGRE_NODE_SEP_VERTICAL = 120;
 const DEFAULT_DAGRE_EDGE_SEP = 30;
 const OVERVIEW_ENTER_ZOOM = 0.52;
 const OVERVIEW_EXIT_ZOOM = 0.62;
+const NARRATIVE_FOCUS_HORIZONTAL_CONTEXT = 420;
+const NARRATIVE_FOCUS_VERTICAL_CONTEXT = 320;
+const NARRATIVE_FOCUS_MIN_ZOOM = 0.58;
+const NARRATIVE_FOCUS_MAX_ZOOM = 1.35;
 const FLAIER_THEME_STORAGE_KEY = "flaier-ui-theme";
 const ARCHITECTURE_ZONE_MIN_CONTENT_PADDING = 44;
 const ARCHITECTURE_ZONE_MIN_BOTTOM_PADDING = 88;
@@ -2009,9 +2013,19 @@ function clearTimer() {
   }
 }
 
-function next() {
+function pauseNarrativePlayback() {
+  if (!isArchitectureMode.value) {
+    playing.value = false;
+  }
+}
+
+function next(manual = true) {
   if (isArchitectureMode.value) {
     return false;
+  }
+
+  if (manual) {
+    pauseNarrativePlayback();
   }
 
   if (currentStep.value >= totalSteps.value - 1) {
@@ -2030,7 +2044,7 @@ watch(
     if (!isPlaying || steps <= 1) return;
 
     timer = setInterval(() => {
-      const advanced = next();
+      const advanced = next(false);
       if (!advanced) {
         playing.value = false;
       }
@@ -2039,9 +2053,13 @@ watch(
   { immediate: true },
 );
 
-function prev() {
+function prev(manual = true) {
   if (isArchitectureMode.value) {
     return;
+  }
+
+  if (manual) {
+    pauseNarrativePlayback();
   }
 
   if (currentStep.value > 0) {
@@ -2049,9 +2067,13 @@ function prev() {
   }
 }
 
-function goTo(step: number) {
+function goTo(step: number, manual = true) {
   if (isArchitectureMode.value) {
     return;
+  }
+
+  if (manual) {
+    pauseNarrativePlayback();
   }
 
   currentStep.value = clampStep(step);
@@ -3167,6 +3189,8 @@ function chooseChoice(choiceId: string) {
   const node = activeNode.value;
   if (!node) return;
 
+  pauseNarrativePlayback();
+
   const options = outgoingNodeKeys.value[node.key] ?? [];
   if (!options.includes(choiceId)) return;
 
@@ -3378,6 +3402,20 @@ async function waitForViewportLayoutStability() {
   await nextTick();
 }
 
+function getNarrativeFocusZoom(size: NodeSize) {
+  const width = Math.max(1, containerWidth.value);
+  const height = Math.max(1, containerHeight.value);
+  const focusWidth = Math.max(size.width * 1.35, size.width + NARRATIVE_FOCUS_HORIZONTAL_CONTEXT);
+  const focusHeight = Math.max(size.height * 1.45, size.height + NARRATIVE_FOCUS_VERTICAL_CONTEXT);
+  const zoom = Math.min(width / focusWidth, height / focusHeight);
+
+  if (!Number.isFinite(zoom)) {
+    return 1;
+  }
+
+  return Math.max(NARRATIVE_FOCUS_MIN_ZOOM, Math.min(NARRATIVE_FOCUS_MAX_ZOOM, zoom));
+}
+
 const sceneStyle = computed<Record<string, string>>(() => ({
   height: `${Math.max(containerHeight.value, containerMinHeight.value)}px`,
 }));
@@ -3435,26 +3473,24 @@ async function refitViewportAfterContainerChange() {
     return;
   }
 
-  await Promise.resolve(
-    fitView({
-      duration: 280,
-      padding: 0.3,
-      maxZoom: 0.95,
-    }),
-  );
-
   const target = narrativeFocusTarget.value;
   if (!target) {
+    await Promise.resolve(
+      fitView({
+        duration: 280,
+        padding: 0.3,
+        maxZoom: 0.95,
+      }),
+    );
     return;
   }
 
   await nextTick();
 
-  const zoom = Number.isFinite(viewport.value.zoom) ? viewport.value.zoom : 1;
   await Promise.resolve(
     setCenter(target.x, target.y, {
       duration: 280,
-      zoom,
+      zoom: target.zoom,
     }),
   );
 }
@@ -3484,6 +3520,7 @@ const narrativeFocusTarget = computed(() => {
 
   return {
     signature: [
+      currentStep.value,
       node.id,
       Math.round(node.position.x),
       Math.round(node.position.y),
@@ -3494,10 +3531,12 @@ const narrativeFocusTarget = computed(() => {
     ].join(":"),
     x: node.position.x + size.width / 2,
     y: node.position.y + size.height / 2,
+    zoom: getNarrativeFocusZoom(size),
   };
 });
 
 const narrativeFitSignature = ref("");
+const suppressNarrativeResizeFit = ref(false);
 
 watch(
   [viewportReady, isArchitectureMode, nodes, containerWidth, containerHeight],
@@ -3512,6 +3551,11 @@ watch(
     ].join("|");
 
     if (signature === narrativeFitSignature.value) {
+      return;
+    }
+
+    if (suppressNarrativeResizeFit.value && narrativeFocusTarget.value) {
+      narrativeFitSignature.value = signature;
       return;
     }
 
@@ -3534,10 +3578,8 @@ watch(
     const target = narrativeFocusTarget.value;
     if (!target) return;
 
-    const zoom = Number.isFinite(viewport.value.zoom) ? viewport.value.zoom : 1;
-
     nextTick(() => {
-      void setCenter(target.x, target.y, { duration: 280, zoom });
+      void setCenter(target.x, target.y, { duration: 280, zoom: target.zoom });
     });
   },
   { immediate: true },
@@ -3586,7 +3628,23 @@ watch(
     narrativeFitSignature.value = "";
     architectureFitSignature.value = "";
 
-    void refitViewportAfterContainerChange();
+    const shouldSuppressNarrativeFit = Boolean(narrativeFocusTarget.value);
+
+    if (shouldSuppressNarrativeFit) {
+      suppressNarrativeResizeFit.value = true;
+    }
+
+    void (async () => {
+      try {
+        await refitViewportAfterContainerChange();
+      } finally {
+        if (shouldSuppressNarrativeFit) {
+          await waitForAnimationFrame();
+          await waitForAnimationFrame();
+          suppressNarrativeResizeFit.value = false;
+        }
+      }
+    })();
   },
   { immediate: true },
 );
