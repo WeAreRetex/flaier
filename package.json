@@ -1,16 +1,16 @@
 {
-  "name": "flow-visualizer",
+  "name": "flaier",
   "version": "0.1.0",
   "private": true,
   "description": "Spec-driven flow visualizer for AI-generated codebase storytelling.",
-  "homepage": "https://github.com/Rigo-m/flow-visualizer#readme",
+  "homepage": "https://github.com/WeAreRetex/flaier#readme",
   "bugs": {
-    "url": "https://github.com/Rigo-m/flow-visualizer/issues"
+    "url": "https://github.com/WeAreRetex/flaier/issues"
   },
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Rigo-m/flow-visualizer.git"
+    "url": "git+https://github.com/WeAreRetex/flaier.git"
   },
   "type": "module",
   "scripts": {
@@ -61,6 +61,6 @@
   },
   "packageManager": "pnpm@10.33.0",
   "changelog": {
-    "repo": "Rigo-m/flow-visualizer"
+    "repo": "WeAreRetex/flaier"
   }
 }

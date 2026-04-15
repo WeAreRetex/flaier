@@ -13,7 +13,7 @@ links:
     icon: i-heroicons-arrow-right
     color: primary
   - label: View on GitHub
-    to: https://github.com/Rigo-m/flow-visualizer
+    to: https://github.com/WeAreRetex/flaier
     icon: i-simple-icons-github
     color: neutral
     variant: outline

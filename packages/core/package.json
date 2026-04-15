@@ -9,14 +9,14 @@
     "visualizer",
     "vue"
   ],
-  "homepage": "https://github.com/Rigo-m/flow-visualizer/tree/main/packages/core#readme",
+  "homepage": "https://github.com/WeAreRetex/flaier/tree/main/packages/core#readme",
   "bugs": {
-    "url": "https://github.com/Rigo-m/flow-visualizer/issues"
+    "url": "https://github.com/WeAreRetex/flaier/issues"
   },
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Rigo-m/flow-visualizer.git",
+    "url": "git+https://github.com/WeAreRetex/flaier.git",
     "directory": "packages/core"
   },
   "files": [

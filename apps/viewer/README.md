@@ -1,6 +1,12 @@
 # @flaier/viewer
 
-Nuxt viewer layer/app for browsing local Flaier specs.
+Local Nuxt app and reusable layer for browsing Flaier manifests and flow specs during development.
+
+## What It Does
+
+- Serves a local manifest API for `Flaier` and the Nuxt wrapper components.
+- Loads `manifest.json` when it exists and synthesizes one when it does not.
+- Works as either a standalone app or a base layer for another Nuxt project.
 
 ## Run
 
@@ -61,6 +67,13 @@ The API normalizes manifest entries so the browser always loads selected flows v
 ## Layer usage
 
 This package is structured as a Nuxt layer (contains `nuxt.config.ts`, `pages/`, `server/`, and `app.vue`) and can be used directly as an app or extended from another Nuxt project.
+
+## Links
+
+- Repository: https://github.com/WeAreRetex/flaier
+- Docs source: https://github.com/WeAreRetex/flaier/tree/main/apps/docs
+- Core package: https://www.npmjs.com/package/@flaier/core
+- Nuxt package: https://www.npmjs.com/package/@flaier/nuxt
 
 ## Nuxt wrappers
 

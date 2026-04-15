@@ -127,9 +127,7 @@ function validateAndPrintSpec(spec: FlowSpec, label: string, flowId?: string) {
   const readiness = validateFlaierReadiness(normalizedSpec);
   if (readiness.errors.length > 0) {
     const header = flowId ? `Flow ${flowId}` : "Spec";
-    throw new Error(
-      `${header} is not flow-visualizer ready (${label}):\n${formatIssues(readiness.errors)}`,
-    );
+    throw new Error(`${header} is not Flaier-ready (${label}):\n${formatIssues(readiness.errors)}`);
   }
 
   if (readiness.warnings.length > 0) {

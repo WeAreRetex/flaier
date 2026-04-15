@@ -63,7 +63,7 @@ function assertGeneratedSpec(spec: FlowSpec) {
   const readiness = validateFlaierReadiness(spec);
   if (readiness.errors.length > 0) {
     throw new Error(
-      `Internal error: generated scaffold is not flow-visualizer ready:\n${formatIssues(readiness.errors)}`,
+      `Internal error: generated scaffold is not Flaier-ready:\n${formatIssues(readiness.errors)}`,
     );
   }
 }
@@ -713,7 +713,7 @@ function formatIssues(issues: string[]) {
 function printUsage() {
   console.log(
     [
-      "Generate a flow-visualizer-ready flow scaffold.",
+      "Generate a Flaier-ready flow scaffold.",
       "",
       "Usage:",
       '  pnpm run scaffold -- --title "Checkout Flow" --out ./flow-specs/checkout.flow.json',
