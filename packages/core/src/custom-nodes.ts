@@ -90,8 +90,7 @@ export function createFlaierCustomRegistryComponents(nodes?: FlaierCustomNodeDef
     return {};
   }
 
-  return Object.fromEntries(Object.keys(normalizedNodes).map((name) => [name, FlaierNullNode])) as Record<
-    string,
-    Component
-  >;
+  return Object.fromEntries(
+    Object.keys(normalizedNodes).map((name) => [name, FlaierNullNode]),
+  ) as Record<string, Component>;
 }

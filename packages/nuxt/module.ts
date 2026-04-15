@@ -1,4 +1,10 @@
-import { addComponentsDir, addImportsDir, addServerHandler, createResolver, defineNuxtModule } from "@nuxt/kit";
+import {
+  addComponentsDir,
+  addImportsDir,
+  addServerHandler,
+  createResolver,
+  defineNuxtModule,
+} from "@nuxt/kit";
 
 export interface FlaierNuxtOptions {
   css?: boolean;

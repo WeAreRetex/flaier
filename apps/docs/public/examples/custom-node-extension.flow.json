@@ -8,13 +8,7 @@
         "description": "A live docs example that registers CalloutNode in Nuxt and uses it in the renderer.",
         "mode": "narrative"
       },
-      "children": [
-        "start",
-        "catalog-awareness",
-        "plugin-code",
-        "runtime-node",
-        "reference"
-      ]
+      "children": ["start", "catalog-awareness", "plugin-code", "runtime-node", "reference"]
     },
     "start": {
       "type": "TriggerNode",

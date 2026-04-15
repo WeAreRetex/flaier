@@ -8,14 +8,7 @@
         "description": "A docs example that themes panel chrome, edge strokes, built-in nodes, and a custom CalloutNode with CSS variables and stable hooks.",
         "mode": "narrative"
       },
-      "children": [
-        "trigger",
-        "callout-intro",
-        "code",
-        "payload",
-        "callout-finish",
-        "link"
-      ]
+      "children": ["trigger", "callout-intro", "code", "payload", "callout-finish", "link"]
     },
     "trigger": {
       "type": "TriggerNode",

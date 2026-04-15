@@ -26,7 +26,12 @@ const toneLabel = computed(() => {
 </script>
 
 <template>
-  <div class="fn-node fn-callout-node" :data-active="active" data-node-type="callout" :data-callout-tone="tone">
+  <div
+    class="fn-node fn-callout-node"
+    :data-active="active"
+    data-node-type="callout"
+    :data-callout-tone="tone"
+  >
     <Handle type="target" :position="Position.Left" />
 
     <div class="fn-callout-node__header">
@@ -65,12 +70,11 @@ const toneLabel = computed(() => {
   padding: 0.95rem 1rem;
   border-radius: 1rem;
   border: 1px solid color-mix(in oklch, var(--fn-callout-accent) 40%, var(--color-border));
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in oklch, var(--color-card) 92%, var(--fn-callout-accent) 8%),
-      color-mix(in oklch, var(--color-card) 97%, black 3%)
-    );
+  background: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--color-card) 92%, var(--fn-callout-accent) 8%),
+    color-mix(in oklch, var(--color-card) 97%, black 3%)
+  );
   box-shadow:
     inset 0 0 0 1px color-mix(in oklch, var(--fn-callout-accent) 12%, transparent),
     0 12px 28px rgba(15, 23, 42, 0.14);

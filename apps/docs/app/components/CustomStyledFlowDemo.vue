@@ -1,6 +1,11 @@
 <template>
   <div class="docs-styled-demo">
-    <FlaierDemo src="/examples/custom-styling.flow.json" :auto-play="true" :interval="2800" :height="580" />
+    <FlaierDemo
+      src="/examples/custom-styling.flow.json"
+      :auto-play="true"
+      :interval="2800"
+      :height="580"
+    />
   </div>
 </template>
 

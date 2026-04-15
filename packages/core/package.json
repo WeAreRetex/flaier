@@ -2,22 +2,22 @@
   "name": "@flaier/core",
   "version": "0.1.0",
   "description": "Vue components and registry helpers for rendering Flaier flow specs.",
-  "license": "MIT",
   "keywords": [
+    "diagram",
     "flaier",
     "flow",
-    "diagram",
     "visualizer",
     "vue"
   ],
   "homepage": "https://github.com/Rigo-m/flow-visualizer/tree/main/packages/core#readme",
+  "bugs": {
+    "url": "https://github.com/Rigo-m/flow-visualizer/issues"
+  },
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Rigo-m/flow-visualizer.git",
     "directory": "packages/core"
-  },
-  "bugs": {
-    "url": "https://github.com/Rigo-m/flow-visualizer/issues"
   },
   "files": [
     "dist"

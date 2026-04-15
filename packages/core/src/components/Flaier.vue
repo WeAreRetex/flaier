@@ -549,8 +549,8 @@ function handleStateChange(changes: Array<{ path: string; value: unknown }>) {
     <StateProvider
       v-else-if="resolvedSpec"
       :key="providerKey"
-        :initial-state="initialState"
-        :on-state-change="handleStateChange"
+      :initial-state="initialState"
+      :on-state-change="handleStateChange"
     >
       <ActionProvider>
         <VisibilityProvider>

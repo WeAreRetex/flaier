@@ -2,8 +2,8 @@
   "name": "@flaier/agents",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
   "license": "MIT",
+  "type": "module",
   "scripts": {
     "manifest": "tsx ./src/manifest.ts",
     "validate": "tsx ./src/validate.ts",

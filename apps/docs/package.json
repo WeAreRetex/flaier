@@ -2,8 +2,8 @@
   "name": "@flaier/docs",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
   "license": "MIT",
+  "type": "module",
   "scripts": {
     "dev": "nuxt dev --extends docus",
     "prebuild": "pnpm --dir ../../packages/core build",
@@ -13,9 +13,9 @@
     "preview": "NUXT_CONTENT_LOCAL_DB=.data/content/preview.sqlite nuxt preview --extends docus"
   },
   "dependencies": {
+    "@flaier/core": "workspace:*",
     "@flaier/nuxt": "workspace:*",
     "docus": "^5.9.0",
-    "@flaier/core": "workspace:*",
     "nuxt": "^4.4.2",
     "zod": "^3.25.0",
     "zod-to-json-schema": "^3.25.2"

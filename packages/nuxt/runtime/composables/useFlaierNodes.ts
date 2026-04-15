@@ -26,7 +26,9 @@ export function useRegisteredFlaierNodes() {
   return getNuxtNodeStore()._flaierNodes ?? {};
 }
 
-export function useMergedFlaierNodes(nodes?: MaybeRefOrGetter<FlaierCustomNodeDefinitions | undefined>) {
+export function useMergedFlaierNodes(
+  nodes?: MaybeRefOrGetter<FlaierCustomNodeDefinitions | undefined>,
+) {
   const registeredNodes = useRegisteredFlaierNodes();
 
   return computed(() => mergeFlaierCustomNodes(registeredNodes, unref(nodes)));

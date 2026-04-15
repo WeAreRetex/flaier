@@ -15,7 +15,12 @@ const manifestPaths = [
   "packages/nuxt/package.json",
 ];
 
-const dependencySections = ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"];
+const dependencySections = [
+  "dependencies",
+  "devDependencies",
+  "peerDependencies",
+  "optionalDependencies",
+];
 
 function readJson(filePath) {
   return JSON.parse(readFileSync(filePath, "utf8"));

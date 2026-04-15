@@ -2,8 +2,8 @@
   "name": "@flaier/slides",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
   "license": "MIT",
+  "type": "module",
   "scripts": {
     "predev": "pnpm --dir ../../packages/core build",
     "dev": "slidev --open",

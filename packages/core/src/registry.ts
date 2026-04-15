@@ -52,9 +52,9 @@ const baseRegistryResult = defineRegistry(catalog, {
 
 export const registry = baseRegistryResult.registry;
 
-export function createFlaierRendererRegistry<TNodes extends NonNullable<FlaierCatalogOptions["nodes"]>>(
-  options?: FlaierCatalogOptions<TNodes>,
-): ComponentRegistry {
+export function createFlaierRendererRegistry<
+  TNodes extends NonNullable<FlaierCatalogOptions["nodes"]>,
+>(options?: FlaierCatalogOptions<TNodes>): ComponentRegistry {
   return {
     ...registry,
     ...createFlaierCustomRegistryComponents(options?.nodes),

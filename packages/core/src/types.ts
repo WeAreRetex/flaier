@@ -248,7 +248,9 @@ export interface FlaierCustomNodeDefinition<TProps extends ZodTypeAny = ZodTypeA
 
 export type FlaierCustomNodeDefinitions = Record<string, FlaierCustomNodeDefinition>;
 
-export interface FlaierCatalogOptions<TNodes extends FlaierCustomNodeDefinitions = FlaierCustomNodeDefinitions> {
+export interface FlaierCatalogOptions<
+  TNodes extends FlaierCustomNodeDefinitions = FlaierCustomNodeDefinitions,
+> {
   nodes?: TNodes;
 }
 
