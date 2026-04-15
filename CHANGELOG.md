@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.1.2
+
+[compare changes](https://github.com/WeAreRetex/flaier/compare/v0.1.1...v0.1.2)
+
+### 🩹 Fixes
+
+- Readmes and docs ([5628cf3](https://github.com/WeAreRetex/flaier/commit/5628cf3))
+
+### ❤️ Contributors
+
+- Rigo-m ([@Rigo-m](https://github.com/Rigo-m))
+
 ## v0.1.1
 
 [compare changes](https://github.com/WeAreRetex/flaier/compare/v0.1.0...v0.1.1)
