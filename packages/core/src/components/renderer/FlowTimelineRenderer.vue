@@ -323,6 +323,9 @@ const containerReady = ref(false);
 const containerWidth = ref(0);
 const containerHeight = ref(0);
 const uiTheme = ref<"dark" | "light">("dark");
+let documentThemeObserver: MutationObserver | null = null;
+let documentThemeMediaQuery: MediaQueryList | null = null;
+let handleDocumentThemeMediaQueryChange: ((event: MediaQueryListEvent) => void) | null = null;
 const isLightTheme = computed(() => uiTheme.value === "light");
 const themeMode = computed(() => (props.themeMode === "document" ? "document" : "local"));
 const isArchitectureMode = computed(() => props.mode === "architecture");
@@ -411,7 +414,27 @@ function getDocumentTheme(): "dark" | "light" | null {
     return null;
   }
 
-  return document.documentElement.classList.contains("dark") ? "dark" : "light";
+  const root = document.documentElement;
+  const dataTheme = root.getAttribute("data-theme")?.trim().toLowerCase();
+
+  if (dataTheme === "dark" || dataTheme === "light") {
+    return dataTheme;
+  }
+
+  if (root.classList.contains("dark")) {
+    return "dark";
+  }
+
+  if (root.classList.contains("light")) {
+    return "light";
+  }
+
+  const colorScheme = root.style.colorScheme?.trim().toLowerCase();
+  if (colorScheme === "dark" || colorScheme === "light") {
+    return colorScheme;
+  }
+
+  return null;
 }
 
 function applyDocumentTheme(theme: "dark" | "light") {
@@ -434,6 +457,61 @@ function persistTheme(theme: "dark" | "light") {
   } catch {
     // no-op when storage is unavailable
   }
+}
+
+function syncDocumentTheme() {
+  uiTheme.value = getDocumentTheme() ?? getPreferredSystemTheme();
+}
+
+function startDocumentThemeSync() {
+  if (typeof document !== "undefined" && typeof MutationObserver !== "undefined") {
+    if (!documentThemeObserver) {
+      documentThemeObserver = new MutationObserver(() => {
+        syncDocumentTheme();
+      });
+
+      documentThemeObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["class", "style", "data-theme"],
+      });
+    }
+  }
+
+  if (typeof window !== "undefined" && typeof window.matchMedia === "function") {
+    if (!documentThemeMediaQuery) {
+      documentThemeMediaQuery = window.matchMedia("(prefers-color-scheme: light)");
+    }
+
+    if (!handleDocumentThemeMediaQueryChange) {
+      handleDocumentThemeMediaQueryChange = () => {
+        syncDocumentTheme();
+      };
+
+      if (typeof documentThemeMediaQuery.addEventListener === "function") {
+        documentThemeMediaQuery.addEventListener("change", handleDocumentThemeMediaQueryChange);
+      } else {
+        documentThemeMediaQuery.addListener(handleDocumentThemeMediaQueryChange);
+      }
+    }
+  }
+}
+
+function stopDocumentThemeSync() {
+  if (documentThemeObserver) {
+    documentThemeObserver.disconnect();
+    documentThemeObserver = null;
+  }
+
+  if (documentThemeMediaQuery && handleDocumentThemeMediaQueryChange) {
+    if (typeof documentThemeMediaQuery.removeEventListener === "function") {
+      documentThemeMediaQuery.removeEventListener("change", handleDocumentThemeMediaQueryChange);
+    } else {
+      documentThemeMediaQuery.removeListener(handleDocumentThemeMediaQueryChange);
+    }
+  }
+
+  handleDocumentThemeMediaQueryChange = null;
+  documentThemeMediaQuery = null;
 }
 
 function toggleHeaderDropdown() {
@@ -485,12 +563,20 @@ watch(uiTheme, (theme) => {
   persistTheme(theme);
 });
 
-watch(themeMode, (mode) => {
-  uiTheme.value =
-    mode === "document"
-      ? (getDocumentTheme() ?? getPreferredSystemTheme())
-      : (readStoredTheme() ?? getPreferredSystemTheme());
-});
+watch(
+  themeMode,
+  (mode) => {
+    if (mode === "document") {
+      startDocumentThemeSync();
+      syncDocumentTheme();
+      return;
+    }
+
+    stopDocumentThemeSync();
+    uiTheme.value = readStoredTheme() ?? getPreferredSystemTheme();
+  },
+  { immediate: true },
+);
 
 const rootElement = computed(() => {
   const activeSpec = spec.value;
@@ -3022,7 +3108,6 @@ const nodesInitialized = useNodesInitialized();
 const paneReady = ref(false);
 const overviewMode = ref(false);
 let resizeObserver: ResizeObserver | null = null;
-let documentThemeObserver: MutationObserver | null = null;
 
 const architectureZoneLayerStyle = computed(() => {
   const x = Number.isFinite(viewport.value.x) ? viewport.value.x : 0;
@@ -3156,25 +3241,9 @@ const sceneStyle = computed<Record<string, string>>(() => ({
 }));
 
 onMounted(() => {
-  uiTheme.value =
-    themeMode.value === "document"
-      ? (getDocumentTheme() ?? getPreferredSystemTheme())
-      : (readStoredTheme() ?? getPreferredSystemTheme());
-
   if (typeof document !== "undefined") {
     document.addEventListener("pointerdown", handleDocumentPointerDown);
     document.addEventListener("keydown", handleDocumentKeydown);
-
-    if (themeMode.value === "document" && typeof MutationObserver !== "undefined") {
-      documentThemeObserver = new MutationObserver(() => {
-        uiTheme.value = getDocumentTheme() ?? getPreferredSystemTheme();
-      });
-
-      documentThemeObserver.observe(document.documentElement, {
-        attributes: true,
-        attributeFilter: ["class", "style", "data-theme"],
-      });
-    }
   }
 
   nextTick(() => {
@@ -3345,10 +3414,7 @@ onUnmounted(() => {
     resizeObserver = null;
   }
 
-  if (documentThemeObserver) {
-    documentThemeObserver.disconnect();
-    documentThemeObserver = null;
-  }
+  stopDocumentThemeSync();
 });
 </script>
 

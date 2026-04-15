@@ -292,6 +292,7 @@ export interface FlaierProps {
   src: FlaierSource;
   autoPlay?: boolean;
   interval?: number;
+  themeMode?: "local" | "document";
 }
 
 export interface FlaierPanelProps extends FlaierProps {

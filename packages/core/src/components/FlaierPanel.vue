@@ -64,7 +64,13 @@ watch(
       />
 
       <div class="fn-panel__surface">
-        <Flaier class="fn-panel__viewer" :src="src" :auto-play="autoPlay" :interval="interval" />
+        <Flaier
+          class="fn-panel__viewer"
+          :src="src"
+          :auto-play="autoPlay"
+          :interval="interval"
+          :theme-mode="themeMode"
+        />
 
         <button
           v-if="fullscreenEnabled"

@@ -53,7 +53,7 @@ provide(flaierRuntimeKey, {
 });
 
 watch(
-  () => props.src,
+  [() => props.src, () => props.themeMode],
   () => {
     void loadSourceCollection();
   },
@@ -76,7 +76,7 @@ const initialState = computed<Record<string, unknown>>(() => {
 const providerKey = computed(() => {
   const spec = resolvedSpec.value;
   if (!spec) return "flaier-empty";
-  return `${specVersion.value}-${spec.root}-${Object.keys(spec.elements).length}-${props.autoPlay ? "auto" : "manual"}`;
+  return `${specVersion.value}-${spec.root}-${Object.keys(spec.elements).length}-${props.autoPlay ? "auto" : "manual"}-${props.themeMode ?? "spec"}`;
 });
 
 async function loadSourceCollection() {
@@ -188,7 +188,7 @@ async function loadFlowSpec(flowId: string, sourceIdAtStart: number) {
     console.warn(`[flaier] Invalid spec:\n${formatSpecIssues(validation.issues)}`);
   }
 
-  const nextSpec = fixed.spec as FlaierSpec;
+  const nextSpec = applyThemeModeOverride(fixed.spec as FlaierSpec);
   resolvedSpec.value = nextSpec;
   specVersion.value += 1;
 
@@ -364,6 +364,36 @@ function getSpecMetadata(spec: FlaierSpec) {
     id: slugifyId(title ?? fallbackId),
     title,
     description,
+  };
+}
+
+function applyThemeModeOverride(spec: FlaierSpec): FlaierSpec {
+  const override = props.themeMode;
+  if (!override) {
+    return spec;
+  }
+
+  const rootElement = spec.elements[spec.root];
+  if (!rootElement || rootElement.type !== "FlowTimeline" || !isObject(rootElement.props)) {
+    return spec;
+  }
+
+  if (rootElement.props.themeMode === override) {
+    return spec;
+  }
+
+  return {
+    ...spec,
+    elements: {
+      ...spec.elements,
+      [spec.root]: {
+        ...rootElement,
+        props: {
+          ...rootElement.props,
+          themeMode: override,
+        },
+      },
+    },
   };
 }
 
