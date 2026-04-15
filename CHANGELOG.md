@@ -1,6 +1,19 @@
 # Changelog
 
 
+## v0.1.4
+
+[compare changes](https://github.com/WeAreRetex/flaier/compare/v0.1.3...v0.1.4)
+
+### 🩹 Fixes
+
+- Zoomin-out issues ([52e0d75](https://github.com/WeAreRetex/flaier/commit/52e0d75))
+- Fix navigation and zooming in navigation mode ([d8efa3f](https://github.com/WeAreRetex/flaier/commit/d8efa3f))
+
+### ❤️ Contributors
+
+- Rigo-m ([@Rigo-m](https://github.com/Rigo-m))
+
 ## v0.1.3
 
 [compare changes](https://github.com/WeAreRetex/flaier/compare/v0.1.2...v0.1.3)
