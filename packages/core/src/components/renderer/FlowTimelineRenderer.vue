@@ -3357,6 +3357,27 @@ function updateContainerReady() {
   containerReady.value = containerWidth.value > 0 && containerHeight.value > 0;
 }
 
+function waitForAnimationFrame() {
+  return new Promise<void>((resolve) => {
+    if (typeof window === "undefined" || typeof window.requestAnimationFrame !== "function") {
+      setTimeout(resolve, 16);
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      resolve();
+    });
+  });
+}
+
+async function waitForViewportLayoutStability() {
+  await nextTick();
+  await waitForAnimationFrame();
+  await waitForAnimationFrame();
+  updateContainerReady();
+  await nextTick();
+}
+
 const sceneStyle = computed<Record<string, string>>(() => ({
   height: `${Math.max(containerHeight.value, containerMinHeight.value)}px`,
 }));
@@ -3393,6 +3414,50 @@ const viewportReady = computed(
 const canExportDiagram = computed(() => {
   return Boolean(viewportReady.value && diagramBounds.value);
 });
+
+async function refitViewportAfterContainerChange() {
+  if (!nodes.value.length) return;
+
+  await waitForViewportLayoutStability();
+
+  if (!viewportReady.value || nodes.value.length === 0) {
+    return;
+  }
+
+  if (isArchitectureMode.value || overviewMode.value) {
+    await Promise.resolve(
+      fitView({
+        duration: isArchitectureMode.value ? 260 : 280,
+        padding: isArchitectureMode.value ? 0.18 : 0.3,
+        maxZoom: isArchitectureMode.value ? 1.15 : 0.95,
+      }),
+    );
+    return;
+  }
+
+  await Promise.resolve(
+    fitView({
+      duration: 280,
+      padding: 0.3,
+      maxZoom: 0.95,
+    }),
+  );
+
+  const target = narrativeFocusTarget.value;
+  if (!target) {
+    return;
+  }
+
+  await nextTick();
+
+  const zoom = Number.isFinite(viewport.value.zoom) ? viewport.value.zoom : 1;
+  await Promise.resolve(
+    setCenter(target.x, target.y, {
+      duration: 280,
+      zoom,
+    }),
+  );
+}
 
 watch(canExportDiagram, (canExport) => {
   if (!canExport) {
@@ -3479,6 +3544,7 @@ watch(
 );
 
 const architectureFitSignature = ref("");
+const lastViewportResetToken = ref(0);
 
 watch(
   [viewportReady, isArchitectureMode, nodes, containerWidth, containerHeight],
@@ -3505,6 +3571,22 @@ watch(
         maxZoom: 1.15,
       });
     });
+  },
+  { immediate: true },
+);
+
+watch(
+  [() => runtime.viewportResetToken.value, viewportReady],
+  ([token, ready]) => {
+    if (!ready || token <= lastViewportResetToken.value) {
+      return;
+    }
+
+    lastViewportResetToken.value = token;
+    narrativeFitSignature.value = "";
+    architectureFitSignature.value = "";
+
+    void refitViewportAfterContainerChange();
   },
   { immediate: true },
 );

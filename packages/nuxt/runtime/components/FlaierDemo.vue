@@ -5,6 +5,10 @@ import { toRef } from "vue";
 import { useMergedFlaierNodes } from "../composables/useFlaierNodes";
 import { usePreparedFlaierSource } from "../composables/usePreparedFlaierSource";
 
+defineOptions({
+  inheritAttrs: false,
+});
+
 const props = withDefaults(
   defineProps<{
     src: FlaierSource;
@@ -28,6 +32,7 @@ const mergedNodes = useMergedFlaierNodes(toRef(props, "nodes"));
   <ClientOnly>
     <FlaierPanel
       class="fn-demo"
+      v-bind="$attrs"
       :src="preparedSource"
       :auto-play="autoPlay"
       :interval="interval"
@@ -37,7 +42,7 @@ const mergedNodes = useMergedFlaierNodes(toRef(props, "nodes"));
     />
 
     <template #fallback>
-      <div class="fn-demo">
+      <div class="fn-demo" v-bind="$attrs">
         <div class="fn-demo__loading">Loading diagram...</div>
       </div>
     </template>

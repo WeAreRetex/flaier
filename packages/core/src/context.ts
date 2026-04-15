@@ -7,6 +7,7 @@ export interface FlaierRuntimeContext {
   nodes: Ref<FlaierCustomNodeDefinitions>;
   flowOptions: Ref<FlaierFlowOption[]>;
   activeFlowId: Ref<string | null>;
+  viewportResetToken: Ref<number>;
   setActiveFlow: (flowId: string) => void;
 }
 

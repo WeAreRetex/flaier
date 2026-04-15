@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { watch } from "vue";
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import Flaier from "./Flaier.vue";
 import { useFlaierFullscreen } from "../composables/useFlaierFullscreen";
 import type { FlaierPanelProps } from "../types";
@@ -21,6 +20,7 @@ const props = withDefaults(defineProps<FlaierPanelProps>(), {
 const { fullscreen, closeFullscreen, toggleFullscreen } = useFlaierFullscreen();
 
 const fullscreenActive = computed(() => props.fullscreenEnabled && fullscreen.value);
+const viewportResetToken = ref(0);
 
 const containerStyle = computed<Record<string, string>>(() => {
   const minHeight = Number.isFinite(props.minHeight)
@@ -44,6 +44,14 @@ watch(
       closeFullscreen();
     }
   },
+);
+
+watch(
+  fullscreenActive,
+  () => {
+    viewportResetToken.value += 1;
+  },
+  { flush: "post" },
 );
 </script>
 
@@ -71,6 +79,7 @@ watch(
           :interval="interval"
           :theme-mode="themeMode"
           :nodes="nodes"
+          :viewport-reset-token="viewportResetToken"
         />
 
         <button

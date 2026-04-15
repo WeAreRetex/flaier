@@ -46,6 +46,11 @@ let sourceRequestId = 0;
 let flowRequestId = 0;
 
 const customNodes = computed(() => normalizeFlaierCustomNodes(props.nodes));
+const viewportResetToken = computed(() => {
+  return typeof props.viewportResetToken === "number" && Number.isFinite(props.viewportResetToken)
+    ? Math.max(0, Math.floor(props.viewportResetToken))
+    : 0;
+});
 const rendererRegistry = computed(() => createFlaierRendererRegistry({ nodes: customNodes.value }));
 
 provide(flaierRuntimeKey, {
@@ -54,6 +59,7 @@ provide(flaierRuntimeKey, {
   nodes: customNodes,
   flowOptions,
   activeFlowId,
+  viewportResetToken,
   setActiveFlow,
 });
 

@@ -16,7 +16,6 @@ import architectureSpec from "../flow-specs/story-architecture.flow.json";
         height="100%"
         :min-height="0"
         :fullscreen-enabled="true"
-        :z-index="1"
       />
     </div>
   </div>
@@ -54,32 +53,26 @@ import architectureSpec from "../flow-specs/story-architecture.flow.json";
   line-height: 1.25;
 }
 
-.architecture-flow__viewer {
+.architecture-flow__viewer:not(.fn-panel--fullscreen) {
   display: flex;
   flex: 1;
-  min-height: 0;
-  box-sizing: border-box;
-  overflow: hidden;
-  border: 1px solid var(--docs-border, rgba(148, 163, 184, 0.25));
-  border-radius: 1.35rem;
-  background: rgba(255, 255, 255, 0.65);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
-}
-
-.architecture-flow__viewer :deep(.fn-panel) {
   height: 100%;
   min-height: 0;
+  box-sizing: border-box;
 }
 
 .architecture-flow__viewer :deep(.flaier) {
   line-height: 1.4;
 }
 
-.architecture-flow__viewer :deep(.fn-panel__surface) {
+.architecture-flow__viewer:not(.fn-panel--fullscreen) :deep(.fn-panel__surface) {
   flex: 1;
-  height: auto;
   min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--docs-border, rgba(148, 163, 184, 0.25));
   border-radius: 1.35rem;
+  background: rgba(255, 255, 255, 0.65);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
 .architecture-flow__viewer :deep(.fn-panel__toggle) {
@@ -135,7 +128,7 @@ html.dark .architecture-flow__title {
   color: var(--docs-text, #e2e8f0);
 }
 
-html.dark .architecture-flow__viewer {
+html.dark .architecture-flow__viewer:not(.fn-panel--fullscreen) :deep(.fn-panel__surface) {
   background: rgba(15, 23, 42, 0.66);
 }
 </style>

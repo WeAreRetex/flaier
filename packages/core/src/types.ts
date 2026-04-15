@@ -342,6 +342,7 @@ export interface FlaierProps {
   interval?: number;
   themeMode?: "local" | "document";
   nodes?: FlaierCustomNodeDefinitions;
+  viewportResetToken?: number;
 }
 
 export interface FlaierPanelProps extends FlaierProps {

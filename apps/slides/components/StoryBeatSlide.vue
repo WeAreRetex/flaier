@@ -15,9 +15,7 @@
       <section class="docs-card docs-card--story">
         <div class="docs-aside">
           <p class="docs-eyebrow">Story Beat</p>
-          <h2 class="docs-section-title">
-            The system becomes easier to reason about when each handoff gets a voice
-          </h2>
+          <h2 class="docs-section-title">The system becomes easier to reason about</h2>
           <p class="docs-lede">
             Instead of jumping straight into logs, the team writes the journey down as a sequence of
             actors, decisions, and side effects. That single shift turns a vague incident into an
@@ -30,10 +28,6 @@
             <div class="docs-step__number">1</div>
             <div>
               <div class="docs-step__title">Capture the symptom</div>
-              <p class="docs-step__body">
-                Support records what the customer saw, what changed, and which path felt slow or
-                wrong.
-              </p>
             </div>
           </div>
 
@@ -47,33 +41,11 @@
               </p>
             </div>
           </div>
-
-          <div class="docs-step">
-            <div class="docs-step__number">3</div>
-            <div>
-              <div class="docs-step__title">Turn the story into a reusable artifact</div>
-              <p class="docs-step__body">
-                Now the same narrative can become docs, a live demo, or an architecture review slide
-                without rewriting it.
-              </p>
-            </div>
-          </div>
         </div>
       </section>
 
       <aside class="docs-card docs-card--story-side">
         <p class="docs-caption">Spec fragment</p>
-        <pre class="docs-code"><code>{
-  "title": "Support Story",
-  "mode": "narrative",
-  "beats": [
-    "symptom",
-    "handoff",
-    "decision",
-    "follow-up"
-  ]
-}</code></pre>
-
         <p class="docs-note">
           The key idea is not the JSON shape. It is the discipline of giving the story a stable form
           so it can survive handoffs between support, product, and engineering.
