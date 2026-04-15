@@ -48,12 +48,12 @@ jobs:
 
       - name: Publish @flaier/core
         working-directory: packages/core
-        run: pnpm publish --provenance --access public
+        run: pnpm publish --no-git-checks --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @flaier/nuxt
         working-directory: packages/nuxt
-        run: pnpm publish --provenance --access public
+        run: pnpm publish --no-git-checks --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
