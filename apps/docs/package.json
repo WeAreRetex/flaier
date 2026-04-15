@@ -13,9 +13,9 @@
     "preview": "NUXT_CONTENT_LOCAL_DB=.data/content/preview.sqlite nuxt preview --extends docus"
   },
   "dependencies": {
-    "@takumi-rs/wasm": "0.73.1",
     "@flaier/core": "workspace:*",
     "@flaier/nuxt": "workspace:*",
+    "@takumi-rs/wasm": "0.73.1",
     "docus": "^5.9.0",
     "nuxt": "^4.4.2",
     "zod": "^3.25.0",
