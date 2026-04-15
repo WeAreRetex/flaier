@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.1.6
+
+[compare changes](https://github.com/WeAreRetex/flaier/compare/v0.1.5...v0.1.6)
+
+### 🩹 Fixes
+
+- Keep docs manifest formatted ([1f6a86d](https://github.com/WeAreRetex/flaier/commit/1f6a86d))
+
+### ❤️ Contributors
+
+- Rigo-m ([@Rigo-m](https://github.com/Rigo-m))
+
 ## v0.1.5
 
 [compare changes](https://github.com/WeAreRetex/flaier/compare/v0.1.4...v0.1.5)
