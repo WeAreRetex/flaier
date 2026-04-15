@@ -18,6 +18,7 @@ defineProps<{
   <div
     class="fn-node w-[220px] rounded-lg border border-border bg-card px-4 py-3"
     :data-active="active"
+    data-node-type="link"
   >
     <Handle type="target" :position="Position.Left" />
     <a :href="href" target="_blank" rel="noopener noreferrer" class="block group">

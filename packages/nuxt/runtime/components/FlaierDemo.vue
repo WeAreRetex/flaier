@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { FlaierPanel } from "@flaier/core";
-import type { FlaierSource } from "@flaier/core";
+import type { FlaierCustomNodeDefinitions, FlaierSource } from "@flaier/core";
 import { toRef } from "vue";
+import { useMergedFlaierNodes } from "../composables/useFlaierNodes";
 import { usePreparedFlaierSource } from "../composables/usePreparedFlaierSource";
 
 const props = withDefaults(
@@ -10,6 +11,7 @@ const props = withDefaults(
     autoPlay?: boolean;
     interval?: number;
     height?: number | string;
+    nodes?: FlaierCustomNodeDefinitions;
   }>(),
   {
     autoPlay: false,
@@ -19,6 +21,7 @@ const props = withDefaults(
 );
 
 const preparedSource = await usePreparedFlaierSource(toRef(props, "src"));
+const mergedNodes = useMergedFlaierNodes(toRef(props, "nodes"));
 </script>
 
 <template>
@@ -29,6 +32,7 @@ const preparedSource = await usePreparedFlaierSource(toRef(props, "src"));
       :auto-play="autoPlay"
       :interval="interval"
       :height="height"
+      :nodes="mergedNodes"
       :fullscreen-enabled="true"
     />
 
@@ -42,6 +46,12 @@ const preparedSource = await usePreparedFlaierSource(toRef(props, "src"));
 
 <style scoped>
 .fn-demo:not(.fn-panel--fullscreen) {
+  --fn-demo-surface-border: rgba(209, 213, 219, 1);
+  --fn-demo-surface-bg: radial-gradient(
+    circle at 18% 12%,
+    rgba(30, 41, 59, 0.94),
+    rgba(2, 6, 23, 0.98)
+  );
   width: 100%;
   margin: 1.5rem 0;
   overflow: hidden;
@@ -50,12 +60,12 @@ const preparedSource = await usePreparedFlaierSource(toRef(props, "src"));
 
 :deep(.fn-demo .fn-panel__surface) {
   border-radius: 0.75rem;
-  border: 1px solid rgba(209, 213, 219, 1);
-  background: radial-gradient(circle at 18% 12%, rgba(30, 41, 59, 0.94), rgba(2, 6, 23, 0.98));
+  border: 1px solid var(--fn-demo-surface-border);
+  background: var(--fn-demo-surface-bg);
 }
 
 :global(.dark) :deep(.fn-demo .fn-panel__surface) {
-  border-color: rgba(55, 65, 81, 1);
+  --fn-demo-surface-border: rgba(55, 65, 81, 1);
 }
 
 .fn-demo__loading {
@@ -68,11 +78,11 @@ const preparedSource = await usePreparedFlaierSource(toRef(props, "src"));
   font-size: 0.875rem;
   color: rgb(156 163 175);
   border-radius: 0.75rem;
-  border: 1px solid rgba(209, 213, 219, 1);
-  background: radial-gradient(circle at 18% 12%, rgba(30, 41, 59, 0.94), rgba(2, 6, 23, 0.98));
+  border: 1px solid var(--fn-demo-surface-border);
+  background: var(--fn-demo-surface-bg);
 }
 
 :global(.dark) .fn-demo__loading {
-  border-color: rgba(55, 65, 81, 1);
+  --fn-demo-surface-border: rgba(55, 65, 81, 1);
 }
 </style>

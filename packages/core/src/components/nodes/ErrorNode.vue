@@ -20,6 +20,7 @@ defineProps<{
   <div
     class="fn-node w-[280px] rounded-lg border border-red-400/45 bg-card overflow-hidden"
     :data-active="active"
+    data-node-type="error"
   >
     <Handle type="target" :position="Position.Left" />
 

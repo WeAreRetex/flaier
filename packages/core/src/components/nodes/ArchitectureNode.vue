@@ -142,6 +142,9 @@ const compactTags = computed(() => (props.tags ?? []).slice(0, 3));
     class="fn-node w-[270px] rounded-xl border bg-card/95 px-4 py-3 shadow-sm"
     :class="kindMeta.cardClass"
     :data-active="active"
+    data-node-type="architecture"
+    :data-node-kind="kind"
+    :data-node-status="status"
   >
     <Handle type="target" :position="Position.Left" />
 

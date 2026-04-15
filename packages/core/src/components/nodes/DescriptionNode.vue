@@ -17,6 +17,7 @@ defineProps<{
   <div
     class="fn-node w-[240px] rounded-lg border border-border bg-card px-4 py-3"
     :data-active="active"
+    data-node-type="description"
   >
     <Handle type="target" :position="Position.Left" />
     <p class="text-sm font-medium text-foreground leading-snug mb-1">{{ label }}</p>

@@ -35,6 +35,7 @@ const singlePayload = computed(() => {
   <div
     class="fn-node w-[300px] rounded-lg border border-border bg-card overflow-hidden"
     :data-active="active"
+    data-node-type="payload"
   >
     <Handle type="target" :position="Position.Left" />
 

@@ -1,4 +1,6 @@
 import type { Node, Edge } from "@vue-flow/core";
+import type { Component } from "vue";
+import type { ZodTypeAny } from "zod";
 
 /** A single code beat for magic-move animation with optional narration metadata */
 export interface MagicMoveStep {
@@ -210,6 +212,46 @@ export interface LinkNodeProps {
   transitions?: EdgeTransition[];
 }
 
+export interface FlaierResolvedSourceAnchor {
+  label: string;
+  href?: string;
+}
+
+export interface FlaierCustomNodeSize {
+  width: number;
+  height: number;
+}
+
+export interface FlaierCustomNodeContext<TProps = Record<string, unknown>> {
+  key: string;
+  elementType: string;
+  props: TProps;
+  sourceAnchor?: FlaierResolvedSourceAnchor;
+}
+
+export interface FlaierCustomNodeComponentProps {
+  active?: boolean;
+  nodeKey?: string;
+  elementType?: string;
+  sourceAnchor?: FlaierResolvedSourceAnchor;
+}
+
+export interface FlaierCustomNodeDefinition<TProps extends ZodTypeAny = ZodTypeAny> {
+  props: TProps;
+  description: string;
+  component: Component;
+  estimateSize?: (
+    context: FlaierCustomNodeContext<Record<string, unknown>>,
+  ) => FlaierCustomNodeSize;
+  getSummary?: (context: FlaierCustomNodeContext<Record<string, unknown>>) => string;
+}
+
+export type FlaierCustomNodeDefinitions = Record<string, FlaierCustomNodeDefinition>;
+
+export interface FlaierCatalogOptions<TNodes extends FlaierCustomNodeDefinitions = FlaierCustomNodeDefinitions> {
+  nodes?: TNodes;
+}
+
 /** Union of all node prop types */
 export type AnyNodeProps =
   | ArchitectureNodeProps
@@ -222,7 +264,7 @@ export type AnyNodeProps =
   | LinkNodeProps;
 
 /** VueFlow custom node type names */
-export type FlowNodeType =
+export type BuiltInFlowNodeType =
   | "architecture"
   | "trigger"
   | "code"
@@ -232,12 +274,16 @@ export type FlowNodeType =
   | "description"
   | "link";
 
+export type FlowNodeType = BuiltInFlowNodeType | (string & {});
+
 /** Data payload attached to each VueFlow node */
 export interface FlowNodeData {
   key: string;
   type: FlowNodeType;
   elementType: string;
   props: Record<string, unknown>;
+  active: boolean;
+  sourceAnchor?: FlaierResolvedSourceAnchor;
   index: number;
 }
 
@@ -293,6 +339,7 @@ export interface FlaierProps {
   autoPlay?: boolean;
   interval?: number;
   themeMode?: "local" | "document";
+  nodes?: FlaierCustomNodeDefinitions;
 }
 
 export interface FlaierPanelProps extends FlaierProps {

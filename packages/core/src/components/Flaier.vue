@@ -3,7 +3,8 @@ import { ActionProvider, Renderer, StateProvider, VisibilityProvider } from "@js
 import { autoFixSpec, formatSpecIssues, type Spec, validateSpec } from "@json-render/core";
 import { computed, provide, ref, toRef, watch } from "vue";
 import { flaierRuntimeKey } from "../context";
-import { registry } from "../registry";
+import { normalizeFlaierCustomNodes } from "../custom-nodes";
+import { createFlaierRendererRegistry } from "../registry";
 import type {
   FlaierFlowOption,
   FlaierManifest,
@@ -44,9 +45,13 @@ const activeFlowId = ref<string | null>(null);
 let sourceRequestId = 0;
 let flowRequestId = 0;
 
+const customNodes = computed(() => normalizeFlaierCustomNodes(props.nodes));
+const rendererRegistry = computed(() => createFlaierRendererRegistry({ nodes: customNodes.value }));
+
 provide(flaierRuntimeKey, {
   spec: resolvedSpec,
   interval: toRef(props, "interval"),
+  nodes: customNodes,
   flowOptions,
   activeFlowId,
   setActiveFlow,
@@ -544,12 +549,12 @@ function handleStateChange(changes: Array<{ path: string; value: unknown }>) {
     <StateProvider
       v-else-if="resolvedSpec"
       :key="providerKey"
-      :initial-state="initialState"
-      :on-state-change="handleStateChange"
+        :initial-state="initialState"
+        :on-state-change="handleStateChange"
     >
       <ActionProvider>
         <VisibilityProvider>
-          <Renderer :spec="resolvedSpec" :registry="registry" />
+          <Renderer :spec="resolvedSpec" :registry="rendererRegistry" />
         </VisibilityProvider>
       </ActionProvider>
     </StateProvider>

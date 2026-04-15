@@ -1,0 +1,101 @@
+{
+  "root": "flow",
+  "elements": {
+    "flow": {
+      "type": "FlowTimeline",
+      "props": {
+        "title": "Custom Styling Overrides",
+        "description": "A docs example that themes panel chrome, edge strokes, built-in nodes, and a custom CalloutNode with CSS variables and stable hooks.",
+        "mode": "narrative"
+      },
+      "children": [
+        "trigger",
+        "callout-intro",
+        "code",
+        "payload",
+        "callout-finish",
+        "link"
+      ]
+    },
+    "trigger": {
+      "type": "TriggerNode",
+      "props": {
+        "label": "Theme wrapper mounts",
+        "description": "A wrapper component scopes CSS variables and selector overrides around FlaierDemo.",
+        "transitions": [
+          {
+            "to": "callout-intro",
+            "label": "Override tokens",
+            "kind": "async"
+          }
+        ]
+      }
+    },
+    "callout-intro": {
+      "type": "CalloutNode",
+      "props": {
+        "label": "Panel + custom node theme",
+        "tone": "tip",
+        "body": "The wrapper updates Flaier color tokens, fullscreen toggle chrome, edge accents, and the custom CalloutNode accent palette without changing renderer code.",
+        "transitions": [
+          {
+            "to": "code",
+            "label": "Deep selector"
+          }
+        ]
+      }
+    },
+    "code": {
+      "type": "CodeNode",
+      "props": {
+        "label": "Scoped CSS override",
+        "language": "css",
+        "code": ".docs-styled-demo :deep(.flaier) {\n  --color-primary: oklch(0.76 0.15 18);\n  --fn-panel-toggle-bg: rgba(34, 10, 48, 0.92);\n}\n\n.docs-styled-demo :deep(.fn-node[data-node-type=\"callout\"]) {\n  transform: rotate(-0.45deg);\n}",
+        "story": "Stable hooks like .flaier[data-mode] and .fn-node[data-node-type] let the docs app restyle the embed without forking component templates.",
+        "transitions": [
+          {
+            "to": "payload",
+            "label": "Styled built-ins"
+          }
+        ]
+      }
+    },
+    "payload": {
+      "type": "PayloadNode",
+      "props": {
+        "label": "Theme result",
+        "format": "json",
+        "payload": "{\n  \"panelSurface\": \"custom gradient\",\n  \"edgeStroke\": \"accent + dashed async\",\n  \"calloutNode\": \"custom accent palette\"\n}",
+        "description": "Built-in nodes can be re-skinned with the same token and data-attribute strategy.",
+        "transitions": [
+          {
+            "to": "callout-finish",
+            "label": "Mix hooks"
+          }
+        ]
+      }
+    },
+    "callout-finish": {
+      "type": "CalloutNode",
+      "props": {
+        "label": "Styling stays isolated",
+        "tone": "warning",
+        "body": "The overrides are scoped to one wrapper component, so the rest of the docs site still uses the default Flaier theme.",
+        "transitions": [
+          {
+            "to": "link",
+            "label": "See API"
+          }
+        ]
+      }
+    },
+    "link": {
+      "type": "LinkNode",
+      "props": {
+        "label": "Styling API reference",
+        "href": "/api/reference",
+        "description": "See the Styling section for the exported hooks and panel tokens."
+      }
+    }
+  }
+}

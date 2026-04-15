@@ -1,0 +1,93 @@
+{
+  "root": "flow",
+  "elements": {
+    "flow": {
+      "type": "FlowTimeline",
+      "props": {
+        "title": "Custom Node Extension",
+        "description": "A live docs example that registers CalloutNode in Nuxt and uses it in the renderer.",
+        "mode": "narrative"
+      },
+      "children": [
+        "start",
+        "catalog-awareness",
+        "plugin-code",
+        "runtime-node",
+        "reference"
+      ]
+    },
+    "start": {
+      "type": "TriggerNode",
+      "props": {
+        "label": "Renderer boots",
+        "description": "The docs app loads a custom node definition before any Flaier example renders.",
+        "transitions": [
+          {
+            "to": "catalog-awareness",
+            "label": "Resolve nodes"
+          }
+        ]
+      }
+    },
+    "catalog-awareness": {
+      "type": "CalloutNode",
+      "props": {
+        "label": "AI sees the new node",
+        "tone": "tip",
+        "body": "createFlaierCatalog({ nodes }) merges the CalloutNode schema into the prompt-facing catalog so generated specs can reference it deliberately.",
+        "sourceAnchor": {
+          "path": "apps/docs/app/lib/flaier-callout-example.ts",
+          "line": 1
+        },
+        "transitions": [
+          {
+            "to": "plugin-code",
+            "label": "Register runtime"
+          }
+        ]
+      }
+    },
+    "plugin-code": {
+      "type": "CodeNode",
+      "props": {
+        "label": "Nuxt plugin registration",
+        "file": "apps/docs/plugins/flaier-nodes.ts",
+        "language": "ts",
+        "code": "import { registerFlaierNodes } from \"#imports\"\nimport { docsCalloutNodes } from \"../lib/flaier-callout-example\"\n\nexport default defineNuxtPlugin(() => {\n  registerFlaierNodes(docsCalloutNodes)\n})",
+        "story": "One registration makes the custom node available to FlaierClient, FlaierDemo, and FlaierMdc, including markdown-driven docs content.",
+        "transitions": [
+          {
+            "to": "runtime-node",
+            "label": "Render flow"
+          }
+        ]
+      }
+    },
+    "runtime-node": {
+      "type": "CalloutNode",
+      "props": {
+        "label": "Rendered inside FlowTimeline",
+        "tone": "warning",
+        "body": "This CalloutNode is a Vue Flow node component with its own handles, sizing hint, and summary hook. It renders alongside built-in TriggerNode, CodeNode, and LinkNode elements.",
+        "sourceAnchor": {
+          "path": "apps/docs/app/components/CalloutNode.vue",
+          "line": 1
+        },
+        "transitions": [
+          {
+            "to": "reference",
+            "label": "See API"
+          }
+        ]
+      }
+    },
+    "reference": {
+      "type": "LinkNode",
+      "props": {
+        "label": "API reference",
+        "href": "/api/reference",
+        "description": "See createFlaierCatalog, createFlaierRegistry, and registerFlaierNodes."
+      }
+    }
+  }
+}

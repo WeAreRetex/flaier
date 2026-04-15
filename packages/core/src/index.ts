@@ -2,8 +2,23 @@ import "./style.css";
 
 export { default as Flaier } from "./components/Flaier.vue";
 export { default as FlaierPanel } from "./components/FlaierPanel.vue";
-export { catalog } from "./catalog";
-export { registry } from "./registry";
+export {
+  architectureDataAssetSchema,
+  architectureInterfaceSchema,
+  architectureLinkSchema,
+  architectureOperationsSchema,
+  architectureSecuritySchema,
+  architectureZoneSchema,
+  catalog,
+  createFlaierCatalog,
+  edgeTransitionKindSchema,
+  edgeTransitionSchema,
+  magicMoveStepSchema,
+  sourceAnchorSchema,
+  twoslashHtmlSchema,
+} from "./catalog";
+export { createFlaierRegistry, createFlaierRendererRegistry, registry } from "./registry";
+export { mergeFlaierCustomNodes, normalizeFlaierCustomNodes } from "./custom-nodes";
 
 export { useShiki } from "./composables/useShiki";
 export { useTimeline } from "./composables/useTimeline";
@@ -25,6 +40,13 @@ export type {
   FlaierSource,
   FlaierProps,
   FlaierPanelProps,
+  FlaierCatalogOptions,
+  FlaierCustomNodeComponentProps,
+  FlaierCustomNodeContext,
+  FlaierCustomNodeDefinition,
+  FlaierCustomNodeDefinitions,
+  FlaierCustomNodeSize,
+  FlaierResolvedSourceAnchor,
   FlowTimelineProps,
   ArchitectureNodeProps,
   TriggerNodeProps,
@@ -45,6 +67,7 @@ export type {
   EdgeTransition,
   EdgeTransitionKind,
   MagicMoveStep,
+  BuiltInFlowNodeType,
   FlowNode,
   FlowEdge,
   FlowNodeType,

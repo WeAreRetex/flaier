@@ -1,8 +1,25 @@
 <script setup lang="ts">
 import dagre from "@dagrejs/dagre";
 import { useStateStore, useStateValue } from "@json-render/vue";
-import { VueFlow, useNodesInitialized, useVueFlow } from "@vue-flow/core";
-import { computed, getCurrentInstance, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import {
+  Position,
+  VueFlow,
+  type NodeProps,
+  type NodeTypesObject,
+  useNodesInitialized,
+  useVueFlow,
+} from "@vue-flow/core";
+import {
+  computed,
+  defineComponent,
+  getCurrentInstance,
+  h,
+  nextTick,
+  onMounted,
+  onUnmounted,
+  ref,
+  watch,
+} from "vue";
 
 import {
   CODE_NODE_MAX_INLINE_CHARS,
@@ -22,12 +39,17 @@ import type {
   ArchitectureInterface,
   ArchitectureLink,
   ArchitectureNodeProps,
+  FlaierCustomNodeContext,
+  FlaierCustomNodeDefinition,
+  FlaierCustomNodeSize,
+  FlaierResolvedSourceAnchor,
   ArchitectureOperations,
   ArchitectureSecurity,
   ArchitectureZone,
   EdgeTransitionKind,
   FlowEdge,
   FlowNode,
+  FlowNodeData,
   FlowNodeType,
   MagicMoveStep,
   SpecElement,
@@ -88,6 +110,18 @@ const TYPE_MAP: Record<string, FlowNodeType> = {
   DescriptionNode: "description",
   LinkNode: "link",
 };
+
+function toNodeType(elementType: string): FlowNodeType | undefined {
+  if (TYPE_MAP[elementType]) {
+    return TYPE_MAP[elementType];
+  }
+
+  return customNodes.value[elementType] ? elementType : undefined;
+}
+
+function getCustomNodeDefinition(elementType: string): FlaierCustomNodeDefinition | undefined {
+  return customNodes.value[elementType];
+}
 
 const DEFAULT_LAYOUT_ENGINE = "dagre";
 const DEFAULT_FALLBACK_GAP = 420;
@@ -293,6 +327,7 @@ const EMPTY_ARCHITECTURE_INSPECTOR_NODE: ArchitectureInspectorArchitectureView =
 
 const runtime = useFlaierRuntime();
 const spec = computed(() => runtime.spec.value);
+const customNodes = computed(() => runtime.nodes.value);
 const availableFlows = computed(() => runtime.flowOptions.value);
 const activeFlowId = computed(() => runtime.activeFlowId.value);
 const activeFlow = computed(() => {
@@ -601,7 +636,7 @@ const orderedNodeElements = computed<OrderedNodeElement[]>(() => {
     const element = activeSpec.elements[key];
     if (!element) continue;
 
-    const nodeType = TYPE_MAP[element.type];
+    const nodeType = toNodeType(element.type);
     if (!nodeType) continue;
 
     seen.add(key);
@@ -1177,6 +1212,136 @@ function resolveNodeSourceAnchor(nodeProps: Record<string, unknown>) {
   } satisfies ParsedSourceAnchor;
 }
 
+function createCustomNodeContext(node: OrderedNodeElement): FlaierCustomNodeContext<Record<string, unknown>> {
+  return {
+    key: node.key,
+    elementType: node.element.type,
+    props: node.element.props,
+    sourceAnchor: resolveNodeSourceAnchor(node.element.props) as FlaierResolvedSourceAnchor | undefined,
+  };
+}
+
+function toCustomNodeSize(value: FlaierCustomNodeSize | undefined): NodeSize | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const width = Number(value.width);
+  const height = Number(value.height);
+
+  if (!Number.isFinite(width) || !Number.isFinite(height)) {
+    return undefined;
+  }
+
+  return {
+    width: Math.max(120, Math.round(width)),
+    height: Math.max(72, Math.round(height)),
+  };
+}
+
+function getNodeSummary(node: OrderedNodeElement) {
+  const customNode = getCustomNodeDefinition(node.element.type);
+  if (customNode?.getSummary) {
+    return customNode.getSummary(createCustomNodeContext(node)) ?? "";
+  }
+
+  if (node.element.type === "CodeNode") {
+    return (
+      toTrimmedNonEmptyString(node.element.props.story) ??
+      toTrimmedNonEmptyString(node.element.props.comment) ??
+      ""
+    );
+  }
+
+  if (node.element.type === "DescriptionNode") {
+    return toTrimmedNonEmptyString(node.element.props.body) ?? "";
+  }
+
+  if (node.element.type === "DecisionNode") {
+    return (
+      toTrimmedNonEmptyString(node.element.props.description) ??
+      toTrimmedNonEmptyString(node.element.props.condition) ??
+      ""
+    );
+  }
+
+  if (node.element.type === "PayloadNode") {
+    return toTrimmedNonEmptyString(node.element.props.description) ?? "";
+  }
+
+  if (node.element.type === "ErrorNode") {
+    const message = toTrimmedNonEmptyString(node.element.props.message);
+    const cause = toTrimmedNonEmptyString(node.element.props.cause);
+    const mitigation = toTrimmedNonEmptyString(node.element.props.mitigation);
+
+    return [message, cause ? `Cause: ${cause}` : "", mitigation ? `Mitigation: ${mitigation}` : ""]
+      .filter((value): value is string => typeof value === "string" && value.length > 0)
+      .join(" ");
+  }
+
+  if (node.element.type === "ArchitectureNode") {
+    const technology = toTrimmedNonEmptyString(node.element.props.technology);
+    const description = toTrimmedNonEmptyString(node.element.props.description);
+
+    return [technology ? `Technology: ${technology}` : "", description ?? ""]
+      .filter((value): value is string => typeof value === "string" && value.length > 0)
+      .join(" ");
+  }
+
+  return toTrimmedNonEmptyString(node.element.props.description) ?? "";
+}
+
+function createCustomNodeRenderer(
+  elementType: string,
+  definition: FlaierCustomNodeDefinition,
+  displayName: string,
+) {
+  return defineComponent<NodeProps<FlowNodeData>>({
+    name: `Flaier${displayName}Node`,
+    props: [
+      "id",
+      "type",
+      "selected",
+      "connectable",
+      "position",
+      "dimensions",
+      "label",
+      "isValidTargetPos",
+      "isValidSourcePos",
+      "parent",
+      "parentNodeId",
+      "dragging",
+      "resizing",
+      "zIndex",
+      "targetPosition",
+      "sourcePosition",
+      "dragHandle",
+      "data",
+      "events",
+    ],
+    setup(nodeProps) {
+      return () =>
+        h(definition.component, {
+          ...(nodeProps.data?.props ?? {}),
+          active: nodeProps.data?.active,
+          nodeKey: nodeProps.data?.key,
+          elementType: nodeProps.data?.elementType ?? elementType,
+          sourceAnchor: nodeProps.data?.sourceAnchor,
+        });
+    },
+  });
+}
+
+const customNodeTypes = computed<NodeTypesObject>(() => {
+  return Object.fromEntries(
+    Object.entries(customNodes.value).map(([elementType, definition]) => {
+      const displayName = elementType.replace(/[^a-z0-9]+/gi, "") || "Custom";
+
+      return [elementType, createCustomNodeRenderer(elementType, definition, displayName)];
+    }),
+  );
+});
+
 function codeNodeTwoslashEnabled(element: SpecElement) {
   if (element.type !== "CodeNode") return false;
 
@@ -1439,6 +1604,21 @@ function estimateCodeNodeSize(element: SpecElement): NodeSize {
 
 function estimateNodeSize(node: OrderedNodeElement): NodeSize {
   const { element } = node;
+  const customNode = getCustomNodeDefinition(element.type);
+
+  if (customNode?.estimateSize) {
+    const customSize = toCustomNodeSize(customNode.estimateSize(createCustomNodeContext(node)));
+    if (customSize) {
+      return customSize;
+    }
+  }
+
+  if (customNode) {
+    return {
+      width: 240,
+      height: 120,
+    };
+  }
 
   if (element.type === "ArchitectureNode") {
     const labelLines = Math.max(1, estimateNodeTextLines(element.props.label, 28));
@@ -2578,6 +2758,8 @@ const nodes = computed<FlowNode[]>(() => {
   return orderedNodeElements.value.map(({ key, nodeType, element, index }) => ({
     id: key,
     type: nodeType,
+    targetPosition: Position.Left,
+    sourcePosition: Position.Right,
     position:
       layoutPositions.value[key] ??
       fallbackPositions[key] ??
@@ -2589,6 +2771,8 @@ const nodes = computed<FlowNode[]>(() => {
       type: nodeType,
       elementType: element.type,
       props: element.props,
+      active: isActive(key),
+      sourceAnchor: resolveNodeSourceAnchor(element.props),
       index,
     },
   }));
@@ -2790,42 +2974,7 @@ const activeDescription = computed(() => {
     return defaultStory ?? "";
   }
 
-  if (node.element.type === "DescriptionNode") {
-    return toOptionalString(node.element.props.body) ?? "";
-  }
-
-  if (node.element.type === "DecisionNode") {
-    return (
-      toOptionalString(node.element.props.description) ??
-      toOptionalString(node.element.props.condition) ??
-      ""
-    );
-  }
-
-  if (node.element.type === "PayloadNode") {
-    return toOptionalString(node.element.props.description) ?? "";
-  }
-
-  if (node.element.type === "ErrorNode") {
-    const message = toOptionalString(node.element.props.message);
-    const cause = toOptionalString(node.element.props.cause);
-    const mitigation = toOptionalString(node.element.props.mitigation);
-
-    return [message, cause ? `Cause: ${cause}` : "", mitigation ? `Mitigation: ${mitigation}` : ""]
-      .filter((value): value is string => typeof value === "string" && value.length > 0)
-      .join(" ");
-  }
-
-  if (node.element.type === "ArchitectureNode") {
-    const technology = toOptionalString(node.element.props.technology);
-    const description = toOptionalString(node.element.props.description);
-
-    return [technology ? `Technology: ${technology}` : "", description ?? ""]
-      .filter((value): value is string => typeof value === "string" && value.length > 0)
-      .join(" ");
-  }
-
-  return toOptionalString(node.element.props.description) ?? "";
+  return getNodeSummary(node);
 });
 
 const activeSourceAnchor = computed(() => {
@@ -2878,42 +3027,10 @@ const architectureInspector = computed<ArchitectureInspectorView | null>(() => {
   const sourceAnchor = resolveNodeSourceAnchor(node.element.props);
 
   if (node.element.type !== "ArchitectureNode") {
-    const summary = (() => {
-      if (node.element.type === "CodeNode") {
-        return (
-          toTrimmedNonEmptyString(node.element.props.story) ??
-          toTrimmedNonEmptyString(node.element.props.comment) ??
-          ""
-        );
-      }
-
-      if (node.element.type === "DecisionNode") {
-        return (
-          toTrimmedNonEmptyString(node.element.props.description) ??
-          toTrimmedNonEmptyString(node.element.props.condition) ??
-          ""
-        );
-      }
-
-      if (node.element.type === "DescriptionNode") {
-        return toTrimmedNonEmptyString(node.element.props.body) ?? "";
-      }
-
-      if (node.element.type === "ErrorNode") {
-        return (
-          toTrimmedNonEmptyString(node.element.props.message) ??
-          toTrimmedNonEmptyString(node.element.props.cause) ??
-          ""
-        );
-      }
-
-      return toTrimmedNonEmptyString(node.element.props.description) ?? "";
-    })();
-
     return {
       type: "Other",
       label,
-      summary,
+      summary: getNodeSummary(node),
       sourceAnchor,
       elementType: node.element.type,
     };
@@ -3016,10 +3133,7 @@ const branchChoices = computed<BranchChoice[]>(() => {
     const transition = transitionMetaBySource.value[node.key]?.[id];
 
     const targetLabel = toOptionalString(target.element.props.label) ?? id;
-    const targetDescription =
-      target.element.type === "DescriptionNode"
-        ? toOptionalString(target.element.props.body)
-        : toOptionalString(target.element.props.description);
+    const targetDescription = getNodeSummary(target);
 
     result.push({
       id,
@@ -3423,6 +3537,7 @@ onUnmounted(() => {
     ref="containerRef"
     class="flaier relative h-full w-full font-sans antialiased bg-background transition-[min-height] duration-300 ease-out"
     :style="{ minHeight: `${containerMinHeight}px` }"
+    :data-mode="isArchitectureMode ? 'architecture' : 'narrative'"
     :data-focus-mode="overviewMode ? 'overview' : 'focus'"
     :data-theme="uiTheme"
   >
@@ -3464,6 +3579,7 @@ onUnmounted(() => {
         :id="flowId"
         :nodes="nodes"
         :edges="edges"
+        :node-types="customNodeTypes"
         :fit-view-on-init="false"
         :nodes-draggable="false"
         :nodes-connectable="false"

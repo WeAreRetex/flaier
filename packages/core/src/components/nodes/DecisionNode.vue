@@ -18,6 +18,7 @@ defineProps<{
   <div
     class="fn-node w-[250px] rounded-lg border border-primary/35 bg-card px-4 py-3"
     :data-active="active"
+    data-node-type="decision"
   >
     <Handle type="target" :position="Position.Left" />
     <div class="mb-1.5 flex items-center gap-2">

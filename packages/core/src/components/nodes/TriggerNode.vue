@@ -23,6 +23,7 @@ const props = withDefaults(
   <div
     class="fn-node w-[220px] rounded-lg border border-border bg-card px-4 py-3"
     :data-active="active"
+    data-node-type="trigger"
   >
     <div class="flex items-center gap-2 mb-1.5">
       <div class="w-2 h-2 rounded-full" :style="{ backgroundColor: color }" />

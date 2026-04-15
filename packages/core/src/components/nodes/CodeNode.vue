@@ -361,6 +361,7 @@ const magicMoveOptions = {
     class="fn-node rounded-lg border border-border bg-card overflow-hidden"
     :style="{ width: `${nodeWidth}px` }"
     :data-active="active"
+    data-node-type="code"
   >
     <Handle type="target" :position="Position.Left" />
 

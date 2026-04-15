@@ -1,4 +1,4 @@
-import { addComponentsDir, addServerHandler, createResolver, defineNuxtModule } from "@nuxt/kit";
+import { addComponentsDir, addImportsDir, addServerHandler, createResolver, defineNuxtModule } from "@nuxt/kit";
 
 export interface FlaierNuxtOptions {
   css?: boolean;
@@ -28,6 +28,8 @@ export default defineNuxtModule<FlaierNuxtOptions>({
         nuxt.options.css.push(stylePath);
       }
     }
+
+    addImportsDir(resolver.resolve("./runtime/composables"));
 
     if (options.components !== false) {
       addComponentsDir({

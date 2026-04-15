@@ -1,8 +1,10 @@
 import { defineCatalog } from "@json-render/core";
 import { schema } from "@json-render/vue";
 import { z } from "zod";
+import { createFlaierCustomCatalogComponents } from "./custom-nodes";
+import type { FlaierCatalogOptions } from "./types";
 
-const magicMoveStepSchema = z.object({
+export const magicMoveStepSchema = z.object({
   code: z.string(),
   title: z.string().optional(),
   comment: z.string().optional(),
@@ -10,14 +12,14 @@ const magicMoveStepSchema = z.object({
   speaker: z.string().optional(),
 });
 
-const twoslashHtmlSchema = z
+export const twoslashHtmlSchema = z
   .object({
     dark: z.string().optional(),
     light: z.string().optional(),
   })
   .optional();
 
-const edgeTransitionKindSchema = z.enum([
+export const edgeTransitionKindSchema = z.enum([
   "default",
   "success",
   "error",
@@ -26,7 +28,7 @@ const edgeTransitionKindSchema = z.enum([
   "async",
 ]);
 
-const edgeTransitionSchema = z.object({
+export const edgeTransitionSchema = z.object({
   to: z.string(),
   label: z.string().optional(),
   description: z.string().optional(),
@@ -38,7 +40,7 @@ const edgeTransitionSchema = z.object({
   criticality: z.enum(["low", "medium", "high"]).optional(),
 });
 
-const sourceAnchorSchema = z.union([
+export const sourceAnchorSchema = z.union([
   z.string(),
   z.object({
     path: z.string(),
@@ -49,7 +51,7 @@ const sourceAnchorSchema = z.union([
   }),
 ]);
 
-const architectureZoneSchema = z.object({
+export const architectureZoneSchema = z.object({
   id: z.string(),
   label: z.string(),
   description: z.string().optional(),
@@ -57,7 +59,7 @@ const architectureZoneSchema = z.object({
   padding: z.number().positive().optional(),
 });
 
-const architectureInterfaceSchema = z.object({
+export const architectureInterfaceSchema = z.object({
   name: z.string(),
   protocol: z.string().optional(),
   direction: z.enum(["inbound", "outbound", "bidirectional"]).optional(),
@@ -66,7 +68,7 @@ const architectureInterfaceSchema = z.object({
   notes: z.string().optional(),
 });
 
-const architectureDataAssetSchema = z.object({
+export const architectureDataAssetSchema = z.object({
   name: z.string(),
   kind: z.string().optional(),
   classification: z.enum(["public", "internal", "confidential", "restricted"]).optional(),
@@ -74,26 +76,26 @@ const architectureDataAssetSchema = z.object({
   notes: z.string().optional(),
 });
 
-const architectureSecuritySchema = z.object({
+export const architectureSecuritySchema = z.object({
   auth: z.string().optional(),
   encryption: z.string().optional(),
   pii: z.boolean().optional(),
   threatModel: z.string().optional(),
 });
 
-const architectureOperationsSchema = z.object({
+export const architectureOperationsSchema = z.object({
   owner: z.string().optional(),
   slo: z.string().optional(),
   alert: z.string().optional(),
   runbook: z.string().optional(),
 });
 
-const architectureLinkSchema = z.object({
+export const architectureLinkSchema = z.object({
   label: z.string(),
   href: z.string(),
 });
 
-export const catalog = defineCatalog(schema, {
+export const flaierCatalogComponents = {
   components: {
     FlowTimeline: {
       props: z.object({
@@ -229,5 +231,21 @@ export const catalog = defineCatalog(schema, {
       description: "Clickable reference link to a file or URL",
     },
   },
+};
+
+export const catalog = defineCatalog(schema, {
+  components: flaierCatalogComponents.components,
   actions: {},
 });
+
+export function createFlaierCatalog<TNodes extends NonNullable<FlaierCatalogOptions["nodes"]>>(
+  options?: FlaierCatalogOptions<TNodes>,
+) {
+  return defineCatalog(schema, {
+    components: {
+      ...flaierCatalogComponents.components,
+      ...createFlaierCustomCatalogComponents(options?.nodes),
+    },
+    actions: {},
+  });
+}

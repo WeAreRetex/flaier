@@ -1,8 +1,10 @@
 import { h } from "vue";
-import type { ComponentFn } from "@json-render/vue";
+import type { ComponentFn, ComponentRegistry } from "@json-render/vue";
 import { defineRegistry } from "@json-render/vue";
-import { catalog } from "./catalog";
+import { catalog, createFlaierCatalog } from "./catalog";
 import FlowTimelineRenderer from "./components/renderer/FlowTimelineRenderer.vue";
+import { createFlaierCustomRegistryComponents } from "./custom-nodes";
+import type { FlaierCatalogOptions } from "./types";
 
 const FlowTimelineComponent: ComponentFn<typeof catalog, "FlowTimeline"> = ({ props }) =>
   h(FlowTimelineRenderer, {
@@ -34,7 +36,7 @@ const ErrorNodeComponent: ComponentFn<typeof catalog, "ErrorNode"> = () => null;
 const DescriptionNodeComponent: ComponentFn<typeof catalog, "DescriptionNode"> = () => null;
 const LinkNodeComponent: ComponentFn<typeof catalog, "LinkNode"> = () => null;
 
-export const { registry } = defineRegistry(catalog, {
+const baseRegistryResult = defineRegistry(catalog, {
   components: {
     FlowTimeline: FlowTimelineComponent,
     ArchitectureNode: ArchitectureNodeComponent,
@@ -47,3 +49,23 @@ export const { registry } = defineRegistry(catalog, {
     LinkNode: LinkNodeComponent,
   },
 });
+
+export const registry = baseRegistryResult.registry;
+
+export function createFlaierRendererRegistry<TNodes extends NonNullable<FlaierCatalogOptions["nodes"]>>(
+  options?: FlaierCatalogOptions<TNodes>,
+): ComponentRegistry {
+  return {
+    ...registry,
+    ...createFlaierCustomRegistryComponents(options?.nodes),
+  };
+}
+
+export function createFlaierRegistry<TNodes extends NonNullable<FlaierCatalogOptions["nodes"]>>(
+  options?: FlaierCatalogOptions<TNodes>,
+) {
+  return {
+    catalog: createFlaierCatalog(options),
+    registry: createFlaierRendererRegistry(options),
+  };
+}

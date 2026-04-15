@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { FlaierPanel } from "@flaier/core";
-import type { FlaierSource } from "@flaier/core";
+import type { FlaierCustomNodeDefinitions, FlaierSource } from "@flaier/core";
 import { toRef } from "vue";
+import { useMergedFlaierNodes } from "../composables/useFlaierNodes";
 import { usePreparedFlaierSource } from "../composables/usePreparedFlaierSource";
 
 const props = withDefaults(
@@ -12,6 +13,7 @@ const props = withDefaults(
     height?: string | number;
     minHeight?: number;
     zIndex?: number;
+    nodes?: FlaierCustomNodeDefinitions;
   }>(),
   {
     interval: 3200,
@@ -23,6 +25,7 @@ const props = withDefaults(
 );
 
 const preparedSource = await usePreparedFlaierSource(toRef(props, "src"));
+const mergedNodes = useMergedFlaierNodes(toRef(props, "nodes"));
 </script>
 
 <template>
@@ -35,6 +38,7 @@ const preparedSource = await usePreparedFlaierSource(toRef(props, "src"));
       :height="height"
       :min-height="minHeight"
       :z-index="zIndex"
+      :nodes="mergedNodes"
       theme-mode="document"
       :fullscreen-enabled="true"
     />

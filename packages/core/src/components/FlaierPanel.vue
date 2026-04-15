@@ -70,6 +70,7 @@ watch(
           :auto-play="autoPlay"
           :interval="interval"
           :theme-mode="themeMode"
+          :nodes="nodes"
         />
 
         <button
@@ -122,6 +123,13 @@ watch(
   --fn-panel-height: min(72vh, 760px);
   --fn-panel-min-height: 420px;
   --fn-panel-z-index: 1400;
+  --fn-panel-toggle-border: rgba(148, 163, 184, 0.5);
+  --fn-panel-toggle-bg: rgba(15, 23, 42, 0.82);
+  --fn-panel-toggle-color: rgba(226, 232, 240, 0.95);
+  --fn-panel-toggle-shadow: 0 10px 26px rgba(15, 23, 42, 0.24);
+  --fn-panel-toggle-hover-border: rgba(125, 211, 252, 0.7);
+  --fn-panel-toggle-hover-bg: rgba(15, 23, 42, 0.96);
+  --fn-panel-backdrop-bg: rgba(2, 6, 23, 0.72);
   position: relative;
   width: 100%;
 }
@@ -146,16 +154,16 @@ watch(
   bottom: 0.95rem;
   width: 2.3rem;
   height: 2.3rem;
-  border: 1px solid rgba(148, 163, 184, 0.5);
+  border: 1px solid var(--fn-panel-toggle-border);
   border-radius: 0.65rem;
-  background: rgba(15, 23, 42, 0.82);
-  color: rgba(226, 232, 240, 0.95);
+  background: var(--fn-panel-toggle-bg);
+  color: var(--fn-panel-toggle-color);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   z-index: 40;
-  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.24);
+  box-shadow: var(--fn-panel-toggle-shadow);
   transition:
     transform 0.18s ease,
     background-color 0.2s ease,
@@ -164,8 +172,8 @@ watch(
 
 .fn-panel__toggle:hover {
   transform: translateY(-1px);
-  border-color: rgba(125, 211, 252, 0.7);
-  background: rgba(15, 23, 42, 0.96);
+  border-color: var(--fn-panel-toggle-hover-border);
+  background: var(--fn-panel-toggle-hover-bg);
 }
 
 .fn-panel__toggle svg {
@@ -186,7 +194,7 @@ watch(
   position: absolute;
   inset: 0;
   border: none;
-  background: rgba(2, 6, 23, 0.72);
+  background: var(--fn-panel-backdrop-bg);
   cursor: default;
 }
 
