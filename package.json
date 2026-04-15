@@ -1,6 +1,6 @@
 {
   "name": "flaier",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "description": "Spec-driven flow visualizer for AI-generated codebase storytelling.",
   "homepage": "https://github.com/WeAreRetex/flaier#readme",

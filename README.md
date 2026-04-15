@@ -177,6 +177,8 @@ This scans `*.flow.json` files and writes a manifest the viewer or renderer can 
 
 Use the agents package when you want to scaffold or validate specs instead of hand-authoring every JSON file:
 
+If your coding agent supports [skills.sh](https://skills.sh), you can also install the provided `flaier-flow-generator` skill directly from this repo with `npx skills add https://github.com/WeAreRetex/flaier --skill flaier-flow-generator`. That gives your agent a packaged workflow for generating, repairing, validating, and manifesting Flaier `*.flow.json` artifacts.
+
 ```bash
 pnpm agents:scaffold -- --title "Checkout Flow" --template branching --out ./apps/viewer/flow-specs/checkout.flow.json
 pnpm agents:manifest -- --dir ./apps/viewer/flow-specs --out ./apps/viewer/flow-specs/manifest.json

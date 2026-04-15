@@ -1,13 +1,13 @@
 {
   "name": "@flaier/docs",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "nuxt dev --extends docus",
     "prebuild": "pnpm --dir ../../packages/core build",
-    "build": "NUXT_CONTENT_LOCAL_DB=.data/content/build.sqlite nuxt build --extends docus",
+    "build": "NODE_OPTIONS=--max-old-space-size=4096 nuxt build --extends docus",
     "pregenerate": "pnpm --dir ../../packages/core build",
     "generate": "NUXT_CONTENT_LOCAL_DB=.data/content/generate.sqlite nuxt generate --extends docus",
     "preview": "NUXT_CONTENT_LOCAL_DB=.data/content/preview.sqlite nuxt preview --extends docus"

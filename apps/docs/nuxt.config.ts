@@ -1,12 +1,7 @@
 import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 
-const siteUrl =
-  process.env.URL ??
-  process.env.DEPLOY_PRIME_URL ??
-  process.env.DEPLOY_URL ??
-  process.env.NUXT_SITE_URL ??
-  "https://flaier.local";
+const siteUrl = process.env.NUXT_SITE_URL ?? "https://flaier.local";
 const siteDomain = new URL(siteUrl).hostname;
 const coreSourceAliases =
   process.env.NODE_ENV === "production"
@@ -43,6 +38,7 @@ export default defineNuxtConfig({
     domain: siteDomain,
   },
   vite: {
+    // @ts-expect-error vite plugin
     plugins: [tailwindcss()],
     resolve: {
       alias: coreSourceAliases,
