@@ -6,12 +6,12 @@ import {
   defineNuxtModule,
 } from "@nuxt/kit";
 
-export interface FlaierNuxtOptions {
+export interface ModuleOptions {
   css?: boolean;
   components?: boolean;
 }
 
-export default defineNuxtModule<FlaierNuxtOptions>({
+export default defineNuxtModule<ModuleOptions>({
   meta: {
     name: "@flaier/nuxt",
     configKey: "flaier",

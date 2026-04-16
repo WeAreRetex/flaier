@@ -20,17 +20,31 @@
     "directory": "packages/nuxt"
   },
   "files": [
-    "module.ts",
-    "runtime"
+    "dist"
   ],
   "type": "module",
-  "types": "./module.ts",
+  "main": "./dist/module.mjs",
+  "types": "./dist/types.d.mts",
   "exports": {
-    ".": "./module.ts"
+    ".": {
+      "types": "./dist/types.d.mts",
+      "default": "./dist/module.mjs"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      ".": [
+        "./dist/types.d.mts"
+      ]
+    }
   },
   "publishConfig": {
     "access": "public",
     "provenance": true
+  },
+  "scripts": {
+    "build": "nuxt-module-build build",
+    "prepack": "pnpm build"
   },
   "dependencies": {
     "@nuxt/kit": "^4.4.0",
@@ -43,5 +57,9 @@
     "@flaier/core": "workspace:*",
     "nuxt": "^4.4.0",
     "vue": "^3.5.0"
+  },
+  "devDependencies": {
+    "@nuxt/module-builder": "^1.0.2",
+    "nuxt": "^4.4.0"
   }
 }

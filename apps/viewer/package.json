@@ -5,11 +5,12 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
+    "predev": "pnpm --dir ../../packages/core build && pnpm --dir ../../packages/nuxt build",
     "dev": "nuxt dev",
-    "prebuild": "pnpm --dir ../../packages/core build",
+    "prebuild": "pnpm --dir ../../packages/core build && pnpm --dir ../../packages/nuxt build",
     "build": "nuxt build",
     "preview": "nuxt preview",
-    "prepare": "nuxt prepare"
+    "prepare": "pnpm --dir ../../packages/nuxt build && nuxt prepare"
   },
   "dependencies": {
     "@flaier/core": "workspace:*",
