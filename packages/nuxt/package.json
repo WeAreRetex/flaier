@@ -25,17 +25,17 @@
   "type": "module",
   "main": "./dist/module.mjs",
   "types": "./dist/types.d.mts",
-  "exports": {
-    ".": {
-      "types": "./dist/types.d.mts",
-      "default": "./dist/module.mjs"
-    }
-  },
   "typesVersions": {
     "*": {
       ".": [
         "./dist/types.d.mts"
       ]
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/types.d.mts",
+      "default": "./dist/module.mjs"
     }
   },
   "publishConfig": {
@@ -53,13 +53,13 @@
     "twoslash": "^0.3",
     "typescript": "^5.9.3"
   },
+  "devDependencies": {
+    "@nuxt/module-builder": "^1.0.2",
+    "nuxt": "^4.4.0"
+  },
   "peerDependencies": {
     "@flaier/core": "workspace:*",
     "nuxt": "^4.4.0",
     "vue": "^3.5.0"
-  },
-  "devDependencies": {
-    "@nuxt/module-builder": "^1.0.2",
-    "nuxt": "^4.4.0"
   }
 }
