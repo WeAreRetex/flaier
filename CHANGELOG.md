@@ -1,6 +1,19 @@
 # Changelog
 
 
+## v0.1.8
+
+[compare changes](https://github.com/WeAreRetex/flaier/compare/v0.1.7...v0.1.8)
+
+### 🩹 Fixes
+
+- Skill ([f475a8f](https://github.com/WeAreRetex/flaier/commit/f475a8f))
+- Ship nuxt module with module-builder ([deeb840](https://github.com/WeAreRetex/flaier/commit/deeb840))
+
+### ❤️ Contributors
+
+- Rigo-m ([@Rigo-m](https://github.com/Rigo-m))
+
 ## v0.1.7
 
 [compare changes](https://github.com/WeAreRetex/flaier/compare/v0.1.6...v0.1.7)
