@@ -58,6 +58,8 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@flaier/core": "^0.1.7",
+    "@flaier/nuxt": "^0.1.7",
     "@tailwindcss/postcss": "^4.2.2",
     "@tsdown/css": "^0.21.7",
     "@vitejs/plugin-vue": "^6.0.6",
