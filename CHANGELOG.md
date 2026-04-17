@@ -1,6 +1,22 @@
 # Changelog
 
 
+## v0.2.0
+
+[compare changes](https://github.com/WeAreRetex/flaier/compare/v0.1.9...v0.2.0)
+
+### 🚀 Enhancements
+
+- Sequence layout ([62e50fc](https://github.com/WeAreRetex/flaier/commit/62e50fc))
+
+### 🩹 Fixes
+
+- Sequence layout fixes ([c19c44d](https://github.com/WeAreRetex/flaier/commit/c19c44d))
+
+### ❤️ Contributors
+
+- Rigo-m ([@Rigo-m](https://github.com/Rigo-m))
+
 ## v0.1.9
 
 [compare changes](https://github.com/WeAreRetex/flaier/compare/v0.1.8...v0.1.9)

@@ -1,6 +1,6 @@
 {
   "name": "@flaier/nuxt",
-  "version": "0.1.9",
+  "version": "0.2.0",
   "description": "Nuxt module and wrapper components for Flaier flows in Nuxt and Docus.",
   "keywords": [
     "diagram",
@@ -44,7 +44,7 @@
   },
   "scripts": {
     "build": "nuxt-module-build build",
-     "dev:prepare": "nuxt-module-build build --stub && nuxt-module-build prepare",
+    "dev:prepare": "nuxt-module-build build --stub && nuxt-module-build prepare",
     "prepack": "pnpm build"
   },
   "dependencies": {
