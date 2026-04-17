@@ -5,7 +5,6 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "predev": "pnpm --dir ../../packages/core build && pnpm --dir ../../packages/nuxt build",
     "dev": "nuxt dev --extends docus",
     "prebuild": "pnpm --dir ../../packages/core build && pnpm --dir ../../packages/nuxt build",
     "build": "NODE_OPTIONS=--max-old-space-size=4096 nuxt build --extends docus",

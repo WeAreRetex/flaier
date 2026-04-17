@@ -16,6 +16,11 @@ const FLOW_COMPONENT_TYPES = new Set([
   "ErrorNode",
   "DescriptionNode",
   "LinkNode",
+  "SequenceParticipant",
+  "SequenceMessage",
+  "SequenceNote",
+  "SequenceGroup",
+  "SequenceBranch",
 ]);
 
 const TWOSLASH_SUPPORTED_LANGUAGES = new Set(["typescript", "ts", "tsx"]);
@@ -39,6 +44,27 @@ const ARCHITECTURE_NODE_KINDS = [
 ];
 const EDGE_TRANSITION_TRANSPORTS = ["sync", "async"];
 const EDGE_TRANSITION_CRITICALITY = ["low", "medium", "high"];
+const SEQUENCE_PARTICIPANT_KINDS = [
+  "participant",
+  "actor",
+  "boundary",
+  "control",
+  "entity",
+  "database",
+  "collections",
+  "queue",
+];
+const SEQUENCE_MESSAGE_KINDS = ["sync", "async", "return"];
+const SEQUENCE_NOTE_PLACEMENTS = ["left-of", "right-of", "over"];
+const SEQUENCE_GROUP_KINDS = ["alt", "loop", "opt"];
+const SEQUENCE_MODE_ALLOWED_TYPES = new Set([
+  "FlowTimeline",
+  "SequenceParticipant",
+  "SequenceMessage",
+  "SequenceNote",
+  "SequenceGroup",
+  "SequenceBranch",
+]);
 
 interface NormalizedTransition {
   to: string;
@@ -130,6 +156,12 @@ export function validateFlaierReadiness(spec: FlowSpec): FlowReadinessResult {
     warnings.push("Root FlowTimeline has no children, so no node timeline can be traversed.");
   }
 
+  if (rootMode === "sequence") {
+    validateSequenceMode(spec, root, entries, errors, warnings);
+    validateStateShape(spec.state, errors, warnings);
+    return { errors, warnings };
+  }
+
   if (rootMode === "architecture") {
     const architectureNodeCount = entries.filter(
       ([key, element]) =>
@@ -214,7 +246,9 @@ function validateElementProps(
     case "FlowTimeline": {
       expectRequiredString(props, "title", key, errors);
       expectOptionalString(props, "description", key, errors);
-      expectOptionalEnum(props, "mode", ["narrative", "architecture"], key, errors);
+      expectOptionalEnum(props, "mode", ["narrative", "architecture", "sequence"], key, errors);
+      expectOptionalStringArray(props, "participants", key, errors);
+      expectOptionalBoolean(props, "showSequenceNumbers", key, errors);
       validateArchitectureZonesProp(key, props.zones, errors);
       expectOptionalEnum(props, "direction", ["horizontal", "vertical"], key, errors);
       expectOptionalEnum(props, "layoutEngine", ["dagre", "manual"], key, errors);
@@ -450,6 +484,45 @@ function validateElementProps(
     case "LinkNode": {
       expectRequiredString(props, "label", key, errors);
       expectRequiredString(props, "href", key, errors);
+      expectOptionalString(props, "description", key, errors);
+      break;
+    }
+
+    case "SequenceParticipant": {
+      expectRequiredString(props, "label", key, errors);
+      expectOptionalString(props, "description", key, errors);
+      expectOptionalEnum(props, "kind", SEQUENCE_PARTICIPANT_KINDS, key, errors);
+      break;
+    }
+
+    case "SequenceMessage": {
+      expectRequiredString(props, "from", key, errors);
+      expectRequiredString(props, "to", key, errors);
+      expectRequiredString(props, "label", key, errors);
+      expectOptionalString(props, "description", key, errors);
+      expectOptionalEnum(props, "kind", SEQUENCE_MESSAGE_KINDS, key, errors);
+      expectOptionalStringArray(props, "activate", key, errors);
+      expectOptionalStringArray(props, "deactivate", key, errors);
+      break;
+    }
+
+    case "SequenceNote": {
+      expectOptionalString(props, "label", key, errors);
+      expectRequiredString(props, "body", key, errors);
+      expectOptionalEnum(props, "placement", SEQUENCE_NOTE_PLACEMENTS, key, errors);
+      validateRequiredStringArrayProp(key, props.participants, "participants", errors, 1, 2);
+      break;
+    }
+
+    case "SequenceGroup": {
+      expectRequiredString(props, "label", key, errors);
+      expectRequiredEnum(props, "kind", SEQUENCE_GROUP_KINDS, key, errors);
+      expectOptionalString(props, "description", key, errors);
+      break;
+    }
+
+    case "SequenceBranch": {
+      expectOptionalString(props, "label", key, errors);
       expectOptionalString(props, "description", key, errors);
       break;
     }
@@ -739,7 +812,350 @@ function validateSourceAnchorProp(
 }
 
 function getFlowTimelineMode(root: FlowElement) {
-  return root.props.mode === "architecture" ? "architecture" : "narrative";
+  if (root.props.mode === "architecture") {
+    return "architecture";
+  }
+
+  if (root.props.mode === "sequence") {
+    return "sequence";
+  }
+
+  return "narrative";
+}
+
+function validateSequenceMode(
+  spec: FlowSpec,
+  root: FlowElement,
+  entries: Array<[string, unknown]>,
+  errors: string[],
+  warnings: string[],
+) {
+  const participantOrder = normalizeSequenceParticipantOrder(root, spec, errors);
+  const participantSet = new Set(participantOrder);
+  const referencedParticipants = new Set<string>();
+  const referencedElements = new Set<string>();
+
+  for (const [key, rawElement] of entries) {
+    if (!isFlowElement(rawElement)) {
+      continue;
+    }
+
+    if (!SEQUENCE_MODE_ALLOWED_TYPES.has(rawElement.type)) {
+      errors.push(
+        `Element "${key}" type "${rawElement.type}" is not supported when FlowTimeline mode="sequence".`,
+      );
+    }
+  }
+
+  const rootChildren = Array.isArray(root.children) ? root.children : [];
+  validateSequenceStatements(
+    rootChildren,
+    spec,
+    participantSet,
+    referencedParticipants,
+    referencedElements,
+    errors,
+    warnings,
+    new Set(),
+  );
+
+  for (const participantKey of participantOrder) {
+    if (!referencedParticipants.has(participantKey)) {
+      warnings.push(
+        `Sequence participant "${participantKey}" is declared in FlowTimeline.props.participants but never referenced by a message or note.`,
+      );
+    }
+  }
+
+  for (const [key, rawElement] of entries) {
+    if (!isFlowElement(rawElement) || key === spec.root) {
+      continue;
+    }
+
+    if (rawElement.type === "SequenceParticipant" && !participantSet.has(key)) {
+      warnings.push(
+        `SequenceParticipant "${key}" exists in elements but is missing from FlowTimeline.props.participants, so it will not render.`,
+      );
+      continue;
+    }
+
+    if (
+      ["SequenceMessage", "SequenceNote", "SequenceGroup", "SequenceBranch"].includes(
+        rawElement.type,
+      ) &&
+      !referencedElements.has(key)
+    ) {
+      warnings.push(
+        `Sequence element "${key}" is not referenced from the root sequence statement tree.`,
+      );
+    }
+  }
+}
+
+function normalizeSequenceParticipantOrder(root: FlowElement, spec: FlowSpec, errors: string[]) {
+  const rawParticipants = root.props.participants;
+  if (!Array.isArray(rawParticipants) || rawParticipants.length === 0) {
+    errors.push('FlowTimeline mode="sequence" requires a non-empty props.participants array.');
+    return [];
+  }
+
+  const result: string[] = [];
+  const seen = new Set<string>();
+
+  for (const [index, participantKey] of rawParticipants.entries()) {
+    if (!isNonEmptyString(participantKey)) {
+      errors.push(`FlowTimeline props.participants[${index}] must be a non-empty string.`);
+      continue;
+    }
+
+    const normalized = participantKey.trim();
+    if (seen.has(normalized)) {
+      errors.push(`FlowTimeline props.participants has duplicate id "${normalized}".`);
+      continue;
+    }
+
+    const participant = spec.elements[normalized];
+    if (!isFlowElement(participant)) {
+      errors.push(
+        `FlowTimeline props.participants[${index}] points to missing element "${normalized}".`,
+      );
+      continue;
+    }
+
+    if (participant.type !== "SequenceParticipant") {
+      errors.push(
+        `FlowTimeline props.participants[${index}] must reference a SequenceParticipant, got "${participant.type}" for "${normalized}".`,
+      );
+      continue;
+    }
+
+    seen.add(normalized);
+    result.push(normalized);
+  }
+
+  return result;
+}
+
+function validateSequenceStatements(
+  statementKeys: string[],
+  spec: FlowSpec,
+  participantSet: Set<string>,
+  referencedParticipants: Set<string>,
+  referencedElements: Set<string>,
+  errors: string[],
+  warnings: string[],
+  path: Set<string>,
+) {
+  for (const key of statementKeys) {
+    if (path.has(key)) {
+      errors.push(`Sequence statement tree contains a cycle at element "${key}".`);
+      continue;
+    }
+
+    const element = spec.elements[key];
+    if (!isFlowElement(element)) {
+      continue;
+    }
+
+    referencedElements.add(key);
+
+    if (element.type === "SequenceMessage") {
+      validateSequenceParticipantReference(
+        key,
+        "from",
+        element.props.from,
+        participantSet,
+        errors,
+        referencedParticipants,
+      );
+      validateSequenceParticipantReference(
+        key,
+        "to",
+        element.props.to,
+        participantSet,
+        errors,
+        referencedParticipants,
+      );
+      validateSequenceParticipantArrayReference(
+        key,
+        "activate",
+        element.props.activate,
+        participantSet,
+        errors,
+        referencedParticipants,
+      );
+      validateSequenceParticipantArrayReference(
+        key,
+        "deactivate",
+        element.props.deactivate,
+        participantSet,
+        errors,
+        referencedParticipants,
+      );
+      continue;
+    }
+
+    if (element.type === "SequenceNote") {
+      validateSequenceParticipantArrayReference(
+        key,
+        "participants",
+        element.props.participants,
+        participantSet,
+        errors,
+        referencedParticipants,
+        1,
+        2,
+      );
+      continue;
+    }
+
+    if (element.type === "SequenceGroup") {
+      const groupKind = typeof element.props.kind === "string" ? element.props.kind : undefined;
+      const childKeys = Array.isArray(element.children) ? element.children : [];
+
+      if (childKeys.length === 0) {
+        warnings.push(`SequenceGroup "${key}" has no branch children.`);
+        continue;
+      }
+
+      if (!childKeys.every((childKey) => spec.elements[childKey]?.type === "SequenceBranch")) {
+        errors.push(`SequenceGroup "${key}" children must all reference SequenceBranch elements.`);
+        continue;
+      }
+
+      if (groupKind === "alt" && childKeys.length < 2) {
+        warnings.push(
+          `SequenceGroup "${key}" kind=alt should usually contain at least two branches.`,
+        );
+      }
+
+      if ((groupKind === "loop" || groupKind === "opt") && childKeys.length !== 1) {
+        warnings.push(
+          `SequenceGroup "${key}" kind=${groupKind} should contain exactly one branch.`,
+        );
+      }
+
+      path.add(key);
+
+      for (const branchKey of childKeys) {
+        const branch = spec.elements[branchKey];
+        if (!isFlowElement(branch) || branch.type !== "SequenceBranch") {
+          continue;
+        }
+
+        referencedElements.add(branchKey);
+
+        if (groupKind === "alt" && !isNonEmptyString(branch.props.label)) {
+          warnings.push(
+            `SequenceBranch "${branchKey}" inside alt group "${key}" should have a label.`,
+          );
+        }
+
+        const branchChildren = Array.isArray(branch.children) ? branch.children : [];
+        if (branchChildren.length === 0) {
+          warnings.push(`SequenceBranch "${branchKey}" has no nested sequence statements.`);
+          continue;
+        }
+
+        const nestedPath = new Set(path);
+        nestedPath.add(branchKey);
+
+        validateSequenceStatements(
+          branchChildren,
+          spec,
+          participantSet,
+          referencedParticipants,
+          referencedElements,
+          errors,
+          warnings,
+          nestedPath,
+        );
+      }
+
+      path.delete(key);
+      continue;
+    }
+
+    if (element.type === "SequenceBranch") {
+      errors.push(`SequenceBranch "${key}" can only appear as a child of SequenceGroup.`);
+      continue;
+    }
+
+    if (element.type === "SequenceParticipant") {
+      errors.push(
+        `SequenceParticipant "${key}" must be referenced via FlowTimeline.props.participants, not root or branch children.`,
+      );
+      continue;
+    }
+
+    errors.push(
+      `Element "${key}" type "${element.type}" cannot appear in a sequence statement tree.`,
+    );
+  }
+}
+
+function validateSequenceParticipantReference(
+  elementKey: string,
+  propKey: string,
+  value: unknown,
+  participantSet: Set<string>,
+  errors: string[],
+  referencedParticipants: Set<string>,
+) {
+  if (!isNonEmptyString(value)) {
+    return;
+  }
+
+  const normalized = value.trim();
+  if (!participantSet.has(normalized)) {
+    errors.push(
+      `Element "${elementKey}" prop "${propKey}" references undeclared participant "${normalized}".`,
+    );
+    return;
+  }
+
+  referencedParticipants.add(normalized);
+}
+
+function validateSequenceParticipantArrayReference(
+  elementKey: string,
+  propKey: string,
+  value: unknown,
+  participantSet: Set<string>,
+  errors: string[],
+  referencedParticipants: Set<string>,
+  min = 0,
+  max = Number.POSITIVE_INFINITY,
+) {
+  if (value === undefined) {
+    return;
+  }
+
+  if (!Array.isArray(value)) {
+    return;
+  }
+
+  if (value.length < min || value.length > max) {
+    errors.push(
+      `Element "${elementKey}" prop "${propKey}" must contain between ${min} and ${max === Number.POSITIVE_INFINITY ? "any" : max} participants.`,
+    );
+  }
+
+  for (const participantKey of value) {
+    if (!isNonEmptyString(participantKey)) {
+      continue;
+    }
+
+    const normalized = participantKey.trim();
+    if (!participantSet.has(normalized)) {
+      errors.push(
+        `Element "${elementKey}" prop "${propKey}" references undeclared participant "${normalized}".`,
+      );
+      continue;
+    }
+
+    referencedParticipants.add(normalized);
+  }
 }
 
 function collectDeclaredArchitectureZones(root: FlowElement) {
@@ -858,6 +1274,34 @@ function expectOptionalStringArray(
   for (const [index, entry] of value.entries()) {
     if (!isNonEmptyString(entry)) {
       errors.push(`Element "${elementKey}" prop "${key}"[${index}] must be a non-empty string.`);
+    }
+  }
+}
+
+function validateRequiredStringArrayProp(
+  elementKey: string,
+  value: unknown,
+  propKey: string,
+  errors: string[],
+  min = 1,
+  max = Number.POSITIVE_INFINITY,
+) {
+  if (!Array.isArray(value)) {
+    errors.push(`Element "${elementKey}" prop "${propKey}" must be an array of strings.`);
+    return;
+  }
+
+  if (value.length < min || value.length > max) {
+    errors.push(
+      `Element "${elementKey}" prop "${propKey}" must contain between ${min} and ${max === Number.POSITIVE_INFINITY ? "any" : max} items.`,
+    );
+  }
+
+  for (const [index, entry] of value.entries()) {
+    if (!isNonEmptyString(entry)) {
+      errors.push(
+        `Element "${elementKey}" prop "${propKey}"[${index}] must be a non-empty string.`,
+      );
     }
   }
 }
@@ -1077,6 +1521,19 @@ function expectOptionalBoolean(
   const value = props[key];
   if (value !== undefined && typeof value !== "boolean") {
     errors.push(`Element "${elementKey}" prop "${key}" must be a boolean when provided.`);
+  }
+}
+
+function expectRequiredEnum(
+  props: Record<string, unknown>,
+  key: string,
+  values: string[],
+  elementKey: string,
+  errors: string[],
+) {
+  const value = props[key];
+  if (typeof value !== "string" || !values.includes(value)) {
+    errors.push(`Element "${elementKey}" prop "${key}" must be one of: ${values.join(", ")}.`);
   }
 }
 

@@ -11,6 +11,11 @@ const RESERVED_FLAIER_NODE_NAMES = new Set([
   "ErrorNode",
   "DescriptionNode",
   "LinkNode",
+  "SequenceParticipant",
+  "SequenceMessage",
+  "SequenceNote",
+  "SequenceGroup",
+  "SequenceBranch",
 ]);
 
 const FlaierNullNode = defineComponent({

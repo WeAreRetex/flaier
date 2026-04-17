@@ -51,7 +51,7 @@ The `root` value does not have to be literally `"timeline"`; it just needs to po
 
 - `FlowTimeline`:
   - required: `title` (string)
-  - optional: `description`, `mode` (`narrative` | `architecture`), `zones`, `direction`, `minHeight`, `layoutEngine`, `layoutRankSep`, `layoutNodeSep`, `layoutEdgeSep`, `themeMode` (`local` | `document`), `showHeaderOverlay`, `showExportControls`, `showThemeToggle`, `showArchitectureInspector`, `defaultArchitectureInspectorOpen`, `showArchitectureInspectorToggleText`
+  - optional: `description`, `mode` (`narrative` | `sequence` | `architecture`), `participants`, `showSequenceNumbers`, `zones`, `direction`, `minHeight`, `layoutEngine`, `layoutRankSep`, `layoutNodeSep`, `layoutEdgeSep`, `themeMode` (`local` | `document`), `showHeaderOverlay`, `showExportControls`, `showThemeToggle`, `showArchitectureInspector`, `defaultArchitectureInspectorOpen`, `showArchitectureInspectorToggleText`
 - `ArchitectureNode`:
   - required: `label`
   - optional: `kind` (`service` | `database` | `queue` | `cache` | `gateway` | `external` | `compute`), `zone`, `status`, `tier`, `technology`, `runtime`, `owner`, `description`, `tags`, `responsibilities`, `capabilities`, `interfaces`, `data`, `security`, `operations`, `links`, `sourceAnchor`, `transitions`
@@ -81,6 +81,21 @@ The `root` value does not have to be literally `"timeline"`; it just needs to po
 - `LinkNode`:
   - required: `label`, `href`
   - optional: `description`, `sourceAnchor`, `transitions`
+- `SequenceParticipant`:
+  - required: `label`
+  - optional: `kind` (`participant` | `actor` | `boundary` | `control` | `entity` | `database` | `collections` | `queue`), `description`, `sourceAnchor`
+- `SequenceMessage`:
+  - required: `from`, `to`, `label`
+  - optional: `description`, `kind` (`sync` | `async` | `return`), `activate`, `deactivate`, `sourceAnchor`
+- `SequenceNote`:
+  - required: `body`, `participants`
+  - optional: `label`, `placement` (`left-of` | `right-of` | `over`), `sourceAnchor`
+- `SequenceGroup`:
+  - required: `label`, `kind` (`alt` | `loop` | `opt`)
+  - optional: `description`, `sourceAnchor`
+- `SequenceBranch`:
+  - required: none
+  - optional: `label`, `description`, `sourceAnchor`
 
 ## Source Anchor Contract
 
@@ -148,6 +163,14 @@ Use `props.transitions` on any non-root node to attach edge metadata:
 - Define `FlowTimeline.props.zones` when you want named boundaries.
 - Prefer `ArchitectureNode` for services, stores, queues, gateways, and external dependencies.
 - Assign `ArchitectureNode.props.zone` to group components inside zone containers.
+
+## Sequence Mode Rules
+
+- Set `FlowTimeline.props.mode` to `"sequence"` for interaction timelines.
+- Define `FlowTimeline.props.participants` with the ordered ids of `SequenceParticipant` elements.
+- Use `FlowTimeline.children` for the ordered top-level statements.
+- Use `SequenceMessage` for interactions, `SequenceNote` for inline commentary, and `SequenceGroup` + `SequenceBranch` for `alt`, `loop`, and `opt` blocks.
+- Put `SequenceBranch` ids inside `SequenceGroup.children`, then place ordered nested statements inside each branch's `children`.
 
 ## Embedded Docs / Slidev Rules
 

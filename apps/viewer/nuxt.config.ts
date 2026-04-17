@@ -2,6 +2,10 @@ import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 
 const flowSpecsDir = fileURLToPath(new URL("./flow-specs", import.meta.url));
+const flaierNuxtModule =
+  process.env.NODE_ENV === "production"
+    ? "@flaier/nuxt"
+    : fileURLToPath(new URL("../../packages/nuxt/src/module.ts", import.meta.url));
 const coreSourceAliases =
   process.env.NODE_ENV === "production"
     ? []
@@ -19,7 +23,7 @@ const coreSourceAliases =
 export default defineNuxtConfig({
   compatibilityDate: "2025-12-01",
   devtools: { enabled: true },
-  modules: ["@flaier/nuxt"],
+  modules: [flaierNuxtModule],
   vite: {
     plugins: [tailwindcss()],
     resolve: {

@@ -130,6 +130,21 @@ function createCaptureStage({
     overlay.style.transform = exportTransform;
   }
 
+  const sequenceParticipants = flowClone.querySelectorAll<HTMLElement>(
+    '[data-sequence-participant="true"]',
+  );
+  for (const participant of sequenceParticipants) {
+    participant.style.visibility = "visible";
+    participant.style.pointerEvents = "none";
+  }
+
+  const stickySequenceHeaders = flowClone.querySelectorAll<HTMLElement>(
+    '[data-sequence-sticky-headers="true"]',
+  );
+  for (const stickyHeader of stickySequenceHeaders) {
+    stickyHeader.style.display = "none";
+  }
+
   stage.appendChild(flowClone);
   wrapper.appendChild(stage);
   document.body.appendChild(wrapper);

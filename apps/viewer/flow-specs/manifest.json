@@ -33,6 +33,14 @@
       "src": "./architecture-overview.flow.json",
       "tags": ["sample", "architecture"],
       "entrypoints": ["src/components/nodes/ArchitectureNode.vue"]
+    },
+    {
+      "id": "auth-sequence",
+      "title": "Auth Login Sequence",
+      "description": "Sequence mode with participants, notes, activations, alt, loop, and opt blocks",
+      "src": "./auth-sequence.flow.json",
+      "tags": ["sample", "sequence"],
+      "entrypoints": ["src/components/renderer/SequenceDiagramCanvas.vue"]
     }
   ]
 }

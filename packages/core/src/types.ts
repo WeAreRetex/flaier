@@ -94,11 +94,29 @@ export interface ArchitectureLink {
   href: string;
 }
 
+export type SequenceParticipantKind =
+  | "participant"
+  | "actor"
+  | "boundary"
+  | "control"
+  | "entity"
+  | "database"
+  | "collections"
+  | "queue";
+
+export type SequenceMessageKind = "sync" | "async" | "return";
+
+export type SequenceNotePlacement = "left-of" | "right-of" | "over";
+
+export type SequenceGroupKind = "alt" | "loop" | "opt";
+
 /** Props for the FlowTimeline root element */
 export interface FlowTimelineProps {
   title: string;
   description?: string;
-  mode?: "narrative" | "architecture";
+  mode?: "narrative" | "architecture" | "sequence";
+  participants?: string[];
+  showSequenceNumbers?: boolean;
   zones?: ArchitectureZone[];
   direction?: "horizontal" | "vertical";
   minHeight?: number;
@@ -212,6 +230,50 @@ export interface LinkNodeProps {
   transitions?: EdgeTransition[];
 }
 
+/** Props for sequence diagram participants/lifelines */
+export interface SequenceParticipantProps {
+  label: string;
+  kind?: SequenceParticipantKind;
+  description?: string;
+  sourceAnchor?: SourceAnchorInput;
+}
+
+/** Props for sequence diagram messages */
+export interface SequenceMessageProps {
+  from: string;
+  to: string;
+  label: string;
+  description?: string;
+  kind?: SequenceMessageKind;
+  activate?: string[];
+  deactivate?: string[];
+  sourceAnchor?: SourceAnchorInput;
+}
+
+/** Props for sequence diagram notes */
+export interface SequenceNoteProps {
+  label?: string;
+  body: string;
+  placement?: SequenceNotePlacement;
+  participants: string[];
+  sourceAnchor?: SourceAnchorInput;
+}
+
+/** Props for sequence grouping containers like alt/loop/opt */
+export interface SequenceGroupProps {
+  label: string;
+  kind: SequenceGroupKind;
+  description?: string;
+  sourceAnchor?: SourceAnchorInput;
+}
+
+/** Props for a branch nested inside a sequence group */
+export interface SequenceBranchProps {
+  label?: string;
+  description?: string;
+  sourceAnchor?: SourceAnchorInput;
+}
+
 export interface FlaierResolvedSourceAnchor {
   label: string;
   href?: string;
@@ -263,7 +325,12 @@ export type AnyNodeProps =
   | PayloadNodeProps
   | ErrorNodeProps
   | DescriptionNodeProps
-  | LinkNodeProps;
+  | LinkNodeProps
+  | SequenceParticipantProps
+  | SequenceMessageProps
+  | SequenceNoteProps
+  | SequenceGroupProps
+  | SequenceBranchProps;
 
 /** VueFlow custom node type names */
 export type BuiltInFlowNodeType =

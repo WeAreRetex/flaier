@@ -1,0 +1,380 @@
+{
+  "root": "timeline",
+  "state": {
+    "currentStep": 0,
+    "playing": false
+  },
+  "elements": {
+    "timeline": {
+      "type": "FlowTimeline",
+      "props": {
+        "title": "Webhook Delivery Sequence",
+        "description": "Inbound webhook intake, queue handoff, retry handling, and optional escalation.",
+        "mode": "sequence",
+        "participants": [
+          "provider",
+          "edge",
+          "queue",
+          "worker",
+          "ops"
+        ],
+        "showSequenceNumbers": true,
+        "minHeight": 640
+      },
+      "children": [
+        "msg-webhook",
+        "group-verify"
+      ]
+    },
+    "provider": {
+      "type": "SequenceParticipant",
+      "props": {
+        "label": "Webhook Provider",
+        "kind": "actor",
+        "description": "Third-party system sending signed events.",
+        "sourceAnchor": "docs/integrations/provider.md:8"
+      }
+    },
+    "edge": {
+      "type": "SequenceParticipant",
+      "props": {
+        "label": "Ingress API",
+        "kind": "boundary",
+        "description": "Public endpoint that validates signatures and accepts events.",
+        "sourceAnchor": "src/server/routes/webhooks.post.ts:1"
+      }
+    },
+    "queue": {
+      "type": "SequenceParticipant",
+      "props": {
+        "label": "Delivery Queue",
+        "kind": "queue",
+        "description": "Buffers outbound delivery jobs for retryable processing.",
+        "sourceAnchor": "src/queues/delivery.ts:1"
+      }
+    },
+    "worker": {
+      "type": "SequenceParticipant",
+      "props": {
+        "label": "Retry Worker",
+        "kind": "control",
+        "description": "Executes webhook delivery attempts and schedules retries.",
+        "sourceAnchor": "src/workers/delivery.ts:1"
+      }
+    },
+    "ops": {
+      "type": "SequenceParticipant",
+      "props": {
+        "label": "Ops On-call",
+        "kind": "actor",
+        "description": "Receives escalation after repeated delivery failures.",
+        "sourceAnchor": "docs/runbooks/webhooks.md:32"
+      }
+    },
+    "msg-webhook": {
+      "type": "SequenceMessage",
+      "props": {
+        "from": "provider",
+        "to": "edge",
+        "label": "POST /webhooks",
+        "description": "Third-party provider sends a signed webhook event to the public endpoint.",
+        "kind": "sync",
+        "activate": [
+          "edge"
+        ],
+        "sourceAnchor": "src/server/routes/webhooks.post.ts:14"
+      }
+    },
+    "group-verify": {
+      "type": "SequenceGroup",
+      "props": {
+        "kind": "alt",
+        "label": "Signature valid?",
+        "description": "Edge service either accepts the event for async delivery or rejects it immediately.",
+        "sourceAnchor": "src/server/routes/webhooks.post.ts:20"
+      },
+      "children": [
+        "branch-valid",
+        "branch-invalid"
+      ]
+    },
+    "branch-valid": {
+      "type": "SequenceBranch",
+      "props": {
+        "label": "Valid",
+        "description": "Persist the job, return 202, and process delivery asynchronously."
+      },
+      "children": [
+        "msg-enqueue",
+        "msg-accepted",
+        "note-delivery-contract",
+        "group-retry",
+        "group-escalate"
+      ]
+    },
+    "branch-invalid": {
+      "type": "SequenceBranch",
+      "props": {
+        "label": "Invalid",
+        "description": "Reject the request without touching the queue."
+      },
+      "children": [
+        "note-rejected",
+        "msg-rejected"
+      ]
+    },
+    "msg-enqueue": {
+      "type": "SequenceMessage",
+      "props": {
+        "from": "edge",
+        "to": "queue",
+        "label": "Enqueue delivery job",
+        "description": "The verified payload is written to the delivery queue with an idempotency key.",
+        "kind": "async",
+        "activate": [
+          "queue"
+        ],
+        "sourceAnchor": "src/server/routes/webhooks.post.ts:34"
+      }
+    },
+    "msg-accepted": {
+      "type": "SequenceMessage",
+      "props": {
+        "from": "edge",
+        "to": "provider",
+        "label": "202 Accepted",
+        "description": "The provider gets an immediate acknowledgement while delivery continues in the background.",
+        "kind": "return",
+        "deactivate": [
+          "edge"
+        ],
+        "sourceAnchor": "src/server/routes/webhooks.post.ts:41"
+      }
+    },
+    "note-delivery-contract": {
+      "type": "SequenceNote",
+      "props": {
+        "label": "Async handoff",
+        "body": "After the 202 response, the external provider is done. Remaining steps model internal retry and escalation behavior.",
+        "placement": "over",
+        "participants": [
+          "queue",
+          "worker"
+        ],
+        "sourceAnchor": "docs/architecture/webhook-delivery.md:18"
+      }
+    },
+    "group-retry": {
+      "type": "SequenceGroup",
+      "props": {
+        "kind": "loop",
+        "label": "Retry until delivered",
+        "description": "Each queued attempt either succeeds or schedules the next retry window.",
+        "sourceAnchor": "src/workers/delivery.ts:16"
+      },
+      "children": [
+        "branch-retry"
+      ]
+    },
+    "branch-retry": {
+      "type": "SequenceBranch",
+      "props": {
+        "label": "Each delivery attempt"
+      },
+      "children": [
+        "msg-dispatch",
+        "group-delivery-result"
+      ]
+    },
+    "msg-dispatch": {
+      "type": "SequenceMessage",
+      "props": {
+        "from": "queue",
+        "to": "worker",
+        "label": "Dispatch queued job",
+        "description": "Queue hands the next delivery attempt to the worker.",
+        "kind": "return",
+        "activate": [
+          "worker"
+        ],
+        "deactivate": [
+          "queue"
+        ],
+        "sourceAnchor": "src/workers/delivery.ts:22"
+      }
+    },
+    "group-delivery-result": {
+      "type": "SequenceGroup",
+      "props": {
+        "kind": "alt",
+        "label": "Provider accepts delivery?",
+        "description": "Successful attempts finish the worker. Retryable failures compute the next delay.",
+        "sourceAnchor": "src/workers/delivery.ts:29"
+      },
+      "children": [
+        "branch-delivered",
+        "branch-retryable"
+      ]
+    },
+    "branch-delivered": {
+      "type": "SequenceBranch",
+      "props": {
+        "label": "Delivered"
+      },
+      "children": [
+        "msg-deliver",
+        "msg-ok"
+      ]
+    },
+    "branch-retryable": {
+      "type": "SequenceBranch",
+      "props": {
+        "label": "Retryable failure"
+      },
+      "children": [
+        "msg-deliver-failed",
+        "msg-backoff",
+        "note-backoff"
+      ]
+    },
+    "msg-deliver": {
+      "type": "SequenceMessage",
+      "props": {
+        "from": "worker",
+        "to": "provider",
+        "label": "POST event payload",
+        "description": "Worker sends the transformed event to the provider callback endpoint.",
+        "kind": "async",
+        "sourceAnchor": "src/workers/delivery.ts:36"
+      }
+    },
+    "msg-ok": {
+      "type": "SequenceMessage",
+      "props": {
+        "from": "provider",
+        "to": "worker",
+        "label": "200 OK",
+        "description": "Remote endpoint accepts the event and the worker finishes the job.",
+        "kind": "return",
+        "deactivate": [
+          "worker"
+        ],
+        "sourceAnchor": "src/workers/delivery.ts:42"
+      }
+    },
+    "msg-deliver-failed": {
+      "type": "SequenceMessage",
+      "props": {
+        "from": "worker",
+        "to": "provider",
+        "label": "POST event payload",
+        "description": "Worker attempts delivery but receives a transient error response.",
+        "kind": "async",
+        "sourceAnchor": "src/workers/delivery.ts:36"
+      }
+    },
+    "msg-backoff": {
+      "type": "SequenceMessage",
+      "props": {
+        "from": "worker",
+        "to": "worker",
+        "label": "Compute exponential backoff",
+        "description": "Self-message showing retry window calculation before the next attempt is scheduled.",
+        "kind": "sync",
+        "deactivate": [
+          "worker"
+        ],
+        "sourceAnchor": "src/workers/delivery.ts:48"
+      }
+    },
+    "note-backoff": {
+      "type": "SequenceNote",
+      "props": {
+        "label": "Retry metadata",
+        "body": "Delivery attempts record the error class, next scheduled timestamp, and cumulative failure count.",
+        "placement": "left-of",
+        "participants": [
+          "worker"
+        ],
+        "sourceAnchor": "docs/runbooks/webhooks.md:14"
+      }
+    },
+    "group-escalate": {
+      "type": "SequenceGroup",
+      "props": {
+        "kind": "opt",
+        "label": "Repeated failure threshold reached",
+        "description": "Only page the on-call if retries are exhausted or the destination stays unhealthy.",
+        "sourceAnchor": "src/workers/delivery.ts:58"
+      },
+      "children": [
+        "branch-escalate"
+      ]
+    },
+    "branch-escalate": {
+      "type": "SequenceBranch",
+      "props": {
+        "label": "Escalate"
+      },
+      "children": [
+        "msg-alert",
+        "note-alert"
+      ]
+    },
+    "msg-alert": {
+      "type": "SequenceMessage",
+      "props": {
+        "from": "worker",
+        "to": "ops",
+        "label": "Send on-call alert",
+        "description": "Worker opens an incident with the latest failure payload and retry history.",
+        "kind": "async",
+        "activate": [
+          "ops"
+        ],
+        "deactivate": [
+          "ops"
+        ],
+        "sourceAnchor": "src/workers/delivery.ts:61"
+      }
+    },
+    "note-alert": {
+      "type": "SequenceNote",
+      "props": {
+        "label": "Escalation payload",
+        "body": "The alert links the destination runbook, last response body, and a replay token for manual recovery.",
+        "placement": "right-of",
+        "participants": [
+          "ops"
+        ],
+        "sourceAnchor": "docs/runbooks/webhooks.md:41"
+      }
+    },
+    "note-rejected": {
+      "type": "SequenceNote",
+      "props": {
+        "label": "Rejected request",
+        "body": "Reject invalid signatures before enqueueing any work, and include enough audit metadata for forensic review.",
+        "placement": "right-of",
+        "participants": [
+          "edge"
+        ],
+        "sourceAnchor": "docs/security/webhook-signatures.md:22"
+      }
+    },
+    "msg-rejected": {
+      "type": "SequenceMessage",
+      "props": {
+        "from": "edge",
+        "to": "provider",
+        "label": "401 Invalid signature",
+        "description": "Ingress rejects the event without writing anything to the queue.",
+        "kind": "return",
+        "deactivate": [
+          "edge"
+        ],
+        "sourceAnchor": "src/server/routes/webhooks.post.ts:27"
+      }
+    }
+  }
+}

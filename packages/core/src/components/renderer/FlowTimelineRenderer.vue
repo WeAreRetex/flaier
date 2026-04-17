@@ -2,6 +2,7 @@
 import dagre from "@dagrejs/dagre";
 import { useStateStore, useStateValue } from "@json-render/vue";
 import {
+  PanOnScrollMode,
   Position,
   VueFlow,
   type NodeProps,
@@ -29,6 +30,12 @@ import {
 } from "../../code-node-sizing";
 import { exportFlowDiagram, type DiagramExportFormat } from "../../composables/useDiagramExport";
 import { useFlaierRuntime } from "../../composables/useFlaierRuntime";
+import {
+  buildSequenceLayout,
+  type SequenceLayoutMessage,
+  type SequenceLayoutNote,
+  type SequenceLayoutParticipant,
+} from "../../sequence-layout";
 import {
   hasTwoslashHints,
   hasTwoslashHtml,
@@ -66,12 +73,15 @@ import ErrorNodeVue from "../nodes/ErrorNode.vue";
 import LinkNodeVue from "../nodes/LinkNode.vue";
 import PayloadNodeVue from "../nodes/PayloadNode.vue";
 import TriggerNodeVue from "../nodes/TriggerNode.vue";
+import SequenceDiagramCanvas from "./SequenceDiagramCanvas.vue";
 
 const props = withDefaults(
   defineProps<{
     title: string;
     description?: string;
-    mode?: "narrative" | "architecture";
+    mode?: "narrative" | "architecture" | "sequence";
+    participants?: string[];
+    showSequenceNumbers?: boolean;
     zones?: ArchitectureZone[];
     direction?: "horizontal" | "vertical";
     minHeight?: number;
@@ -137,6 +147,19 @@ const NARRATIVE_FOCUS_HORIZONTAL_CONTEXT = 420;
 const NARRATIVE_FOCUS_VERTICAL_CONTEXT = 320;
 const NARRATIVE_FOCUS_MIN_ZOOM = 0.58;
 const NARRATIVE_FOCUS_MAX_ZOOM = 1.35;
+const SEQUENCE_MIN_ZOOM = 0.08;
+const SEQUENCE_MAX_ZOOM = 2;
+const SEQUENCE_VIEWPORT_PADDING = 24;
+const SEQUENCE_VIEWPORT_TOP_PADDING = 36;
+const SEQUENCE_STICKY_MORPH_DISTANCE = 88;
+const SEQUENCE_STICKY_COMPACT_HEIGHT = 58;
+const SEQUENCE_STICKY_COMPACT_MIN_WIDTH = 116;
+const SEQUENCE_STICKY_COMPACT_MAX_WIDTH = 260;
+const SEQUENCE_STICKY_COMPACT_LANE_GUTTER = 12;
+const SEQUENCE_STICKY_BAND_HEIGHT = 64;
+const SEQUENCE_FOCUS_VERTICAL_PADDING = 18;
+const SEQUENCE_VIEWPORT_BOTTOM_SAFE_AREA = 152;
+const SEQUENCE_VIEWPORT_BOTTOM_DETAIL_SAFE_AREA = 236;
 const FLAIER_THEME_STORAGE_KEY = "flaier-ui-theme";
 const ARCHITECTURE_ZONE_MIN_CONTENT_PADDING = 44;
 const ARCHITECTURE_ZONE_MIN_BOTTOM_PADDING = 88;
@@ -344,12 +367,26 @@ const showFlowSelector = computed(() => availableFlows.value.length > 1);
 const showHeaderOverlay = computed(() => props.showHeaderOverlay !== false);
 const overlayTitle = computed(() => activeFlow.value?.title ?? props.title);
 const overlayDescription = computed(() => activeFlow.value?.description ?? props.description);
+const showHeaderOverlayCard = computed(() => {
+  if (isSequenceMode.value) {
+    return false;
+  }
+
+  return (
+    showHeaderOverlay.value &&
+    (showFlowSelector.value || Boolean(overlayTitle.value) || Boolean(overlayDescription.value))
+  );
+});
 const headerModeLabel = computed(() => {
   if (showFlowSelector.value) {
     return "Flow";
   }
 
-  return isArchitectureMode.value ? "Diagram" : "Narrative";
+  if (isArchitectureMode.value) {
+    return "Diagram";
+  }
+
+  return isSequenceMode.value ? "Sequence" : "Narrative";
 });
 const headerDropdownRef = ref<HTMLDivElement | null>(null);
 const headerDropdownOpen = ref(false);
@@ -362,13 +399,17 @@ const sceneRef = ref<HTMLElement | null>(null);
 const containerReady = ref(false);
 const containerWidth = ref(0);
 const containerHeight = ref(0);
+const sequenceParticipantScreenCenterXByKey = ref<Record<string, number>>({});
+const sequenceRenderedViewport = ref({ x: Number.NaN, y: Number.NaN, zoom: Number.NaN });
 const uiTheme = ref<"dark" | "light">("dark");
 let documentThemeObserver: MutationObserver | null = null;
 let documentThemeMediaQuery: MediaQueryList | null = null;
 let handleDocumentThemeMediaQueryChange: ((event: MediaQueryListEvent) => void) | null = null;
+let sequenceParticipantMeasureFrame: number | null = null;
 const isLightTheme = computed(() => uiTheme.value === "light");
 const themeMode = computed(() => (props.themeMode === "document" ? "document" : "local"));
 const isArchitectureMode = computed(() => props.mode === "architecture");
+const isSequenceMode = computed(() => props.mode === "sequence");
 const showExportControls = computed(() => props.showExportControls !== false);
 const showThemeToggle = computed(() => props.showThemeToggle !== false);
 const showArchitectureInspectorPanel = computed(() => props.showArchitectureInspector !== false);
@@ -384,6 +425,23 @@ const showTopRightControls = computed(() => {
     showThemeToggle.value ||
     (showExportControls.value && Boolean(exportError.value))
   );
+});
+const sequenceTopInset = computed(() => {
+  if (!isSequenceMode.value) {
+    return 0;
+  }
+
+  let inset = 0;
+
+  if (showHeaderOverlayCard.value) {
+    inset = Math.max(inset, 104);
+  }
+
+  if (showTopRightControls.value || isSequenceMode.value) {
+    inset = Math.max(inset, 60);
+  }
+
+  return inset;
 });
 const architectureInspectorOpen = ref(props.defaultArchitectureInspectorOpen !== false);
 const themeToggleLabel = computed(() => {
@@ -758,6 +816,50 @@ const startNodeKey = computed(() => {
   if (!root?.children?.length) return undefined;
 
   return root.children.find((key) => Boolean(orderedNodeByKey.value[key]));
+});
+
+const sequenceParticipantOrder = computed(() => {
+  if (!isSequenceMode.value) {
+    return [];
+  }
+
+  return toStringArray(props.participants);
+});
+
+const sequenceStatementOrder = computed(() => {
+  if (!isSequenceMode.value) {
+    return [];
+  }
+
+  return Array.isArray(rootElement.value?.children) ? rootElement.value.children : [];
+});
+
+const sequenceLayout = computed(() => {
+  if (!isSequenceMode.value) {
+    return null;
+  }
+
+  const activeSpec = spec.value;
+  if (!activeSpec) {
+    return null;
+  }
+
+  return buildSequenceLayout({
+    elements: activeSpec.elements,
+    participantOrder: sequenceParticipantOrder.value,
+    statementOrder: sequenceStatementOrder.value,
+    topInset: sequenceTopInset.value,
+  });
+});
+
+const sequenceStepIndexByKey = computed<Record<string, number>>(() => {
+  const map: Record<string, number> = {};
+
+  (sequenceLayout.value?.steps ?? []).forEach((step, index) => {
+    map[step.key] = index;
+  });
+
+  return map;
 });
 
 function toOptionalString(value: unknown) {
@@ -1937,7 +2039,10 @@ function applyBranchSelectionsForPath(pathKeys: string[]) {
   selectedBranchByNode.value = nextSelected;
 }
 
-const totalSteps = computed(() => pathFrames.value.length);
+const sequenceSteps = computed(() => sequenceLayout.value?.steps ?? []);
+const totalSteps = computed(() => {
+  return isSequenceMode.value ? sequenceSteps.value.length : pathFrames.value.length;
+});
 const maxStepIndex = computed(() => Math.max(0, totalSteps.value - 1));
 
 const { set } = useStateStore();
@@ -1969,13 +2074,26 @@ const playing = computed<boolean>({
 });
 
 watch(
-  [startNodeKey, orderedNodeElements, isArchitectureMode],
-  ([start, , architectureMode]) => {
+  [startNodeKey, orderedNodeElements, isArchitectureMode, isSequenceMode, sequenceSteps],
+  ([start, , architectureMode, sequenceMode, steps]) => {
     if (architectureMode) {
       selectedBranchByNode.value = {};
       pathFrames.value = [];
       currentStep.value = 0;
       playing.value = false;
+      return;
+    }
+
+    if (sequenceMode) {
+      selectedBranchByNode.value = {};
+      pathFrames.value = [];
+      currentStep.value = clampStep(Number(currentStepState.value ?? 0));
+
+      if (steps.length === 0) {
+        currentStep.value = 0;
+        playing.value = false;
+      }
+
       return;
     }
 
@@ -2095,6 +2213,12 @@ function togglePlay() {
 
 const activeFrame = computed(() => pathFrames.value[currentStep.value]);
 const nextPlannedNodeKey = computed(() => pathFrames.value[currentStep.value + 1]?.nodeKey);
+const activeSequenceStep = computed(() => {
+  return isSequenceMode.value ? sequenceSteps.value[currentStep.value] : undefined;
+});
+const activeSequenceParticipantKeys = computed(() => {
+  return activeSequenceStep.value?.participantKeys ?? [];
+});
 
 function jumpToNode(nodeKey: string) {
   if (!orderedNodeByKey.value[nodeKey]) return;
@@ -2842,7 +2966,11 @@ const edges = computed<FlowEdge[]>(() => {
         labelBgBorderRadius: hasLabel && !isArchitectureMode.value ? 6 : undefined,
         labelBgStyle:
           hasLabel && !isArchitectureMode.value
-            ? { fill: "var(--color-card)", fillOpacity: 0.985, stroke: "var(--color-border)" }
+            ? {
+                fill: "var(--color-card)",
+                fillOpacity: 0.985,
+                stroke: "var(--color-border)",
+              }
             : undefined,
         labelStyle:
           hasLabel && !isArchitectureMode.value
@@ -2860,6 +2988,10 @@ const edges = computed<FlowEdge[]>(() => {
 });
 
 const diagramBounds = computed(() => {
+  if (isSequenceMode.value) {
+    return sequenceBounds.value;
+  }
+
   if (nodes.value.length === 0) {
     return null;
   }
@@ -2967,8 +3099,28 @@ const activeNode = computed(() => {
 });
 
 const activeLocalStep = computed(() => activeFrame.value?.localStep ?? 0);
+const sequenceParticipantLabelByKey = computed<Record<string, string>>(() => {
+  return Object.fromEntries(
+    (sequenceLayout.value?.participants ?? []).map((participant) => [
+      participant.key,
+      participant.label,
+    ]),
+  );
+});
 
 const activeLabel = computed(() => {
+  if (isSequenceMode.value) {
+    const step = activeSequenceStep.value;
+    const element = step ? spec.value?.elements[step.key] : undefined;
+    if (!step || !element) return "";
+
+    if (element.type === "SequenceNote") {
+      return toOptionalString(element.props.label) ?? "Note";
+    }
+
+    return toOptionalString(element.props.label) ?? step.label;
+  }
+
   const node = activeNode.value;
   if (!node) return "";
 
@@ -2986,6 +3138,32 @@ const activeLabel = computed(() => {
 });
 
 const activeDescription = computed(() => {
+  if (isSequenceMode.value) {
+    const step = activeSequenceStep.value;
+    const element = step ? spec.value?.elements[step.key] : undefined;
+    if (!step || !element) return "";
+
+    if (element.type === "SequenceMessage") {
+      const description = toOptionalString(element.props.description);
+      if (description) {
+        return description;
+      }
+
+      const fromKey = toRequiredString(element.props.from);
+      const toKey = toRequiredString(element.props.to);
+      const from = sequenceParticipantLabelByKey.value[fromKey] ?? fromKey;
+      const to = sequenceParticipantLabelByKey.value[toKey] ?? toKey;
+      const kind = toOptionalString(element.props.kind);
+      return kind && kind !== "sync" ? `${from} -> ${to} (${kind})` : `${from} -> ${to}`;
+    }
+
+    if (element.type === "SequenceNote") {
+      return toRequiredString(element.props.body);
+    }
+
+    return "";
+  }
+
   const node = activeNode.value;
   if (!node) return "";
 
@@ -3007,6 +3185,14 @@ const activeDescription = computed(() => {
 });
 
 const activeSourceAnchor = computed(() => {
+  if (isSequenceMode.value) {
+    const step = activeSequenceStep.value;
+    const element = step ? spec.value?.elements[step.key] : undefined;
+    if (!element) return undefined;
+
+    return resolveNodeSourceAnchor(element.props);
+  }
+
   const node = activeNode.value;
   if (!node) return undefined;
 
@@ -3138,7 +3324,7 @@ const architectureInspectorPanelStyle = computed(() => {
 });
 
 const branchChoices = computed<BranchChoice[]>(() => {
-  if (isArchitectureMode.value) {
+  if (isArchitectureMode.value || isSequenceMode.value) {
     return [];
   }
 
@@ -3209,6 +3395,38 @@ function chooseChoice(choiceId: string) {
   }
 }
 
+function handleSequenceStepSelect(stepKey: string) {
+  const stepIndex = sequenceStepIndexByKey.value[stepKey];
+  if (stepIndex === undefined) {
+    return;
+  }
+
+  if (stepIndex === currentStep.value) {
+    nextTick(() => {
+      void followSequenceStep(220);
+    });
+    return;
+  }
+
+  goTo(stepIndex);
+}
+
+function handleSequenceParticipantSelect(participantKey: string) {
+  const nextIndex = sequenceSteps.value.findIndex((step) =>
+    step.participantKeys.includes(participantKey),
+  );
+  if (nextIndex >= 0) {
+    if (nextIndex === currentStep.value) {
+      nextTick(() => {
+        void followSequenceStep(220);
+      });
+      return;
+    }
+
+    goTo(nextIndex);
+  }
+}
+
 const containerMinHeight = computed(() => {
   const provided = Number(props.minHeight);
   if (Number.isFinite(provided) && provided >= 320) {
@@ -3217,6 +3435,10 @@ const containerMinHeight = computed(() => {
 
   if (isArchitectureMode.value) {
     return 620;
+  }
+
+  if (isSequenceMode.value) {
+    return 560;
   }
 
   const node = activeNode.value ?? orderedNodeElements.value[0];
@@ -3248,7 +3470,8 @@ const containerMinHeight = computed(() => {
 
 const instance = getCurrentInstance();
 const flowId = `flaier-${instance?.uid ?? 0}`;
-const { fitView, onNodeClick, onViewportChange, setCenter, viewport } = useVueFlow(flowId);
+const { fitView, onNodeClick, onViewportChange, setCenter, setViewport, viewport } =
+  useVueFlow(flowId);
 const nodesInitialized = useNodesInitialized();
 const paneReady = ref(false);
 const overviewMode = ref(false);
@@ -3348,6 +3571,14 @@ function syncOverviewModeFromZoom(zoom: number) {
   }
 }
 
+function clampToUnit(value: number) {
+  return Math.max(0, Math.min(1, value));
+}
+
+function lerp(start: number, end: number, progress: number) {
+  return start + (end - start) * progress;
+}
+
 watch(
   () => viewport.value.zoom,
   (zoom) => {
@@ -3359,6 +3590,26 @@ watch(
 );
 
 onViewportChange((transform) => {
+  if (isSequenceMode.value) {
+    const currentY = Number.isFinite(transform.y) ? transform.y : sequenceViewportStartY.value;
+    const nextY = Math.round(clampSequenceViewportY(currentY));
+
+    if (Math.abs(currentY - nextY) > 0.5) {
+      void setViewport(
+        {
+          x: sequenceViewportX.value,
+          y: nextY,
+          zoom: sequenceViewportZoom.value,
+        },
+        { duration: 0 },
+      );
+    }
+
+    scheduleSequenceParticipantMeasurement();
+
+    return;
+  }
+
   if (!Number.isFinite(transform.zoom)) return;
 
   syncOverviewModeFromZoom(transform.zoom);
@@ -3391,6 +3642,70 @@ function waitForAnimationFrame() {
     window.requestAnimationFrame(() => {
       resolve();
     });
+  });
+}
+
+function readSequenceParticipantScreenCenters() {
+  const sceneElement = sceneRef.value;
+  if (!sceneElement || !isSequenceMode.value) {
+    sequenceParticipantScreenCenterXByKey.value = {};
+    sequenceRenderedViewport.value = {
+      x: Number.NaN,
+      y: Number.NaN,
+      zoom: Number.NaN,
+    };
+    return;
+  }
+
+  const paneElement = sceneElement.querySelector<HTMLElement>(".vue-flow__transformationpane");
+  const paneTransform = paneElement ? getComputedStyle(paneElement).transform : "none";
+
+  if (paneTransform !== "none" && typeof DOMMatrixReadOnly !== "undefined") {
+    const matrix = new DOMMatrixReadOnly(paneTransform);
+    sequenceRenderedViewport.value = {
+      x: matrix.m41,
+      y: matrix.m42,
+      zoom: matrix.m11,
+    };
+  } else {
+    sequenceRenderedViewport.value = {
+      x: Number.NaN,
+      y: Number.NaN,
+      zoom: Number.NaN,
+    };
+  }
+
+  const sceneRect = sceneElement.getBoundingClientRect();
+  const participantElements = sceneElement.querySelectorAll<HTMLElement>(
+    "[data-sequence-participant-key]",
+  );
+  const nextCenters: Record<string, number> = {};
+
+  participantElements.forEach((element) => {
+    const key = element.dataset.sequenceParticipantKey;
+    if (!key) {
+      return;
+    }
+
+    const rect = element.getBoundingClientRect();
+    nextCenters[key] = rect.left - sceneRect.left + rect.width / 2;
+  });
+
+  sequenceParticipantScreenCenterXByKey.value = nextCenters;
+}
+
+function scheduleSequenceParticipantMeasurement() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  if (sequenceParticipantMeasureFrame !== null) {
+    window.cancelAnimationFrame(sequenceParticipantMeasureFrame);
+  }
+
+  sequenceParticipantMeasureFrame = window.requestAnimationFrame(() => {
+    sequenceParticipantMeasureFrame = null;
+    readSequenceParticipantScreenCenters();
   });
 }
 
@@ -3428,11 +3743,13 @@ onMounted(() => {
 
   nextTick(() => {
     updateContainerReady();
+    scheduleSequenceParticipantMeasurement();
 
     if (typeof ResizeObserver === "undefined") return;
 
     resizeObserver = new ResizeObserver(() => {
       updateContainerReady();
+      scheduleSequenceParticipantMeasurement();
     });
 
     if (containerRef.value) {
@@ -3448,12 +3765,489 @@ function onInit() {
 const viewportReady = computed(
   () => paneReady.value && nodesInitialized.value && containerReady.value && nodes.value.length > 0,
 );
+const sequenceReady = computed(() => {
+  return paneReady.value && containerReady.value && Boolean(sequenceLayout.value);
+});
+
+const sequenceBounds = computed(() => {
+  const layout = sequenceLayout.value;
+  if (!layout) {
+    return null;
+  }
+
+  return {
+    x: 0,
+    y: 0,
+    width: Math.max(1, Math.ceil(layout.width)),
+    height: Math.max(1, Math.ceil(layout.height)),
+  };
+});
+
+const sequenceContentBounds = computed(() => {
+  const layout = sequenceLayout.value;
+  if (!layout || layout.participants.length === 0) {
+    return null;
+  }
+
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+
+  for (const participant of layout.participants) {
+    minX = Math.min(minX, participant.x - participant.width / 2);
+    minY = Math.min(minY, participant.headerY);
+    maxX = Math.max(maxX, participant.x + participant.width / 2);
+    maxY = Math.max(maxY, participant.headerY + participant.headerHeight);
+  }
+
+  for (const note of layout.notes) {
+    minX = Math.min(minX, note.x);
+    minY = Math.min(minY, note.y - note.height / 2);
+    maxX = Math.max(maxX, note.x + note.width);
+    maxY = Math.max(maxY, note.y + note.height / 2);
+  }
+
+  for (const group of layout.groups) {
+    minX = Math.min(minX, group.left);
+    minY = Math.min(minY, group.top);
+    maxX = Math.max(maxX, group.left + group.width);
+    maxY = Math.max(maxY, group.top + group.height);
+  }
+
+  for (const message of layout.messages) {
+    minX = Math.min(minX, message.lineLeft);
+    minY = Math.min(minY, message.y - 30);
+    maxX = Math.max(
+      maxX,
+      Math.max(message.lineRight, message.endX + (message.selfMessage ? 56 : 0)),
+    );
+    maxY = Math.max(maxY, message.y + (message.selfMessage ? 24 : 0));
+  }
+
+  if (
+    !Number.isFinite(minX) ||
+    !Number.isFinite(minY) ||
+    !Number.isFinite(maxX) ||
+    !Number.isFinite(maxY)
+  ) {
+    return null;
+  }
+
+  return {
+    x: minX,
+    y: minY,
+    width: Math.max(1, maxX - minX),
+    height: Math.max(1, maxY - minY),
+  };
+});
+
+const sequenceViewportTopSafeArea = computed(() => {
+  let top = SEQUENCE_VIEWPORT_TOP_PADDING;
+
+  if (showHeaderOverlayCard.value) {
+    top = Math.max(top, overlayDescription.value ? 156 : 132);
+  }
+
+  if (showTopRightControls.value) {
+    top = Math.max(top, 72);
+  }
+
+  return top;
+});
+
+const sequenceViewportBottomSafeArea = computed(() => {
+  return activeDescription.value || activeSourceAnchor.value?.label
+    ? SEQUENCE_VIEWPORT_BOTTOM_DETAIL_SAFE_AREA
+    : SEQUENCE_VIEWPORT_BOTTOM_SAFE_AREA;
+});
+
+const sequenceViewportZoom = computed(() => {
+  const bounds = sequenceContentBounds.value;
+  if (!bounds) {
+    return 1;
+  }
+
+  const availableWidth = Math.max(1, containerWidth.value - SEQUENCE_VIEWPORT_PADDING * 2);
+
+  return Math.max(
+    SEQUENCE_MIN_ZOOM,
+    Math.min(SEQUENCE_MAX_ZOOM, availableWidth / Math.max(1, bounds.width)),
+  );
+});
+
+const sequenceStickyViewportZoom = computed(() => {
+  if (Number.isFinite(sequenceRenderedViewport.value.zoom)) {
+    return sequenceRenderedViewport.value.zoom;
+  }
+
+  return Number.isFinite(viewport.value.zoom) ? viewport.value.zoom : sequenceViewportZoom.value;
+});
+
+const sequenceViewportX = computed(() => {
+  const bounds = sequenceContentBounds.value;
+  if (!bounds) {
+    return 0;
+  }
+
+  return Math.round(SEQUENCE_VIEWPORT_PADDING - bounds.x * sequenceViewportZoom.value);
+});
+
+const sequenceStickyViewportX = computed(() => {
+  if (Number.isFinite(sequenceRenderedViewport.value.x)) {
+    return sequenceRenderedViewport.value.x;
+  }
+
+  return Number.isFinite(viewport.value.x) ? viewport.value.x : sequenceViewportX.value;
+});
+
+const sequenceStickyViewportY = computed(() => {
+  if (Number.isFinite(sequenceRenderedViewport.value.y)) {
+    return sequenceRenderedViewport.value.y;
+  }
+
+  return Number.isFinite(viewport.value.y) ? viewport.value.y : sequenceViewportStartY.value;
+});
+
+const sequenceViewportStartY = computed(() => {
+  const bounds = sequenceContentBounds.value;
+  if (!bounds) {
+    return 0;
+  }
+
+  return Math.round(sequenceViewportTopSafeArea.value - bounds.y * sequenceViewportZoom.value);
+});
+
+const sequenceViewportEndY = computed(() => {
+  const bounds = sequenceContentBounds.value;
+  if (!bounds) {
+    return sequenceViewportStartY.value;
+  }
+
+  const bottomY =
+    containerHeight.value -
+    sequenceViewportBottomSafeArea.value -
+    (bounds.y + bounds.height) * sequenceViewportZoom.value;
+
+  return Math.min(sequenceViewportStartY.value, Math.round(bottomY));
+});
+
+function clampSequenceViewportY(y: number) {
+  const lower = Math.min(sequenceViewportStartY.value, sequenceViewportEndY.value);
+  const upper = Math.max(sequenceViewportStartY.value, sequenceViewportEndY.value);
+
+  return Math.max(lower, Math.min(upper, y));
+}
+
+function sequenceStickyParticipantMorphProgress(participant: SequenceLayoutParticipant) {
+  const zoom = sequenceStickyViewportZoom.value;
+  const viewportY = sequenceStickyViewportY.value;
+  const expandedTop = participant.headerY * zoom + sequenceViewportStartY.value;
+  const currentTop = participant.headerY * zoom + viewportY;
+
+  return clampToUnit((expandedTop - currentTop) / SEQUENCE_STICKY_MORPH_DISTANCE);
+}
+
+function sequenceStickyParticipantCompactWidth(participant: SequenceLayoutParticipant) {
+  const layout = sequenceLayout.value;
+  const zoom = sequenceStickyViewportZoom.value;
+
+  if (!layout) {
+    return Math.round(participant.width * zoom);
+  }
+
+  const participants = layout.participants;
+  const index = participants.findIndex((candidate) => candidate.key === participant.key);
+
+  if (index === -1) {
+    return Math.round(participant.width * zoom);
+  }
+
+  const centerX = participant.x * zoom;
+  const previousParticipant = index > 0 ? (participants[index - 1] ?? null) : null;
+  const nextParticipant =
+    index < participants.length - 1 ? (participants[index + 1] ?? null) : null;
+  const previousCenterX =
+    previousParticipant !== null
+      ? previousParticipant.x * zoom
+      : centerX - participant.width * zoom;
+  const nextCenterX =
+    nextParticipant !== null ? nextParticipant.x * zoom : centerX + participant.width * zoom;
+  const leftBoundary =
+    previousParticipant !== null
+      ? (previousCenterX + centerX) / 2
+      : centerX - participant.width * zoom * 0.5 - SEQUENCE_VIEWPORT_PADDING;
+  const rightBoundary =
+    nextParticipant !== null
+      ? (centerX + nextCenterX) / 2
+      : centerX + participant.width * zoom * 0.5 + SEQUENCE_VIEWPORT_PADDING;
+  const slotWidth = Math.max(
+    SEQUENCE_STICKY_COMPACT_MIN_WIDTH,
+    Math.round(rightBoundary - leftBoundary - SEQUENCE_STICKY_COMPACT_LANE_GUTTER * 2),
+  );
+  const expandedWidth = Math.round(participant.width * zoom);
+  const idealWidth = Math.round(
+    participant.label.length * 6.6 + participant.kind.length * 4.8 + 64,
+  );
+
+  return Math.max(
+    SEQUENCE_STICKY_COMPACT_MIN_WIDTH,
+    Math.min(
+      Math.min(SEQUENCE_STICKY_COMPACT_MAX_WIDTH, slotWidth),
+      Math.max(Math.round(expandedWidth), idealWidth),
+    ),
+  );
+}
+
+function getSequenceStickyParticipantCompactMetrics(participant: SequenceLayoutParticipant) {
+  const width = sequenceStickyParticipantCompactWidth(participant);
+  const textWidth = Math.max(72, width - 28);
+  const charsPerLine = Math.max(8, Math.floor(textWidth / 6.2));
+  const lineCount = estimateSequenceTextLines(participant.label, charsPerLine);
+
+  return {
+    width,
+    height: Math.max(SEQUENCE_STICKY_COMPACT_HEIGHT, Math.round(46 + lineCount * 15)),
+  };
+}
+
+function sequenceStickyParticipantPinnedTop(height: number) {
+  return Math.max(0, Math.round((sequenceStickyHeaderBandHeight.value - height) / 2));
+}
+
+function sequenceStickyParticipantStyle(participant: SequenceLayoutParticipant) {
+  const zoom = sequenceStickyViewportZoom.value;
+  const viewportX = sequenceStickyViewportX.value;
+  const viewportY = sequenceStickyViewportY.value;
+  const progress = sequenceStickyParticipantMorphProgress(participant);
+  const expandedWidth = Math.round(participant.width * zoom);
+  const compactMetrics = getSequenceStickyParticipantCompactMetrics(participant);
+  const width = Math.round(lerp(expandedWidth, compactMetrics.width, progress));
+  const height = Math.round(lerp(participant.headerHeight * zoom, compactMetrics.height, progress));
+  const measuredCenterX = sequenceParticipantScreenCenterXByKey.value[participant.key];
+  const centerX =
+    measuredCenterX !== undefined ? measuredCenterX : participant.x * zoom + viewportX;
+  const naturalTop = participant.headerY * zoom + viewportY;
+  const top = lerp(naturalTop, sequenceStickyParticipantPinnedTop(height), progress);
+
+  return {
+    width: `${width}px`,
+    height: `${height}px`,
+    transform: `translate(${Math.round(centerX - width / 2)}px, ${Math.round(top)}px)`,
+    transformOrigin: "top left",
+  };
+}
+
+function sequenceStickyParticipantClass(participant: SequenceLayoutParticipant) {
+  const tone = activeSequenceParticipantKeys.value.includes(participant.key)
+    ? "border-primary/55 bg-primary/13 text-foreground shadow-xl shadow-primary/10"
+    : "border-border/70 bg-card/94 text-foreground/92";
+
+  return `z-[1] rounded-[22px] overflow-hidden bg-card/98 shadow-2xl ring-1 ring-border/50 backdrop-blur-none ${tone}`;
+}
+
+function sequenceStickyExpandedContentStyle(participant: SequenceLayoutParticipant) {
+  const progress = sequenceStickyParticipantMorphProgress(participant);
+
+  return {
+    opacity: `${1 - progress}`,
+    transform: `translateY(${Math.round(-8 * progress)}px) scale(${1 - progress * 0.05})`,
+    transformOrigin: "top center",
+  };
+}
+
+function sequenceStickyCompactContentStyle(participant: SequenceLayoutParticipant) {
+  const progress = sequenceStickyParticipantMorphProgress(participant);
+
+  return {
+    opacity: `${progress}`,
+    transform: `translateY(${Math.round((1 - progress) * 8)}px) scale(${0.96 + progress * 0.04})`,
+    transformOrigin: "center center",
+  };
+}
+
+const sequenceStickyHeaderBandProgress = computed(() => {
+  const layout = sequenceLayout.value;
+  if (!layout || layout.participants.length === 0) {
+    return 0;
+  }
+
+  return layout.participants.reduce((maxProgress, participant) => {
+    return Math.max(maxProgress, sequenceStickyParticipantMorphProgress(participant));
+  }, 0);
+});
+
+const sequenceStickyHeaderBandHeight = computed(() => {
+  return Math.max(
+    SEQUENCE_STICKY_BAND_HEIGHT,
+    Math.round(sequenceViewportTopSafeArea.value + SEQUENCE_STICKY_BAND_HEIGHT),
+  );
+});
+
+const sequenceStickyHeaderBandStyle = computed(() => {
+  const progress = sequenceStickyHeaderBandProgress.value;
+
+  return {
+    top: "0px",
+    height: `${sequenceStickyHeaderBandHeight.value}px`,
+    opacity: `${clampToUnit(progress * 0.96)}`,
+  };
+});
+
+function estimateSequenceMessageBounds(message: SequenceLayoutMessage) {
+  const metrics = getSequenceMessageLabelMetrics(message.label, props.showSequenceNumbers);
+  const left = message.selfMessage
+    ? message.startX + 14
+    : (message.startX + message.endX) / 2 - metrics.width / 2;
+  const top = message.y - metrics.height - 10;
+
+  return {
+    x: Math.max(10, left),
+    y: top,
+    width: metrics.width,
+    height: metrics.height,
+  };
+}
+
+function getSequenceMessageLabelMetrics(label: string, showSequenceNumbers = false) {
+  const width = Math.max(144, Math.min(280, label.length * 6.8 + (showSequenceNumbers ? 42 : 26)));
+  const reservedWidth = showSequenceNumbers ? 48 : 16;
+  const charsPerLine = Math.max(10, Math.floor((width - reservedWidth) / 6.8));
+  const lineCount = estimateSequenceTextLines(label, charsPerLine);
+  const contentHeight = Math.max(showSequenceNumbers ? 20 : 14, lineCount * 14);
+
+  return {
+    width,
+    height: Math.max(28, contentHeight + 8),
+  };
+}
+
+function estimateSequenceTextLines(value: string, charsPerLine: number) {
+  const normalized = value.split(/\r?\n/);
+
+  return normalized.reduce((total, line) => {
+    const length = Math.max(1, line.trim().length);
+    return total + Math.max(1, Math.ceil(length / Math.max(1, charsPerLine)));
+  }, 0);
+}
+
+function estimateSequenceNoteBounds(note: SequenceLayoutNote) {
+  return {
+    x: note.x,
+    y: note.y - note.height / 2,
+    width: note.width,
+    height: note.height,
+  };
+}
+
+const activeSequenceStepBounds = computed(() => {
+  const layout = sequenceLayout.value;
+  const step = activeSequenceStep.value;
+  if (!layout || !step) {
+    return null;
+  }
+
+  const message = layout.messages.find((candidate) => candidate.key === step.key);
+  if (message) {
+    return estimateSequenceMessageBounds(message);
+  }
+
+  const note = layout.notes.find((candidate) => candidate.key === step.key);
+  if (note) {
+    return estimateSequenceNoteBounds(note);
+  }
+
+  return null;
+});
+
+async function fitSequenceViewport(duration = 260) {
+  const bounds = sequenceContentBounds.value;
+  if (!bounds || !sequenceReady.value) {
+    return;
+  }
+
+  await waitForViewportLayoutStability();
+
+  if (!sequenceReady.value) {
+    return;
+  }
+
+  const nextViewport = {
+    x: sequenceViewportX.value,
+    y: Math.round(clampSequenceViewportY(sequenceViewportStartY.value)),
+    zoom: sequenceViewportZoom.value,
+  };
+
+  await Promise.resolve(
+    setViewport(nextViewport, {
+      duration,
+      interpolate: "smooth",
+    }),
+  );
+
+  scheduleSequenceParticipantMeasurement();
+}
+
+async function followSequenceStep(duration = 260) {
+  const stepBounds = activeSequenceStepBounds.value;
+  if (!stepBounds || !sequenceReady.value) {
+    return;
+  }
+
+  await waitForViewportLayoutStability();
+
+  if (!sequenceReady.value || !activeSequenceStepBounds.value) {
+    return;
+  }
+
+  const zoom = sequenceViewportZoom.value;
+  const currentY = Number.isFinite(viewport.value.y) ? viewport.value.y : 0;
+  const safeTop = sequenceViewportTopSafeArea.value + SEQUENCE_FOCUS_VERTICAL_PADDING;
+  const safeBottom = sequenceViewportBottomSafeArea.value;
+  const screenTop = stepBounds.y * zoom + currentY;
+  const screenBottom = (stepBounds.y + stepBounds.height) * zoom + currentY;
+
+  let nextY = currentY;
+
+  if (screenTop < safeTop) {
+    nextY += safeTop - screenTop;
+  } else if (screenBottom > containerHeight.value - safeBottom) {
+    nextY += containerHeight.value - safeBottom - screenBottom;
+  }
+
+  if (Math.abs(nextY - currentY) < 0.5) {
+    return;
+  }
+
+  await Promise.resolve(
+    setViewport(
+      {
+        x: sequenceViewportX.value,
+        y: Math.round(clampSequenceViewportY(nextY)),
+        zoom,
+      },
+      {
+        duration,
+        interpolate: "smooth",
+      },
+    ),
+  );
+
+  scheduleSequenceParticipantMeasurement();
+}
 
 const canExportDiagram = computed(() => {
-  return Boolean(viewportReady.value && diagramBounds.value);
+  return Boolean(
+    (isSequenceMode.value ? sequenceReady.value : viewportReady.value) && diagramBounds.value,
+  );
 });
 
 async function refitViewportAfterContainerChange() {
+  if (isSequenceMode.value) {
+    await fitSequenceViewport();
+    return;
+  }
+
   if (!nodes.value.length) return;
 
   await waitForViewportLayoutStability();
@@ -3501,8 +4295,80 @@ watch(canExportDiagram, (canExport) => {
   }
 });
 
+const sequenceFitSignature = ref("");
+
+watch(
+  [sequenceReady, isSequenceMode, sequenceBounds, containerWidth, containerHeight],
+  ([ready, sequenceMode, bounds, width, height]) => {
+    if (!ready || !sequenceMode || !bounds) {
+      return;
+    }
+
+    const signature = [
+      `${Math.round(width)}x${Math.round(height)}`,
+      `${bounds.x}:${bounds.y}:${bounds.width}:${bounds.height}`,
+    ].join("|");
+
+    if (signature === sequenceFitSignature.value) {
+      return;
+    }
+
+    sequenceFitSignature.value = signature;
+
+    nextTick(() => {
+      void fitSequenceViewport();
+    });
+  },
+  { immediate: true },
+);
+
+watch(
+  [sequenceReady, isSequenceMode, sequenceLayout, containerWidth, containerHeight],
+  ([ready, sequenceMode, layout]) => {
+    if (!sequenceMode || !ready || !layout) {
+      sequenceParticipantScreenCenterXByKey.value = {};
+      sequenceRenderedViewport.value = {
+        x: Number.NaN,
+        y: Number.NaN,
+        zoom: Number.NaN,
+      };
+      return;
+    }
+
+    nextTick(() => {
+      scheduleSequenceParticipantMeasurement();
+    });
+  },
+  { immediate: true },
+);
+
+watch(
+  [currentStep, sequenceReady, isSequenceMode],
+  ([step, ready, sequenceMode], [previousStep, previousReady, previousMode]) => {
+    if (!sequenceMode || !ready) {
+      return;
+    }
+
+    const shouldFollow =
+      step !== previousStep || (!previousReady && step > 0) || (!previousMode && step > 0);
+
+    if (!shouldFollow) {
+      return;
+    }
+
+    nextTick(() => {
+      void followSequenceStep(260);
+    });
+  },
+);
+
 const narrativeFocusTarget = computed(() => {
-  if (isArchitectureMode.value || overviewMode.value || !viewportReady.value) {
+  if (
+    isArchitectureMode.value ||
+    isSequenceMode.value ||
+    overviewMode.value ||
+    !viewportReady.value
+  ) {
     return null;
   }
 
@@ -3620,6 +4486,17 @@ watch(
 watch(
   [() => runtime.viewportResetToken.value, viewportReady],
   ([token, ready]) => {
+    if (isSequenceMode.value) {
+      if (!sequenceReady.value || token <= lastViewportResetToken.value) {
+        return;
+      }
+
+      lastViewportResetToken.value = token;
+      sequenceFitSignature.value = "";
+      void fitSequenceViewport();
+      return;
+    }
+
     if (!ready || token <= lastViewportResetToken.value) {
       return;
     }
@@ -3662,8 +4539,17 @@ watch(isArchitectureMode, (architectureMode) => {
   architectureInspectorOpen.value = defaultArchitectureInspectorOpen.value;
 });
 
+watch(isSequenceMode, (sequenceMode) => {
+  sequenceFitSignature.value = "";
+});
+
 onUnmounted(() => {
   clearTimer();
+
+  if (typeof window !== "undefined" && sequenceParticipantMeasureFrame !== null) {
+    window.cancelAnimationFrame(sequenceParticipantMeasureFrame);
+    sequenceParticipantMeasureFrame = null;
+  }
 
   if (typeof document !== "undefined") {
     document.removeEventListener("pointerdown", handleDocumentPointerDown);
@@ -3684,7 +4570,7 @@ onUnmounted(() => {
     ref="containerRef"
     class="flaier relative h-full w-full font-sans antialiased bg-background transition-[min-height] duration-300 ease-out"
     :style="{ minHeight: `${containerMinHeight}px` }"
-    :data-mode="isArchitectureMode ? 'architecture' : 'narrative'"
+    :data-mode="isArchitectureMode ? 'architecture' : isSequenceMode ? 'sequence' : 'narrative'"
     :data-focus-mode="overviewMode ? 'overview' : 'focus'"
     :data-theme="uiTheme"
   >
@@ -3721,6 +4607,63 @@ onUnmounted(() => {
         </div>
       </div>
 
+      <div
+        v-if="containerReady && isSequenceMode && sequenceLayout"
+        class="pointer-events-none absolute inset-0 z-[16] overflow-hidden"
+        data-sequence-sticky-headers="true"
+      >
+        <div
+          class="absolute inset-x-0 border-b border-border/60 bg-gradient-to-b from-background/96 via-background/92 to-background/0 backdrop-blur-xl"
+          :style="sequenceStickyHeaderBandStyle"
+        />
+
+        <button
+          v-for="participant in sequenceLayout.participants"
+          :key="`sticky-${participant.key}`"
+          type="button"
+          class="fn-sequence-surface pointer-events-none absolute left-0 top-0 border will-change-transform"
+          data-sequence-sticky-participant="true"
+          :class="sequenceStickyParticipantClass(participant)"
+          :style="sequenceStickyParticipantStyle(participant)"
+        >
+          <div
+            class="pointer-events-none absolute inset-0 flex flex-col items-center justify-start px-3 py-2 text-center will-change-transform"
+            :style="sequenceStickyExpandedContentStyle(participant)"
+          >
+            <span
+              class="rounded-full border border-border/60 bg-background/75 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"
+            >
+              {{ participant.kind }}
+            </span>
+            <span class="mt-1 text-[12px] font-medium leading-snug text-foreground break-words">
+              {{ participant.label }}
+            </span>
+            <span
+              v-if="participant.description"
+              class="mt-1 text-[10px] leading-relaxed text-muted-foreground break-words"
+            >
+              {{ participant.description }}
+            </span>
+          </div>
+
+          <div
+            class="pointer-events-none absolute inset-0 flex flex-col items-center justify-start gap-1.5 px-3 py-2 text-center will-change-transform"
+            :style="sequenceStickyCompactContentStyle(participant)"
+          >
+            <span
+              class="shrink-0 rounded-full border border-border/60 bg-background/80 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"
+            >
+              {{ participant.kind }}
+            </span>
+            <span
+              class="min-w-0 whitespace-normal break-words text-[12px] font-medium leading-snug text-foreground"
+            >
+              {{ participant.label }}
+            </span>
+          </div>
+        </button>
+      </div>
+
       <VueFlow
         v-if="containerReady"
         :id="flowId"
@@ -3732,16 +4675,30 @@ onUnmounted(() => {
         :nodes-focusable="false"
         :nodes-draggable="false"
         :nodes-connectable="false"
-        :zoom-on-scroll="true"
-        :zoom-on-pinch="true"
-        :pan-on-drag="true"
+        :zoom-on-scroll="!isSequenceMode"
+        :zoom-on-pinch="!isSequenceMode"
+        :zoom-on-double-click="!isSequenceMode"
+        :pan-on-drag="!isSequenceMode"
         :pan-on-scroll="true"
-        :min-zoom="0.15"
-        :max-zoom="2"
+        :pan-on-scroll-mode="isSequenceMode ? PanOnScrollMode.Vertical : PanOnScrollMode.Free"
+        :min-zoom="isSequenceMode ? sequenceViewportZoom : 0.15"
+        :max-zoom="isSequenceMode ? sequenceViewportZoom : 2"
         :prevent-scrolling="true"
         class="relative z-[10] h-full w-full"
         @init="onInit"
       >
+        <template #zoom-pane>
+          <SequenceDiagramCanvas
+            v-if="isSequenceMode && sequenceLayout"
+            :layout="sequenceLayout"
+            :current-step="currentStep"
+            :show-sequence-numbers="props.showSequenceNumbers"
+            :active-participant-keys="activeSequenceParticipantKeys"
+            @select-step="handleSequenceStepSelect"
+            @select-participant="handleSequenceParticipantSelect"
+          />
+        </template>
+
         <template #node-architecture="{ data }">
           <ArchitectureNodeVue
             :label="toRequiredString(data.props.label)"
@@ -3851,7 +4808,7 @@ onUnmounted(() => {
     </div>
 
     <div
-      v-if="showHeaderOverlay && (showFlowSelector || overlayTitle || overlayDescription)"
+      v-if="showHeaderOverlayCard"
       ref="headerDropdownRef"
       class="absolute top-4 left-4 z-20 w-[min(90vw,430px)]"
     >
@@ -4251,19 +5208,22 @@ onUnmounted(() => {
                       v-if="architectureInspectorNodeSafe.security.encryption"
                       class="mt-1 text-[10px] text-foreground"
                     >
-                      Encryption: {{ architectureInspectorNodeSafe.security.encryption }}
+                      Encryption:
+                      {{ architectureInspectorNodeSafe.security.encryption }}
                     </p>
                     <p
                       v-if="architectureInspectorNodeSafe.security.pii !== undefined"
                       class="mt-1 text-[10px] text-foreground"
                     >
-                      PII: {{ architectureInspectorNodeSafe.security.pii ? "Yes" : "No" }}
+                      PII:
+                      {{ architectureInspectorNodeSafe.security.pii ? "Yes" : "No" }}
                     </p>
                     <p
                       v-if="architectureInspectorNodeSafe.security.threatModel"
                       class="mt-1 text-[10px] text-foreground"
                     >
-                      Threat Model: {{ architectureInspectorNodeSafe.security.threatModel }}
+                      Threat Model:
+                      {{ architectureInspectorNodeSafe.security.threatModel }}
                     </p>
                   </template>
 
@@ -4368,7 +5328,8 @@ onUnmounted(() => {
                     v-if="architectureInspectorNodeSafe.operations?.runbook"
                     class="mt-1 text-[10px] text-foreground"
                   >
-                    Runbook: {{ architectureInspectorNodeSafe.operations.runbook }}
+                    Runbook:
+                    {{ architectureInspectorNodeSafe.operations.runbook }}
                   </p>
 
                   <div

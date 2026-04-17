@@ -11,6 +11,8 @@ const FlowTimelineComponent: ComponentFn<typeof catalog, "FlowTimeline"> = ({ pr
     title: props.title,
     description: props.description,
     mode: props.mode,
+    participants: props.participants,
+    showSequenceNumbers: props.showSequenceNumbers,
     zones: props.zones,
     direction: props.direction,
     minHeight: props.minHeight,
@@ -35,6 +37,11 @@ const PayloadNodeComponent: ComponentFn<typeof catalog, "PayloadNode"> = () => n
 const ErrorNodeComponent: ComponentFn<typeof catalog, "ErrorNode"> = () => null;
 const DescriptionNodeComponent: ComponentFn<typeof catalog, "DescriptionNode"> = () => null;
 const LinkNodeComponent: ComponentFn<typeof catalog, "LinkNode"> = () => null;
+const SequenceParticipantComponent: ComponentFn<typeof catalog, "SequenceParticipant"> = () => null;
+const SequenceMessageComponent: ComponentFn<typeof catalog, "SequenceMessage"> = () => null;
+const SequenceNoteComponent: ComponentFn<typeof catalog, "SequenceNote"> = () => null;
+const SequenceGroupComponent: ComponentFn<typeof catalog, "SequenceGroup"> = () => null;
+const SequenceBranchComponent: ComponentFn<typeof catalog, "SequenceBranch"> = () => null;
 
 const baseRegistryResult = defineRegistry(catalog, {
   components: {
@@ -47,6 +54,11 @@ const baseRegistryResult = defineRegistry(catalog, {
     ErrorNode: ErrorNodeComponent,
     DescriptionNode: DescriptionNodeComponent,
     LinkNode: LinkNodeComponent,
+    SequenceParticipant: SequenceParticipantComponent,
+    SequenceMessage: SequenceMessageComponent,
+    SequenceNote: SequenceNoteComponent,
+    SequenceGroup: SequenceGroupComponent,
+    SequenceBranch: SequenceBranchComponent,
   },
 });
 

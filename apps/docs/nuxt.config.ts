@@ -3,6 +3,10 @@ import tailwindcss from "@tailwindcss/vite";
 
 const siteUrl = process.env.NUXT_SITE_URL ?? "https://flaier.local";
 const siteDomain = new URL(siteUrl).hostname;
+const flaierNuxtModule =
+  process.env.NODE_ENV === "production"
+    ? "@flaier/nuxt"
+    : fileURLToPath(new URL("../../packages/nuxt/src/module.ts", import.meta.url));
 const coreSourceAliases =
   process.env.NODE_ENV === "production"
     ? []
@@ -18,7 +22,7 @@ const coreSourceAliases =
       ];
 
 export default defineNuxtConfig({
-  modules: ["@flaier/nuxt"],
+  modules: [flaierNuxtModule],
   ogImage: {
     zeroRuntime: true,
     compatibility: {

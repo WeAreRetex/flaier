@@ -27,6 +27,7 @@ It is built for the moment when a static diagram is not enough: you want to show
 ## 🌟 Feature Highlights
 
 - 🎬 Narrative mode for timeline playback, active-step focus, autoplay, and guided walkthroughs.
+- ↔️ Sequence mode for participant lifelines, ordered messages, notes, activations, and grouped interaction blocks.
 - 🏗 Architecture mode for topology-first diagrams, zones, inspector panels, and static exploration.
 - 🗂 Manifest support so one URL or file can expose a whole collection of related flows.
 - 📤 Full-diagram PNG and PDF export instead of viewport-only screenshots.
@@ -112,6 +113,7 @@ When a manifest is loaded, the renderer exposes a flow picker so users can jump 
 `FlowTimeline.props.mode` controls how people explore the diagram:
 
 - `"narrative"` (default): timeline controls, active-node focus, autoplay, and step traversal.
+- `"sequence"`: participant-based interaction timelines with messages, notes, activations, `alt`/`loop`/`opt` groups, and playback over ordered steps.
 - `"architecture"`: topology exploration with inspector panels and full-diagram export controls.
 
 For architecture diagrams, prefer `ArchitectureNode` entries, explicit `props.transitions` labels, and `FlowTimeline.props.zones` plus `ArchitectureNode.props.zone` so system boundaries stay readable.

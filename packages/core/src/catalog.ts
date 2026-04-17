@@ -95,13 +95,32 @@ export const architectureLinkSchema = z.object({
   href: z.string(),
 });
 
+export const sequenceParticipantKindSchema = z.enum([
+  "participant",
+  "actor",
+  "boundary",
+  "control",
+  "entity",
+  "database",
+  "collections",
+  "queue",
+]);
+
+export const sequenceMessageKindSchema = z.enum(["sync", "async", "return"]);
+
+export const sequenceNotePlacementSchema = z.enum(["left-of", "right-of", "over"]);
+
+export const sequenceGroupKindSchema = z.enum(["alt", "loop", "opt"]);
+
 export const flaierCatalogComponents = {
   components: {
     FlowTimeline: {
       props: z.object({
         title: z.string(),
         description: z.string().optional(),
-        mode: z.enum(["narrative", "architecture"]).default("narrative"),
+        mode: z.enum(["narrative", "architecture", "sequence"]).default("narrative"),
+        participants: z.array(z.string()).optional(),
+        showSequenceNumbers: z.boolean().optional(),
         zones: z.array(architectureZoneSchema).optional(),
         direction: z.enum(["horizontal", "vertical"]).default("horizontal"),
         minHeight: z.number().int().positive().optional(),
@@ -229,6 +248,57 @@ export const flaierCatalogComponents = {
         transitions: z.array(edgeTransitionSchema).optional(),
       }),
       description: "Clickable reference link to a file or URL",
+    },
+    SequenceParticipant: {
+      props: z.object({
+        label: z.string(),
+        kind: sequenceParticipantKindSchema.default("participant"),
+        description: z.string().optional(),
+        sourceAnchor: sourceAnchorSchema.optional(),
+      }),
+      description: "Sequence diagram participant/lifeline declaration",
+    },
+    SequenceMessage: {
+      props: z.object({
+        from: z.string(),
+        to: z.string(),
+        label: z.string(),
+        description: z.string().optional(),
+        kind: sequenceMessageKindSchema.default("sync"),
+        activate: z.array(z.string()).optional(),
+        deactivate: z.array(z.string()).optional(),
+        sourceAnchor: sourceAnchorSchema.optional(),
+      }),
+      description: "Ordered sequence message between two participants",
+    },
+    SequenceNote: {
+      props: z.object({
+        label: z.string().optional(),
+        body: z.string(),
+        placement: sequenceNotePlacementSchema.default("over"),
+        participants: z.array(z.string()).min(1).max(2),
+        sourceAnchor: sourceAnchorSchema.optional(),
+      }),
+      description: "Inline note attached to one or two sequence participants",
+    },
+    SequenceGroup: {
+      props: z.object({
+        label: z.string(),
+        kind: sequenceGroupKindSchema,
+        description: z.string().optional(),
+        sourceAnchor: sourceAnchorSchema.optional(),
+      }),
+      description: "Sequence grouping container for alt, loop, and opt blocks",
+      slots: ["default"],
+    },
+    SequenceBranch: {
+      props: z.object({
+        label: z.string().optional(),
+        description: z.string().optional(),
+        sourceAnchor: sourceAnchorSchema.optional(),
+      }),
+      description: "Ordered branch nested inside a sequence group",
+      slots: ["default"],
     },
   },
 };
