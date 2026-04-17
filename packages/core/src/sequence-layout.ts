@@ -1,5 +1,6 @@
 import type {
   SequenceGroupKind,
+  SequenceMessageArrow,
   SequenceMessageKind,
   SequenceNotePlacement,
   SequenceParticipantKind,
@@ -15,10 +16,20 @@ const SEQUENCE_LIFELINE_BOTTOM_PADDING = 88;
 const SEQUENCE_PARTICIPANT_GAP = 190;
 const SEQUENCE_MESSAGE_ROW_HEIGHT = 80;
 const SEQUENCE_MESSAGE_LINE_OFFSET = 54;
+const SEQUENCE_MIRROR_PARTICIPANT_TOP_GAP = 44;
+const SEQUENCE_MIRROR_PARTICIPANT_BAND_PADDING = 18;
 const SEQUENCE_NOTE_ROW_GAP = 18;
 const SEQUENCE_NOTE_MIN_HEIGHT = 78;
 const SEQUENCE_NOTE_MIN_WIDTH = 176;
 const SEQUENCE_NOTE_MAX_WIDTH = 240;
+const SEQUENCE_PARTICIPANT_BOX_SIDE_PADDING = 28;
+const SEQUENCE_PARTICIPANT_BOX_TOP_PADDING = 12;
+const SEQUENCE_PARTICIPANT_BOX_BOTTOM_PADDING = 18;
+const SEQUENCE_PARTICIPANT_BOX_LABEL_RESERVE = 40;
+const SEQUENCE_PARTICIPANT_BOX_DESCRIPTION_TOP = 48;
+const SEQUENCE_PARTICIPANT_BOX_DESCRIPTION_CHARS_PER_LINE = 40;
+const SEQUENCE_PARTICIPANT_BOX_DESCRIPTION_LINE_HEIGHT = 14;
+const SEQUENCE_PARTICIPANT_BOX_CONTENT_BOTTOM_GAP = 12;
 const SEQUENCE_GROUP_HEADER_HEIGHT = 34;
 const SEQUENCE_GROUP_BRANCH_LABEL_HEIGHT = 22;
 const SEQUENCE_GROUP_VERTICAL_PADDING = 16;
@@ -48,6 +59,19 @@ const SEQUENCE_PARTICIPANT_KINDS: SequenceParticipantKind[] = [
 const SEQUENCE_PARTICIPANT_KIND_SET = new Set(SEQUENCE_PARTICIPANT_KINDS);
 const SEQUENCE_MESSAGE_KINDS: SequenceMessageKind[] = ["sync", "async", "return"];
 const SEQUENCE_MESSAGE_KIND_SET = new Set(SEQUENCE_MESSAGE_KINDS);
+const SEQUENCE_MESSAGE_ARROWS: SequenceMessageArrow[] = [
+  "->",
+  "-->",
+  "->>",
+  "-->>",
+  "<<->>",
+  "<<-->>",
+  "-x",
+  "--x",
+  "-)",
+  "--)",
+];
+const SEQUENCE_MESSAGE_ARROW_SET = new Set(SEQUENCE_MESSAGE_ARROWS);
 const SEQUENCE_NOTE_PLACEMENTS: SequenceNotePlacement[] = ["left-of", "right-of", "over"];
 const SEQUENCE_NOTE_PLACEMENT_SET = new Set(SEQUENCE_NOTE_PLACEMENTS);
 const SEQUENCE_GROUP_KINDS: SequenceGroupKind[] = ["alt", "loop", "opt"];
@@ -57,11 +81,27 @@ export interface SequenceLayoutParticipant {
   key: string;
   label: string;
   kind: SequenceParticipantKind;
+  icon?: string;
   description?: string;
   x: number;
   width: number;
   headerY: number;
   headerHeight: number;
+  lifelineStartY: number;
+  lifelineEndY: number;
+  destroyed: boolean;
+}
+
+export interface SequenceLayoutParticipantBox {
+  key: string;
+  label?: string;
+  description?: string;
+  participants: string[];
+  color?: string;
+  top: number;
+  left: number;
+  width: number;
+  height: number;
 }
 
 export interface SequenceLayoutStep {
@@ -78,6 +118,7 @@ export interface SequenceLayoutMessage {
   label: string;
   description?: string;
   kind: SequenceMessageKind;
+  arrow: SequenceMessageArrow;
   y: number;
   stepIndex: number;
   startX: number;
@@ -85,6 +126,8 @@ export interface SequenceLayoutMessage {
   lineLeft: number;
   lineRight: number;
   selfMessage: boolean;
+  create: string[];
+  destroy: string[];
   activate: string[];
   deactivate: string[];
 }
@@ -138,6 +181,7 @@ export interface SequenceLayoutActivation {
 
 export interface SequenceLayout {
   participants: SequenceLayoutParticipant[];
+  participantBoxes: SequenceLayoutParticipantBox[];
   messages: SequenceLayoutMessage[];
   notes: SequenceLayoutNote[];
   groups: SequenceLayoutGroup[];
@@ -147,6 +191,9 @@ export interface SequenceLayout {
   height: number;
   lifelineTop: number;
   lifelineBottom: number;
+  mirrorParticipantsY: number;
+  mirrorParticipantBandTop: number;
+  participantHeaderMaxHeight: number;
 }
 
 interface LayoutContext {
@@ -173,6 +220,7 @@ interface LayoutResult {
 export function buildSequenceLayout(options: {
   elements: Record<string, SpecElement>;
   participantOrder: string[];
+  participantBoxOrder?: string[];
   statementOrder: string[];
   topInset?: number;
 }): SequenceLayout | null {
@@ -197,7 +245,11 @@ export function buildSequenceLayout(options: {
       headerHeight: estimateParticipantHeaderHeight(label, description),
       label,
       kind: toSequenceParticipantKind(element.props.kind),
+      icon: toOptionalString(element.props.icon),
       description,
+      lifelineStartY: 0,
+      lifelineEndY: 0,
+      destroyed: false,
     });
   });
 
@@ -224,10 +276,36 @@ export function buildSequenceLayout(options: {
     SEQUENCE_HEADER_HEIGHT,
     ...participants.map((participant) => participant.headerHeight),
   );
-  const lifelineTop = headerY + maxHeaderHeight + SEQUENCE_LIFELINE_TOP_GAP;
+  const participantBoxContentReserve = estimateParticipantBoxContentReserve(
+    options.participantBoxOrder ?? [],
+    options.elements,
+  );
+  const lifelineTop =
+    headerY + maxHeaderHeight + SEQUENCE_LIFELINE_TOP_GAP + participantBoxContentReserve;
   const laidOut = layoutStatements(options.statementOrder, lifelineTop, 0, ctx);
+  const mirrorParticipantsY = Math.max(
+    lifelineTop + SEQUENCE_MESSAGE_ROW_HEIGHT,
+    Math.ceil(laidOut.cursorY + SEQUENCE_MIRROR_PARTICIPANT_TOP_GAP),
+  );
+  const lifelineBottom = Math.max(lifelineTop + 60, mirrorParticipantsY);
+  const participantsWithLifelines = resolveParticipantLifelines(
+    participants,
+    laidOut.messages,
+    mirrorParticipantsY,
+    lifelineBottom,
+  );
+  const participantBoxes = layoutParticipantBoxes({
+    boxKeys: options.participantBoxOrder ?? [],
+    elements: options.elements,
+    participantIndexByKey,
+    participants: participantsWithLifelines,
+    headerY,
+    mirrorParticipantsY,
+    maxHeaderHeight,
+  });
   const furthestRight = Math.max(
     participants[participants.length - 1]?.x ?? 0,
+    ...participantBoxes.map((box) => box.left + box.width),
     ...laidOut.notes.map((note) => note.x + note.width),
     ...laidOut.groups.map((group) => group.left + group.width),
     ...laidOut.messages.map((message) =>
@@ -235,17 +313,25 @@ export function buildSequenceLayout(options: {
     ),
   );
   const furthestBottom = Math.max(
-    laidOut.cursorY,
+    mirrorParticipantsY + maxHeaderHeight + SEQUENCE_MIRROR_PARTICIPANT_BAND_PADDING,
     ...laidOut.notes.map((note) => note.y + note.height / 2),
     ...laidOut.groups.map((group) => group.top + group.height),
+    ...participantBoxes.map((box) => box.top + box.height),
   );
   const width = Math.max(720, Math.ceil(furthestRight + SEQUENCE_RIGHT_PADDING));
-  const height = Math.max(420, Math.ceil(furthestBottom + SEQUENCE_LIFELINE_BOTTOM_PADDING));
-  const lifelineBottom = Math.max(lifelineTop + 60, height - SEQUENCE_LIFELINE_BOTTOM_PADDING / 2);
-  const activations = buildActivations(laidOut.messages, participantXByKey, lifelineBottom);
+  const height = Math.max(420, Math.ceil(furthestBottom + SEQUENCE_LIFELINE_BOTTOM_PADDING / 3));
+  const activations = buildActivations(
+    laidOut.messages,
+    participantXByKey,
+    Object.fromEntries(
+      participantsWithLifelines.map((participant) => [participant.key, participant.lifelineEndY]),
+    ),
+    lifelineBottom,
+  );
 
   return {
-    participants,
+    participants: participantsWithLifelines,
+    participantBoxes,
     messages: laidOut.messages,
     notes: laidOut.notes,
     groups: laidOut.groups,
@@ -255,6 +341,12 @@ export function buildSequenceLayout(options: {
     height,
     lifelineTop,
     lifelineBottom,
+    mirrorParticipantsY,
+    mirrorParticipantBandTop: Math.max(
+      0,
+      mirrorParticipantsY - SEQUENCE_MIRROR_PARTICIPANT_BAND_PADDING,
+    ),
+    participantHeaderMaxHeight: maxHeaderHeight,
   };
 }
 
@@ -293,11 +385,16 @@ function layoutStatements(
         key,
         type: "SequenceMessage",
         label: message.label,
-        participantKeys: uniqueStrings([from, to]),
+        participantKeys: uniqueStrings([from, to, ...message.create, ...message.destroy]),
       });
 
-      minParticipantIndex = Math.min(minParticipantIndex, fromIndex, toIndex);
-      maxParticipantIndex = Math.max(maxParticipantIndex, fromIndex, toIndex);
+      const relatedParticipants = uniqueStrings([from, to, ...message.create, ...message.destroy]);
+      for (const participantKey of relatedParticipants) {
+        const index = ctx.participantIndexByKey[participantKey];
+        if (index === undefined) continue;
+        minParticipantIndex = Math.min(minParticipantIndex, index);
+        maxParticipantIndex = Math.max(maxParticipantIndex, index);
+      }
       cursorY += SEQUENCE_MESSAGE_ROW_HEIGHT;
       continue;
     }
@@ -500,6 +597,7 @@ function layoutMessage(
     label: toRequiredString(element.props.label),
     description: toOptionalString(element.props.description),
     kind: toSequenceMessageKind(element.props.kind),
+    arrow: toSequenceMessageArrow(element.props.arrow, element.props.kind),
     y,
     stepIndex: ctx.stepCounter,
     startX,
@@ -507,6 +605,8 @@ function layoutMessage(
     lineLeft,
     lineRight,
     selfMessage,
+    create: toStringArray(element.props.create),
+    destroy: toStringArray(element.props.destroy),
     activate: toStringArray(element.props.activate),
     deactivate: toStringArray(element.props.deactivate),
   };
@@ -556,6 +656,7 @@ function layoutNote(
 function buildActivations(
   messages: SequenceLayoutMessage[],
   participantXByKey: Record<string, number>,
+  participantBottomByKey: Record<string, number>,
   fallbackBottom: number,
 ): SequenceLayoutActivation[] {
   const stacks = new Map<string, Array<{ top: number; depth: number }>>();
@@ -599,11 +700,12 @@ function buildActivations(
     while (stack.length > 0) {
       const entry = stack.pop();
       if (!entry) continue;
+      const participantBottom = participantBottomByKey[participantKey] ?? fallbackBottom;
 
       result.push({
         participantKey,
         top: entry.top,
-        height: Math.max(30, fallbackBottom - entry.top),
+        height: Math.max(30, participantBottom - entry.top),
         x:
           (participantXByKey[participantKey] ?? 0) -
           SEQUENCE_ACTIVATION_BAR_WIDTH / 2 +
@@ -612,6 +714,114 @@ function buildActivations(
         depth: entry.depth,
       });
     }
+  }
+
+  return result;
+}
+
+function resolveParticipantLifelines(
+  participants: SequenceLayoutParticipant[],
+  messages: SequenceLayoutMessage[],
+  mirrorParticipantsY: number,
+  lifelineBottom: number,
+) {
+  const startByKey = Object.fromEntries(
+    participants.map((participant) => [
+      participant.key,
+      participant.headerY + participant.headerHeight,
+    ]),
+  ) as Record<string, number>;
+  const endByKey = Object.fromEntries(
+    participants.map((participant) => [participant.key, mirrorParticipantsY]),
+  ) as Record<string, number>;
+
+  for (const message of messages) {
+    for (const participantKey of uniqueStrings(message.create)) {
+      if (!(participantKey in startByKey)) continue;
+      startByKey[participantKey] = Math.max(startByKey[participantKey] ?? message.y, message.y);
+    }
+
+    for (const participantKey of uniqueStrings(message.destroy)) {
+      if (!(participantKey in endByKey)) continue;
+
+      const nextEnd = Math.max(
+        (startByKey[participantKey] ?? message.y) + 22,
+        Math.min(endByKey[participantKey] ?? lifelineBottom, message.y),
+      );
+      endByKey[participantKey] = nextEnd;
+    }
+  }
+
+  return participants.map((participant) => ({
+    ...participant,
+    lifelineStartY: startByKey[participant.key] ?? participant.headerY + participant.headerHeight,
+    lifelineEndY: Math.max(
+      startByKey[participant.key] ?? participant.headerY + participant.headerHeight,
+      endByKey[participant.key] ?? lifelineBottom,
+    ),
+    destroyed: (endByKey[participant.key] ?? lifelineBottom) < lifelineBottom,
+  }));
+}
+
+function layoutParticipantBoxes(options: {
+  boxKeys: string[];
+  elements: Record<string, SpecElement>;
+  participantIndexByKey: Record<string, number>;
+  participants: SequenceLayoutParticipant[];
+  headerY: number;
+  mirrorParticipantsY: number;
+  maxHeaderHeight: number;
+}) {
+  const result: SequenceLayoutParticipantBox[] = [];
+
+  for (const key of options.boxKeys) {
+    const element = options.elements[key];
+    if (!element || element.type !== "SequenceParticipantBox") {
+      continue;
+    }
+
+    const participantKeys = uniqueStrings(toStringArray(element.props.participants)).filter(
+      (participantKey) => participantKey in options.participantIndexByKey,
+    );
+
+    if (participantKeys.length === 0) {
+      continue;
+    }
+
+    const indices = participantKeys
+      .map((participantKey) => options.participantIndexByKey[participantKey])
+      .filter((index): index is number => index !== undefined)
+      .sort((left, right) => left - right);
+    const firstParticipant = options.participants[indices[0] ?? -1];
+    const lastParticipant = options.participants[indices[indices.length - 1] ?? -1];
+
+    if (!firstParticipant || !lastParticipant) {
+      continue;
+    }
+
+    const top = options.headerY + options.maxHeaderHeight + SEQUENCE_PARTICIPANT_BOX_TOP_PADDING;
+    const left = Math.max(
+      8,
+      firstParticipant.x - firstParticipant.width / 2 - SEQUENCE_PARTICIPANT_BOX_SIDE_PADDING,
+    );
+    const right =
+      lastParticipant.x + lastParticipant.width / 2 + SEQUENCE_PARTICIPANT_BOX_SIDE_PADDING;
+    const bottom =
+      options.mirrorParticipantsY +
+      options.maxHeaderHeight +
+      SEQUENCE_PARTICIPANT_BOX_BOTTOM_PADDING;
+
+    result.push({
+      key,
+      label: toOptionalString(element.props.label),
+      description: toOptionalString(element.props.description),
+      participants: participantKeys,
+      color: toOptionalString(element.props.color),
+      top,
+      left,
+      width: Math.max(120, right - left),
+      height: Math.max(96, bottom - top),
+    });
   }
 
   return result;
@@ -666,6 +876,35 @@ function estimateGroupDescriptionReserve(description?: string) {
   const lines = estimateTextLines(description, SEQUENCE_GROUP_DESCRIPTION_CHARS_PER_LINE);
 
   return 8 + lines * SEQUENCE_GROUP_DESCRIPTION_LINE_HEIGHT;
+}
+
+function estimateParticipantBoxContentReserve(
+  boxKeys: string[],
+  elements: Record<string, SpecElement>,
+) {
+  let reserve = 0;
+
+  for (const key of boxKeys) {
+    const element = elements[key];
+    if (!element || element.type !== "SequenceParticipantBox") {
+      continue;
+    }
+
+    const description = toOptionalString(element.props.description);
+    const descriptionReserve = description
+      ? SEQUENCE_PARTICIPANT_BOX_DESCRIPTION_TOP +
+        estimateTextLines(description, SEQUENCE_PARTICIPANT_BOX_DESCRIPTION_CHARS_PER_LINE) *
+          SEQUENCE_PARTICIPANT_BOX_DESCRIPTION_LINE_HEIGHT +
+        SEQUENCE_PARTICIPANT_BOX_CONTENT_BOTTOM_GAP
+      : SEQUENCE_PARTICIPANT_BOX_LABEL_RESERVE;
+
+    reserve = Math.max(
+      reserve,
+      Math.max(SEQUENCE_PARTICIPANT_BOX_LABEL_RESERVE, descriptionReserve),
+    );
+  }
+
+  return reserve;
 }
 
 function estimateNoteWidth(label: string | undefined, body: string) {
@@ -729,6 +968,23 @@ function toSequenceMessageKind(value: unknown): SequenceMessageKind {
   }
 
   return "sync";
+}
+
+function toSequenceMessageArrow(value: unknown, kindValue: unknown): SequenceMessageArrow {
+  if (typeof value === "string" && SEQUENCE_MESSAGE_ARROW_SET.has(value as SequenceMessageArrow)) {
+    return value as SequenceMessageArrow;
+  }
+
+  const kind = toSequenceMessageKind(kindValue);
+  if (kind === "async") {
+    return "-)";
+  }
+
+  if (kind === "return") {
+    return "-->>";
+  }
+
+  return "->>";
 }
 
 function toSequenceNotePlacement(value: unknown): SequenceNotePlacement {

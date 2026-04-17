@@ -74,6 +74,7 @@ import LinkNodeVue from "../nodes/LinkNode.vue";
 import PayloadNodeVue from "../nodes/PayloadNode.vue";
 import TriggerNodeVue from "../nodes/TriggerNode.vue";
 import SequenceDiagramCanvas from "./SequenceDiagramCanvas.vue";
+import SequenceParticipantIcon from "./SequenceParticipantIcon.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -399,7 +400,17 @@ const sceneRef = ref<HTMLElement | null>(null);
 const containerReady = ref(false);
 const containerWidth = ref(0);
 const containerHeight = ref(0);
+type SequenceParticipantScreenMetrics = {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  centerX: number;
+};
 const sequenceParticipantScreenCenterXByKey = ref<Record<string, number>>({});
+const sequenceParticipantBottomMetricsByKey = ref<Record<string, SequenceParticipantScreenMetrics>>(
+  {},
+);
 const sequenceRenderedViewport = ref({ x: Number.NaN, y: Number.NaN, zoom: Number.NaN });
 const uiTheme = ref<"dark" | "light">("dark");
 let documentThemeObserver: MutationObserver | null = null;
@@ -831,7 +842,28 @@ const sequenceStatementOrder = computed(() => {
     return [];
   }
 
-  return Array.isArray(rootElement.value?.children) ? rootElement.value.children : [];
+  return Array.isArray(rootElement.value?.children)
+    ? rootElement.value.children.filter((key) => {
+        const element = spec.value?.elements[key];
+        return (
+          element?.type === "SequenceMessage" ||
+          element?.type === "SequenceNote" ||
+          element?.type === "SequenceGroup"
+        );
+      })
+    : [];
+});
+
+const sequenceParticipantBoxOrder = computed(() => {
+  if (!isSequenceMode.value) {
+    return [];
+  }
+
+  return Array.isArray(rootElement.value?.children)
+    ? rootElement.value.children.filter((key) => {
+        return spec.value?.elements[key]?.type === "SequenceParticipantBox";
+      })
+    : [];
 });
 
 const sequenceLayout = computed(() => {
@@ -847,6 +879,7 @@ const sequenceLayout = computed(() => {
   return buildSequenceLayout({
     elements: activeSpec.elements,
     participantOrder: sequenceParticipantOrder.value,
+    participantBoxOrder: sequenceParticipantBoxOrder.value,
     statementOrder: sequenceStatementOrder.value,
     topInset: sequenceTopInset.value,
   });
@@ -3649,6 +3682,7 @@ function readSequenceParticipantScreenCenters() {
   const sceneElement = sceneRef.value;
   if (!sceneElement || !isSequenceMode.value) {
     sequenceParticipantScreenCenterXByKey.value = {};
+    sequenceParticipantBottomMetricsByKey.value = {};
     sequenceRenderedViewport.value = {
       x: Number.NaN,
       y: Number.NaN,
@@ -3676,12 +3710,13 @@ function readSequenceParticipantScreenCenters() {
   }
 
   const sceneRect = sceneElement.getBoundingClientRect();
-  const participantElements = sceneElement.querySelectorAll<HTMLElement>(
-    "[data-sequence-participant-key]",
+  const topParticipantElements = sceneElement.querySelectorAll<HTMLElement>(
+    '[data-sequence-participant-anchor="top"]',
   );
   const nextCenters: Record<string, number> = {};
+  const nextBottomMetrics: Record<string, SequenceParticipantScreenMetrics> = {};
 
-  participantElements.forEach((element) => {
+  topParticipantElements.forEach((element) => {
     const key = element.dataset.sequenceParticipantKey;
     if (!key) {
       return;
@@ -3691,7 +3726,30 @@ function readSequenceParticipantScreenCenters() {
     nextCenters[key] = rect.left - sceneRect.left + rect.width / 2;
   });
 
+  const bottomParticipantElements = sceneElement.querySelectorAll<HTMLElement>(
+    '[data-sequence-participant-anchor="bottom"]',
+  );
+
+  bottomParticipantElements.forEach((element) => {
+    const key = element.dataset.sequenceParticipantKey;
+    if (!key) {
+      return;
+    }
+
+    const rect = element.getBoundingClientRect();
+    const left = rect.left - sceneRect.left;
+    const top = rect.top - sceneRect.top;
+    nextBottomMetrics[key] = {
+      left,
+      top,
+      width: rect.width,
+      height: rect.height,
+      centerX: left + rect.width / 2,
+    };
+  });
+
   sequenceParticipantScreenCenterXByKey.value = nextCenters;
+  sequenceParticipantBottomMetricsByKey.value = nextBottomMetrics;
 }
 
 function scheduleSequenceParticipantMeasurement() {
@@ -3798,7 +3856,18 @@ const sequenceContentBounds = computed(() => {
     minX = Math.min(minX, participant.x - participant.width / 2);
     minY = Math.min(minY, participant.headerY);
     maxX = Math.max(maxX, participant.x + participant.width / 2);
-    maxY = Math.max(maxY, participant.headerY + participant.headerHeight);
+    maxY = Math.max(
+      maxY,
+      participant.headerY + participant.headerHeight,
+      layout.mirrorParticipantsY + participant.headerHeight,
+    );
+  }
+
+  for (const participantBox of layout.participantBoxes) {
+    minX = Math.min(minX, participantBox.left);
+    minY = Math.min(minY, participantBox.top);
+    maxX = Math.max(maxX, participantBox.left + participantBox.width);
+    maxY = Math.max(maxY, participantBox.top + participantBox.height);
   }
 
   for (const note of layout.notes) {
@@ -3986,9 +4055,7 @@ function sequenceStickyParticipantCompactWidth(participant: SequenceLayoutPartic
     Math.round(rightBoundary - leftBoundary - SEQUENCE_STICKY_COMPACT_LANE_GUTTER * 2),
   );
   const expandedWidth = Math.round(participant.width * zoom);
-  const idealWidth = Math.round(
-    participant.label.length * 6.6 + participant.kind.length * 4.8 + 64,
-  );
+  const idealWidth = Math.round(participant.label.length * 6.4 + 52);
 
   return Math.max(
     SEQUENCE_STICKY_COMPACT_MIN_WIDTH,
@@ -4029,6 +4096,34 @@ function sequenceStickyParticipantStyle(participant: SequenceLayoutParticipant) 
     measuredCenterX !== undefined ? measuredCenterX : participant.x * zoom + viewportX;
   const naturalTop = participant.headerY * zoom + viewportY;
   const top = lerp(naturalTop, sequenceStickyParticipantPinnedTop(height), progress);
+
+  return {
+    width: `${width}px`,
+    height: `${height}px`,
+    transform: `translate(${Math.round(centerX - width / 2)}px, ${Math.round(top)}px)`,
+    transformOrigin: "top left",
+  };
+}
+
+function sequenceMirroredParticipantStyle(participant: SequenceLayoutParticipant) {
+  const measuredMetrics = sequenceParticipantBottomMetricsByKey.value[participant.key];
+  if (measuredMetrics) {
+    return {
+      width: `${Math.round(measuredMetrics.width)}px`,
+      height: `${Math.round(measuredMetrics.height)}px`,
+      transform: `translate(${Math.round(measuredMetrics.left)}px, ${Math.round(measuredMetrics.top)}px)`,
+      transformOrigin: "top left",
+    };
+  }
+
+  const layout = sequenceLayout.value;
+  const zoom = sequenceStickyViewportZoom.value;
+  const viewportX = sequenceStickyViewportX.value;
+  const viewportY = sequenceStickyViewportY.value;
+  const width = Math.round(participant.width * zoom);
+  const height = Math.round(participant.headerHeight * zoom);
+  const centerX = participant.x * zoom + viewportX;
+  const top = (layout?.mirrorParticipantsY ?? participant.headerY) * zoom + viewportY;
 
   return {
     width: `${width}px`,
@@ -4327,6 +4422,7 @@ watch(
   ([ready, sequenceMode, layout]) => {
     if (!sequenceMode || !ready || !layout) {
       sequenceParticipantScreenCenterXByKey.value = {};
+      sequenceParticipantBottomMetricsByKey.value = {};
       sequenceRenderedViewport.value = {
         x: Number.NaN,
         y: Number.NaN,
@@ -4631,9 +4727,14 @@ onUnmounted(() => {
             :style="sequenceStickyExpandedContentStyle(participant)"
           >
             <span
-              class="rounded-full border border-border/60 bg-background/75 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"
+              class="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border/60 bg-background/78 text-muted-foreground"
             >
-              {{ participant.kind }}
+              <SequenceParticipantIcon
+                :kind="participant.kind"
+                :icon="participant.icon"
+                :size="16"
+                :title="participant.kind"
+              />
             </span>
             <span class="mt-1 text-[12px] font-medium leading-snug text-foreground break-words">
               {{ participant.label }}
@@ -4651,14 +4752,53 @@ onUnmounted(() => {
             :style="sequenceStickyCompactContentStyle(participant)"
           >
             <span
-              class="shrink-0 rounded-full border border-border/60 bg-background/80 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"
+              class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border/60 bg-background/80 text-muted-foreground"
             >
-              {{ participant.kind }}
+              <SequenceParticipantIcon
+                :kind="participant.kind"
+                :icon="participant.icon"
+                :size="14"
+                :title="participant.kind"
+              />
             </span>
             <span
               class="min-w-0 whitespace-normal break-words text-[12px] font-medium leading-snug text-foreground"
             >
               {{ participant.label }}
+            </span>
+          </div>
+        </button>
+
+        <button
+          v-for="participant in sequenceLayout.participants"
+          :key="`mirror-${participant.key}`"
+          type="button"
+          class="fn-sequence-surface pointer-events-none absolute left-0 top-0 border will-change-transform"
+          data-sequence-mirrored-participant="true"
+          :class="sequenceStickyParticipantClass(participant)"
+          :style="sequenceMirroredParticipantStyle(participant)"
+        >
+          <div
+            class="pointer-events-none absolute inset-0 flex flex-col items-center justify-start px-3 py-2 text-center"
+          >
+            <span
+              class="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border/60 bg-background/78 text-muted-foreground"
+            >
+              <SequenceParticipantIcon
+                :kind="participant.kind"
+                :icon="participant.icon"
+                :size="16"
+                :title="participant.kind"
+              />
+            </span>
+            <span class="mt-1 text-[12px] font-medium leading-snug text-foreground break-words">
+              {{ participant.label }}
+            </span>
+            <span
+              v-if="participant.description"
+              class="mt-1 text-[10px] leading-relaxed text-muted-foreground break-words"
+            >
+              {{ participant.description }}
             </span>
           </div>
         </button>

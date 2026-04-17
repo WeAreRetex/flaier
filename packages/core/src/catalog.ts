@@ -108,6 +108,19 @@ export const sequenceParticipantKindSchema = z.enum([
 
 export const sequenceMessageKindSchema = z.enum(["sync", "async", "return"]);
 
+export const sequenceMessageArrowSchema = z.enum([
+  "->",
+  "-->",
+  "->>",
+  "-->>",
+  "<<->>",
+  "<<-->>",
+  "-x",
+  "--x",
+  "-)",
+  "--)",
+]);
+
 export const sequenceNotePlacementSchema = z.enum(["left-of", "right-of", "over"]);
 
 export const sequenceGroupKindSchema = z.enum(["alt", "loop", "opt"]);
@@ -253,10 +266,21 @@ export const flaierCatalogComponents = {
       props: z.object({
         label: z.string(),
         kind: sequenceParticipantKindSchema.default("participant"),
+        icon: z.string().optional(),
         description: z.string().optional(),
         sourceAnchor: sourceAnchorSchema.optional(),
       }),
       description: "Sequence diagram participant/lifeline declaration",
+    },
+    SequenceParticipantBox: {
+      props: z.object({
+        label: z.string().optional(),
+        description: z.string().optional(),
+        participants: z.array(z.string()).min(1),
+        color: z.string().optional(),
+        sourceAnchor: sourceAnchorSchema.optional(),
+      }),
+      description: "Sequence participant grouping box spanning one or more lifelines",
     },
     SequenceMessage: {
       props: z.object({
@@ -265,6 +289,9 @@ export const flaierCatalogComponents = {
         label: z.string(),
         description: z.string().optional(),
         kind: sequenceMessageKindSchema.default("sync"),
+        arrow: sequenceMessageArrowSchema.optional(),
+        create: z.array(z.string()).optional(),
+        destroy: z.array(z.string()).optional(),
         activate: z.array(z.string()).optional(),
         deactivate: z.array(z.string()).optional(),
         sourceAnchor: sourceAnchorSchema.optional(),

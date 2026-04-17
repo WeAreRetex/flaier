@@ -38,6 +38,8 @@ const ErrorNodeComponent: ComponentFn<typeof catalog, "ErrorNode"> = () => null;
 const DescriptionNodeComponent: ComponentFn<typeof catalog, "DescriptionNode"> = () => null;
 const LinkNodeComponent: ComponentFn<typeof catalog, "LinkNode"> = () => null;
 const SequenceParticipantComponent: ComponentFn<typeof catalog, "SequenceParticipant"> = () => null;
+const SequenceParticipantBoxComponent: ComponentFn<typeof catalog, "SequenceParticipantBox"> = () =>
+  null;
 const SequenceMessageComponent: ComponentFn<typeof catalog, "SequenceMessage"> = () => null;
 const SequenceNoteComponent: ComponentFn<typeof catalog, "SequenceNote"> = () => null;
 const SequenceGroupComponent: ComponentFn<typeof catalog, "SequenceGroup"> = () => null;
@@ -55,6 +57,7 @@ const baseRegistryResult = defineRegistry(catalog, {
     DescriptionNode: DescriptionNodeComponent,
     LinkNode: LinkNodeComponent,
     SequenceParticipant: SequenceParticipantComponent,
+    SequenceParticipantBox: SequenceParticipantBoxComponent,
     SequenceMessage: SequenceMessageComponent,
     SequenceNote: SequenceNoteComponent,
     SequenceGroup: SequenceGroupComponent,

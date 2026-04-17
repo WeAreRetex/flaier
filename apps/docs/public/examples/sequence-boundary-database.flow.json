@@ -1,0 +1,60 @@
+{
+  "root": "timeline",
+  "state": {
+    "currentStep": 0,
+    "playing": false
+  },
+  "elements": {
+    "timeline": {
+      "type": "FlowTimeline",
+      "props": {
+        "title": "Boundary to Database Sequence",
+        "description": "A tiny sequence example showing Mermaid-style participant kinds, aliases, and explicit arrow types.",
+        "mode": "sequence",
+        "participants": [
+          "api",
+          "db"
+        ],
+        "minHeight": 420
+      },
+      "children": [
+        "msg-query",
+        "msg-result"
+      ]
+    },
+    "api": {
+      "type": "SequenceParticipant",
+      "props": {
+        "label": "External Name",
+        "kind": "boundary"
+      }
+    },
+    "db": {
+      "type": "SequenceParticipant",
+      "props": {
+        "label": "External DB",
+        "kind": "database"
+      }
+    },
+    "msg-query": {
+      "type": "SequenceMessage",
+      "props": {
+        "from": "api",
+        "to": "db",
+        "label": "Query",
+        "kind": "sync",
+        "arrow": "->>"
+      }
+    },
+    "msg-result": {
+      "type": "SequenceMessage",
+      "props": {
+        "from": "db",
+        "to": "api",
+        "label": "Result",
+        "kind": "return",
+        "arrow": "-->>"
+      }
+    }
+  }
+}

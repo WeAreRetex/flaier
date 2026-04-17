@@ -47,6 +47,9 @@
   },
   "dependencies": {
     "@dagrejs/dagre": "^2.0.4",
+    "@iconify-json/logos": "^1.2.11",
+    "@iconify-json/lucide": "^1.2.102",
+    "@iconify/vue": "^5.0.0",
     "@json-render/core": "^0.17.0",
     "@json-render/vue": "^0.17.0",
     "@shikijs/twoslash": "^3",

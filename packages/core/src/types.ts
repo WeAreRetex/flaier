@@ -106,6 +106,18 @@ export type SequenceParticipantKind =
 
 export type SequenceMessageKind = "sync" | "async" | "return";
 
+export type SequenceMessageArrow =
+  | "->"
+  | "-->"
+  | "->>"
+  | "-->>"
+  | "<<->>"
+  | "<<-->>"
+  | "-x"
+  | "--x"
+  | "-)"
+  | "--)";
+
 export type SequenceNotePlacement = "left-of" | "right-of" | "over";
 
 export type SequenceGroupKind = "alt" | "loop" | "opt";
@@ -234,7 +246,17 @@ export interface LinkNodeProps {
 export interface SequenceParticipantProps {
   label: string;
   kind?: SequenceParticipantKind;
+  icon?: string;
   description?: string;
+  sourceAnchor?: SourceAnchorInput;
+}
+
+/** Props for grouping sequence participants into vertical boxes */
+export interface SequenceParticipantBoxProps {
+  label?: string;
+  description?: string;
+  participants: string[];
+  color?: string;
   sourceAnchor?: SourceAnchorInput;
 }
 
@@ -245,6 +267,9 @@ export interface SequenceMessageProps {
   label: string;
   description?: string;
   kind?: SequenceMessageKind;
+  arrow?: SequenceMessageArrow;
+  create?: string[];
+  destroy?: string[];
   activate?: string[];
   deactivate?: string[];
   sourceAnchor?: SourceAnchorInput;
@@ -327,6 +352,7 @@ export type AnyNodeProps =
   | DescriptionNodeProps
   | LinkNodeProps
   | SequenceParticipantProps
+  | SequenceParticipantBoxProps
   | SequenceMessageProps
   | SequenceNoteProps
   | SequenceGroupProps

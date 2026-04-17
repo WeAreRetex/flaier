@@ -12,6 +12,7 @@ const RESERVED_FLAIER_NODE_NAMES = new Set([
   "DescriptionNode",
   "LinkNode",
   "SequenceParticipant",
+  "SequenceParticipantBox",
   "SequenceMessage",
   "SequenceNote",
   "SequenceGroup",

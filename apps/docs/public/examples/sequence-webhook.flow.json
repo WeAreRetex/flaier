@@ -22,9 +22,22 @@
         "minHeight": 640
       },
       "children": [
+        "box-platform",
         "msg-webhook",
         "group-verify"
       ]
+    },
+    "box-platform": {
+      "type": "SequenceParticipantBox",
+      "props": {
+        "label": "Delivery Platform",
+        "participants": [
+          "edge",
+          "queue",
+          "worker"
+        ],
+        "color": "#60a5fa"
+      }
     },
     "provider": {
       "type": "SequenceParticipant",

@@ -7,7 +7,9 @@ import type {
   SequenceLayoutMessage,
   SequenceLayoutNote,
   SequenceLayoutParticipant,
+  SequenceLayoutParticipantBox,
 } from "../../sequence-layout";
+import SequenceParticipantIcon from "./SequenceParticipantIcon.vue";
 
 const props = defineProps<{
   layout: SequenceLayout;
@@ -40,6 +42,14 @@ function isParticipantActive(participant: SequenceLayoutParticipant) {
   return props.activeParticipantKeys?.includes(participant.key) ?? false;
 }
 
+type SequenceArrowDecorationKind = "solid" | "open" | "cross";
+
+interface SequenceArrowDecoration {
+  key: string;
+  kind: SequenceArrowDecorationKind;
+  path: string;
+}
+
 function messagePath(message: SequenceLayoutMessage) {
   if (message.selfMessage) {
     const loopHeight = 24;
@@ -52,7 +62,7 @@ function messagePath(message: SequenceLayoutMessage) {
 }
 
 function messageStrokeDasharray(message: SequenceLayoutMessage) {
-  return message.kind === "return" ? "6 5" : undefined;
+  return ["-->", "-->>", "<<-->>", "--x", "--)"].includes(message.arrow) ? "6 5" : undefined;
 }
 
 function messageLineStyle(message: SequenceLayoutMessage): Record<string, string> {
@@ -71,36 +81,85 @@ function messageLineStyle(message: SequenceLayoutMessage): Record<string, string
   };
 }
 
-function messageArrowPath(message: SequenceLayoutMessage) {
-  const arrowSize = 8;
-
-  if (message.selfMessage) {
-    const y = message.y + 24;
-    const x = message.startX;
-    return message.kind === "sync"
-      ? `M ${x} ${y} L ${x + arrowSize} ${y - 4.5} L ${x + arrowSize} ${y + 4.5} Z`
-      : `M ${x + arrowSize} ${y - 4.5} L ${x} ${y} L ${x + arrowSize} ${y + 4.5}`;
+function resolveMessageArrowTerminals(message: SequenceLayoutMessage) {
+  switch (message.arrow) {
+    case "<<->>":
+    case "<<-->>":
+      return { start: "solid", end: "solid" } as const;
+    case "-x":
+    case "--x":
+      return { start: "none", end: "cross" } as const;
+    case "-)":
+    case "--)":
+      return { start: "none", end: "open" } as const;
+    case "->>":
+    case "-->>":
+      return { start: "none", end: "solid" } as const;
+    default:
+      return { start: "none", end: "none" } as const;
   }
-
-  const pointsRight = message.endX >= message.startX;
-  const x = message.endX;
-  const y = message.y;
-
-  if (message.kind === "sync") {
-    return pointsRight
-      ? `M ${x} ${y} L ${x - arrowSize} ${y - 4.5} L ${x - arrowSize} ${y + 4.5} Z`
-      : `M ${x} ${y} L ${x + arrowSize} ${y - 4.5} L ${x + arrowSize} ${y + 4.5} Z`;
-  }
-
-  return pointsRight
-    ? `M ${x - arrowSize} ${y - 4.5} L ${x} ${y} L ${x - arrowSize} ${y + 4.5}`
-    : `M ${x + arrowSize} ${y - 4.5} L ${x} ${y} L ${x + arrowSize} ${y + 4.5}`;
 }
 
-function messageArrowStyle(message: SequenceLayoutMessage): Record<string, string> {
+function buildMessageArrowDecorationPath(
+  x: number,
+  y: number,
+  direction: -1 | 1,
+  kind: SequenceArrowDecorationKind,
+) {
+  const arrowSize = 8;
+  const crossSize = 5.5;
+
+  if (kind === "cross") {
+    return `M ${x - crossSize} ${y - crossSize} L ${x + crossSize} ${y + crossSize} M ${x - crossSize} ${y + crossSize} L ${x + crossSize} ${y - crossSize}`;
+  }
+
+  const baseX = x - direction * arrowSize;
+
+  if (kind === "solid") {
+    return `M ${x} ${y} L ${baseX} ${y - 4.5} L ${baseX} ${y + 4.5} Z`;
+  }
+
+  return `M ${baseX} ${y - 4.5} L ${x} ${y} L ${baseX} ${y + 4.5}`;
+}
+
+function messageArrowDecorations(message: SequenceLayoutMessage) {
+  const terminals = resolveMessageArrowTerminals(message);
+  const endDirection = message.selfMessage ? -1 : message.endX >= message.startX ? 1 : -1;
+  const endX = message.selfMessage ? message.startX : message.endX;
+  const endY = message.selfMessage ? message.y + 24 : message.y;
+  const result: SequenceArrowDecoration[] = [];
+
+  if (!message.selfMessage && terminals.start !== "none") {
+    result.push({
+      key: `${message.key}-start`,
+      kind: terminals.start,
+      path: buildMessageArrowDecorationPath(
+        message.startX,
+        message.y,
+        (endDirection * -1) as -1 | 1,
+        terminals.start,
+      ),
+    });
+  }
+
+  if (terminals.end !== "none") {
+    result.push({
+      key: `${message.key}-end`,
+      kind: terminals.end,
+      path: buildMessageArrowDecorationPath(endX, endY, endDirection as -1 | 1, terminals.end),
+    });
+  }
+
+  return result;
+}
+
+function messageArrowStyle(
+  message: SequenceLayoutMessage,
+  decoration: SequenceArrowDecoration,
+): Record<string, string> {
   const base = messageLineStyle(message);
 
-  if (message.kind === "sync") {
+  if (decoration.kind === "solid") {
     return {
       fill: base.stroke ?? "var(--color-foreground)",
       opacity: base.opacity ?? "1",
@@ -150,18 +209,81 @@ function participantStyle(participant: SequenceLayoutParticipant) {
   };
 }
 
-function participantClass(participant: SequenceLayoutParticipant) {
+function participantMirrorStyle(participant: SequenceLayoutParticipant) {
+  return {
+    left: `${participant.x - participant.width / 2}px`,
+    top: `${props.layout.mirrorParticipantsY}px`,
+    width: `${participant.width}px`,
+    minHeight: `${participant.headerHeight}px`,
+    visibility: "hidden" as const,
+  };
+}
+
+function participantToneClass(participant: SequenceLayoutParticipant) {
   return isParticipantActive(participant)
     ? "border-primary/55 bg-primary/13 text-foreground shadow-xl shadow-primary/10"
     : "border-border/70 bg-card/94 text-foreground/92";
+}
+
+function participantSurfaceClass(participant: SequenceLayoutParticipant) {
+  return `overflow-hidden rounded-[22px] bg-card/98 shadow-2xl ring-1 ring-border/50 backdrop-blur-none ${participantToneClass(participant)}`;
 }
 
 function lifelineStyle(participant: SequenceLayoutParticipant) {
   return {
     x1: participant.x,
     x2: participant.x,
-    y1: props.layout.lifelineTop,
-    y2: props.layout.lifelineBottom,
+    y1: participant.lifelineStartY,
+    y2: participant.lifelineEndY,
+  };
+}
+
+function destroyMarkerPath(participant: SequenceLayoutParticipant) {
+  const x = participant.x;
+  const y = participant.lifelineEndY;
+  return `M ${x - 7} ${y - 7} L ${x + 7} ${y + 7} M ${x - 7} ${y + 7} L ${x + 7} ${y - 7}`;
+}
+
+function participantBoxStyle(box: SequenceLayoutParticipantBox) {
+  const color = box.color?.trim();
+
+  return {
+    left: `${box.left}px`,
+    top: `${box.top}px`,
+    width: `${box.width}px`,
+    height: `${box.height}px`,
+    ...(color
+      ? {
+          borderColor: `color-mix(in srgb, ${color} 38%, var(--color-border))`,
+          background: `color-mix(in srgb, ${color} 8%, transparent)`,
+        }
+      : {}),
+  };
+}
+
+function participantBoxBadgeStyle(box: SequenceLayoutParticipantBox) {
+  const color = box.color?.trim();
+
+  if (!color) {
+    return {};
+  }
+
+  return {
+    borderColor: `color-mix(in srgb, ${color} 46%, var(--color-border))`,
+    background: `color-mix(in srgb, ${color} 14%, var(--color-background))`,
+    color,
+  };
+}
+
+function participantBoxDescriptionStyle(box: SequenceLayoutParticipantBox) {
+  const color = box.color?.trim();
+
+  if (!color) {
+    return {};
+  }
+
+  return {
+    color: `color-mix(in srgb, ${color} 52%, var(--color-muted-foreground))`,
   };
 }
 
@@ -264,6 +386,29 @@ function sequenceBadge(stepIndex: number) {
     :style="canvasStyle"
   >
     <div
+      v-for="participantBox in layout.participantBoxes"
+      :key="participantBox.key"
+      class="absolute rounded-[28px] border border-dashed"
+      :style="participantBoxStyle(participantBox)"
+    >
+      <div
+        v-if="participantBox.label"
+        class="absolute left-4 top-3 inline-flex items-center gap-2 rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em]"
+        :style="participantBoxBadgeStyle(participantBox)"
+      >
+        <span>{{ participantBox.label }}</span>
+      </div>
+
+      <p
+        v-if="participantBox.description"
+        class="absolute left-4 right-4 top-12 text-[10px] leading-relaxed text-muted-foreground"
+        :style="participantBoxDescriptionStyle(participantBox)"
+      >
+        {{ participantBox.description }}
+      </p>
+    </div>
+
+    <div
       v-for="group in layout.groups"
       :key="group.key"
       class="fn-sequence-group absolute rounded-2xl border border-dashed"
@@ -316,6 +461,17 @@ function sequenceBadge(stepIndex: number) {
         stroke-dasharray="5 7"
       />
 
+      <template v-for="participant in layout.participants" :key="`${participant.key}-destroy`">
+        <path
+          v-if="participant.destroyed"
+          :d="destroyMarkerPath(participant)"
+          fill="none"
+          stroke="var(--color-foreground)"
+          stroke-linecap="round"
+          stroke-width="1.8"
+        />
+      </template>
+
       <rect
         v-for="activation in layout.activations"
         :key="`${activation.participantKey}-${activation.top}-${activation.depth}`"
@@ -337,7 +493,12 @@ function sequenceBadge(stepIndex: number) {
           :stroke-dasharray="messageStrokeDasharray(message)"
           :style="messageLineStyle(message)"
         />
-        <path :d="messageArrowPath(message)" :style="messageArrowStyle(message)" />
+        <path
+          v-for="decoration in messageArrowDecorations(message)"
+          :key="decoration.key"
+          :d="decoration.path"
+          :style="messageArrowStyle(message, decoration)"
+        />
       </g>
     </svg>
 
@@ -345,19 +506,58 @@ function sequenceBadge(stepIndex: number) {
       v-for="participant in layout.participants"
       :key="participant.key"
       type="button"
-      class="fn-sequence-surface pointer-events-none absolute flex flex-col items-center justify-start rounded-2xl border px-3 py-2 text-center shadow-xl backdrop-blur-xl transition-colors"
+      class="fn-sequence-surface pointer-events-none absolute flex flex-col items-center justify-start border px-3 py-2 text-center transition-colors"
       data-sequence-participant="true"
       :data-sequence-participant-key="participant.key"
+      data-sequence-participant-anchor="top"
       aria-hidden="true"
       tabindex="-1"
-      :class="participantClass(participant)"
+      :class="participantSurfaceClass(participant)"
       :style="participantStyle(participant)"
       @click="emit('selectParticipant', participant.key)"
     >
       <span
-        class="rounded-full border border-border/60 bg-background/75 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"
+        class="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border/60 bg-background/75 text-muted-foreground"
       >
-        {{ participant.kind }}
+        <SequenceParticipantIcon
+          :kind="participant.kind"
+          :icon="participant.icon"
+          :size="16"
+          :title="participant.kind"
+        />
+      </span>
+      <span class="mt-1 text-[12px] font-medium leading-snug text-foreground break-words">{{
+        participant.label
+      }}</span>
+      <span
+        v-if="participant.description"
+        class="mt-1 text-[10px] leading-relaxed text-muted-foreground break-words"
+      >
+        {{ participant.description }}
+      </span>
+    </button>
+
+    <button
+      v-for="participant in layout.participants"
+      :key="`${participant.key}-bottom`"
+      type="button"
+      class="fn-sequence-surface pointer-events-none absolute flex flex-col items-center justify-start border px-3 py-2 text-center transition-colors"
+      data-sequence-participant-anchor="bottom"
+      :data-sequence-participant-key="participant.key"
+      aria-hidden="true"
+      tabindex="-1"
+      :class="participantSurfaceClass(participant)"
+      :style="participantMirrorStyle(participant)"
+    >
+      <span
+        class="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border/60 bg-background/75 text-muted-foreground"
+      >
+        <SequenceParticipantIcon
+          :kind="participant.kind"
+          :icon="participant.icon"
+          :size="16"
+          :title="participant.kind"
+        />
       </span>
       <span class="mt-1 text-[12px] font-medium leading-snug text-foreground break-words">{{
         participant.label
