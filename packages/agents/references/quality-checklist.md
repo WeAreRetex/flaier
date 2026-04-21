@@ -11,6 +11,7 @@ Use this checklist before finalizing generated flow specs.
 - Use realistic, minimal code snippets in `CodeNode.code`.
 - For topology/system overviews, set `FlowTimeline.props.mode` to `architecture` and model components with `ArchitectureNode`.
 - Define `FlowTimeline.props.zones` and assign `ArchitectureNode.props.zone` when trust boundaries or platform domains should be visually grouped.
+- For time-ordered interactions between actors/services, set `FlowTimeline.props.mode` to `sequence`, define `SequenceParticipant` elements, and model the story with `SequenceMessage`, `SequenceNote`, and `SequenceGroup`/`SequenceBranch` elements.
 - Use `PayloadNode` for data snapshots/transforms and `ErrorNode` for failure states when those concepts matter to the story.
 - Add `sourceAnchor` to key nodes (`path:line` preferred) so readers can jump to relevant source quickly.
 
@@ -26,6 +27,11 @@ Use this checklist before finalizing generated flow specs.
 - For CodeNodes that combine `magicMoveSteps` and twoslash, keep markers in the final step code so the post-animation twoslash inspection frame has visible callouts.
 - For architecture mode, use explicit edge labels (`props.transitions`) for critical links (for example async/event/retry paths) so exported diagrams stay self-explanatory.
 - Add architecture metadata where useful: `owner`, `status`, `tier`, `interfaces`, `data`, `security`, and `operations` so node inspectors become actionable.
+- For sequence mode, keep `FlowTimeline.props.participants` ordered left-to-right and include every `SequenceParticipant` id exactly once.
+- Use `SequenceMessage.kind` (`sync`, `async`, `return`) and `activate`/`deactivate` arrays to clarify lifelines and control flow.
+- Keep `SequenceGroup` nesting correct: `alt` groups should have at least two `SequenceBranch` children; `loop` and `opt` groups should have exactly one branch. Give branches clear labels.
+- Use `SequenceNote` sparingly to highlight contracts, risks, or side effects tied to specific participants.
+- Enable `FlowTimeline.props.showSequenceNumbers` when the spec is narrated step-by-step in docs or presentations.
 - For docs pages or slide decks, prefer `themeMode: "document"` and hide header/export chrome when the canvas is tight.
 - Collapse the architecture inspector by default in constrained embeds unless the story depends on its metadata immediately.
 
@@ -38,6 +44,8 @@ Use this checklist before finalizing generated flow specs.
 - Prefer one entry root child and build traversal from that node.
 - Validate `sourceAnchor` references are plausible and include line numbers where available.
 - Remember that `root` can be any key, but it must reference the single `FlowTimeline` element.
+- In sequence mode, ensure every `SequenceMessage.from`/`SequenceMessage.to` and every `SequenceNote.participants` entry matches an id in `FlowTimeline.props.participants`.
+- In sequence mode, keep all root children and nested branch children limited to `SequenceMessage`, `SequenceNote`, and `SequenceGroup`; do not place `SequenceParticipant` inside branch children.
 
 ## Packaging Quality
 

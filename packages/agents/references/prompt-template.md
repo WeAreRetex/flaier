@@ -8,10 +8,12 @@ Generate a single `flaier` flow spec JSON file.
 Requirements:
 - Output only JSON.
 - Root must be `FlowTimeline`.
-- Allowed node types: ArchitectureNode, TriggerNode, CodeNode, DecisionNode, PayloadNode, ErrorNode, DescriptionNode, LinkNode.
+- Allowed narrative/architecture node types: ArchitectureNode, TriggerNode, CodeNode, DecisionNode, PayloadNode, ErrorNode, DescriptionNode, LinkNode.
+- Allowed sequence node types: SequenceParticipant, SequenceMessage, SequenceNote, SequenceGroup, SequenceBranch.
 - Include `state.currentStep` (number) and `state.playing` (boolean).
 - For topology/system diagrams, set `FlowTimeline.props.mode` to `architecture` and prefer `ArchitectureNode` for services/stores/queues/gateways.
 - When boundaries matter, define `FlowTimeline.props.zones` and set `ArchitectureNode.props.zone` references.
+- For sequence diagrams, set `FlowTimeline.props.mode` to `sequence`, define participants in `FlowTimeline.props.participants`, then model steps with `SequenceMessage`, `SequenceNote`, `SequenceGroup` (kind: `alt`, `loop`, `opt`), and child `SequenceBranch` elements. Keep participant references consistent.
 - If the flow is intended for docs pages or a Slidev deck, prefer `FlowTimeline.props.themeMode: "document"` and trim chrome with `showHeaderOverlay`, `showExportControls`, `defaultArchitectureInspectorOpen`, and `showArchitectureInspectorToggleText` when appropriate.
 - For architecture nodes, include operational metadata when known (`owner`, `status`, `tier`, `interfaces`, `data`, `security`, `operations`, `links`).
 - Include realistic code snippets for each CodeNode.
