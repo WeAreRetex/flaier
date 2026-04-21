@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.2.1
+
+[compare changes](https://github.com/WeAreRetex/flaier/compare/v0.2.0...v0.2.1)
+
+### 🏡 Chore
+
+- Added new info to skills ([5cef6a4](https://github.com/WeAreRetex/flaier/commit/5cef6a4))
+
+### ❤️ Contributors
+
+- Rigo-m ([@Rigo-m](https://github.com/Rigo-m))
+
 ## v0.2.0
 
 [compare changes](https://github.com/WeAreRetex/flaier/compare/v0.1.9...v0.2.0)
