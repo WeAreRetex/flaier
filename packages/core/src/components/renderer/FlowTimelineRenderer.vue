@@ -3013,14 +3013,65 @@ const edges = computed<FlowEdge[]>(() => {
         : undefined;
 
       const hasReverse = directedPairs.has(`${target}->${node.key}`);
-      const parallelOffset =
-        isArchitectureMode.value && hasReverse ? (node.key < target ? 1 : -1) : undefined;
+
+      let sourceHandle: string | undefined;
+      let targetHandle: string | undefined;
+      let parallelOffset: number | undefined;
+      let labelBias: number | undefined;
+      if (isArchitectureMode.value) {
+        const isVertical = props.direction === "vertical";
+        if (hasReverse) {
+          // Bidirectional pair: route each direction on opposite sides of the layout axis
+          // so the two edges flow parallel without overlapping. Endpoint separation comes
+          // from the handles themselves, so we don't need an extra perpendicular offset.
+          const primary = node.key < target;
+          if (isVertical) {
+            sourceHandle = primary ? "s-right" : "s-left";
+            targetHandle = primary ? "t-right" : "t-left";
+          } else {
+            sourceHandle = primary ? "s-bottom" : "s-top";
+            targetHandle = primary ? "t-bottom" : "t-top";
+          }
+          // Position each label close to its own source node so the two labels end up
+          // on opposite ends of the pair instead of stacking at the midpoint.
+          labelBias = 0.3;
+        } else {
+          sourceHandle = isVertical ? "s-bottom" : "s-right";
+          targetHandle = isVertical ? "t-top" : "t-left";
+
+          // Fan-out: when a node has multiple non-reverse targets in the same rank
+          // direction, distribute source handles so straight lines stay shorter.
+          if (isVertical && targets.length > 1) {
+            const sourcePos = layoutPositions.value[node.key];
+            const targetPos = layoutPositions.value[target];
+            if (sourcePos && targetPos) {
+              const sourceSize = nodeSizes.value[node.key] ?? { width: 270, height: 120 };
+              const sourceCenterX = sourcePos.x + sourceSize.width / 2;
+              const targetSize = nodeSizes.value[target] ?? { width: 270, height: 120 };
+              const targetCenterX = targetPos.x + targetSize.width / 2;
+              const dx = targetCenterX - sourceCenterX;
+              const threshold = sourceSize.width * 0.2;
+              if (dx < -threshold) {
+                sourceHandle = "s-bottom-l";
+                targetHandle = "t-top-r";
+              } else if (dx > threshold) {
+                sourceHandle = "s-bottom-r";
+                targetHandle = "t-top-l";
+              }
+            }
+          }
+        }
+      } else if (hasReverse) {
+        // Non-architecture modes keep the legacy perpendicular shift fallback.
+        parallelOffset = node.key < target ? 1 : -1;
+      }
 
       const edgeData =
-        resolvedShape || parallelOffset !== undefined
+        resolvedShape || parallelOffset !== undefined || labelBias !== undefined
           ? {
               ...(resolvedShape ? { shape: resolvedShape } : {}),
               ...(parallelOffset !== undefined ? { parallelOffset } : {}),
+              ...(labelBias !== undefined ? { labelBias } : {}),
             }
           : undefined;
 
@@ -3028,6 +3079,8 @@ const edges = computed<FlowEdge[]>(() => {
         id: `e-${node.key}-${target}`,
         source: node.key,
         target,
+        sourceHandle,
+        targetHandle,
         type: isArchitectureMode.value ? "architecture" : "smoothstep",
         animated: !isArchitectureMode.value,
         class: edgeClasses.length > 0 ? edgeClasses.join(" ") : undefined,

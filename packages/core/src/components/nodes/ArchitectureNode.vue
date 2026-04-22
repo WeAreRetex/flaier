@@ -146,7 +146,12 @@ const compactTags = computed(() => (props.tags ?? []).slice(0, 3));
     :data-node-kind="kind"
     :data-node-status="status"
   >
-    <Handle type="target" :position="Position.Left" />
+    <Handle id="t-top" type="target" :position="Position.Top" />
+    <Handle id="s-top" type="source" :position="Position.Top" />
+    <Handle id="t-top-l" type="target" :position="Position.Top" :style="{ left: '25%' }" />
+    <Handle id="t-top-r" type="target" :position="Position.Top" :style="{ left: '75%' }" />
+    <Handle id="t-left" type="target" :position="Position.Left" />
+    <Handle id="s-left" type="source" :position="Position.Left" />
 
     <div class="flex items-start gap-2.5">
       <div
@@ -229,6 +234,11 @@ const compactTags = computed(() => (props.tags ?? []).slice(0, 3));
       <NodeSourceAnchor :label="sourceAnchor.label" :href="sourceAnchor.href" />
     </div>
 
-    <Handle type="source" :position="Position.Right" />
+    <Handle id="t-bottom" type="target" :position="Position.Bottom" />
+    <Handle id="s-bottom" type="source" :position="Position.Bottom" />
+    <Handle id="s-bottom-l" type="source" :position="Position.Bottom" :style="{ left: '25%' }" />
+    <Handle id="s-bottom-r" type="source" :position="Position.Bottom" :style="{ left: '75%' }" />
+    <Handle id="t-right" type="target" :position="Position.Right" />
+    <Handle id="s-right" type="source" :position="Position.Right" />
   </div>
 </template>

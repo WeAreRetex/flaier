@@ -13,6 +13,7 @@ import type { EdgeShape } from "../../types";
 interface ArchitectureEdgeData {
   shape?: EdgeShape;
   parallelOffset?: number;
+  labelBias?: number;
 }
 
 const props = withDefaults(defineProps<EdgeProps<ArchitectureEdgeData>>(), {
@@ -91,8 +92,22 @@ const pathDefinition = computed<[string, number, number]>(() => {
 });
 
 const edgePath = computed(() => pathDefinition.value[0]);
-const labelX = computed(() => pathDefinition.value[1]);
-const labelY = computed(() => pathDefinition.value[2]);
+const labelX = computed(() => {
+  const bias = props.data?.labelBias;
+  if (typeof bias === "number") {
+    const { sourceX, targetX } = offsetEndpoints.value;
+    return sourceX + (targetX - sourceX) * bias;
+  }
+  return pathDefinition.value[1];
+});
+const labelY = computed(() => {
+  const bias = props.data?.labelBias;
+  if (typeof bias === "number") {
+    const { sourceY, targetY } = offsetEndpoints.value;
+    return sourceY + (targetY - sourceY) * bias;
+  }
+  return pathDefinition.value[2];
+});
 const labelText = computed(() => (typeof props.label === "string" ? props.label : ""));
 const labelPositionStyle = computed(() => ({
   transform: `translate(-50%, -50%) translate(${labelX.value}px, ${labelY.value}px)`,

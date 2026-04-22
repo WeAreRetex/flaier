@@ -1,0 +1,137 @@
+{
+  "root": "timeline",
+  "state": { "currentStep": 0, "playing": false },
+  "elements": {
+    "timeline": {
+      "type": "FlowTimeline",
+      "props": {
+        "title": "Bidirectional Read Path",
+        "description": "Vertical architecture with cache hit return, straight edges, and zones.",
+        "mode": "architecture",
+        "direction": "vertical",
+        "layoutEngine": "dagre",
+        "layoutRankSep": 220,
+        "layoutNodeSep": 220,
+        "layoutEdgeSep": 40,
+        "edgeShape": "straight",
+        "minHeight": 760,
+        "defaultArchitectureInspectorOpen": false,
+        "showArchitectureInspectorToggleText": false,
+        "zones": [
+          { "id": "client", "label": "Client", "color": "#475569" },
+          { "id": "netlify", "label": "Netlify", "color": "#0ea5e9" },
+          { "id": "sources", "label": "Sources", "color": "#f59e0b" }
+        ]
+      },
+      "children": ["browser"]
+    },
+
+    "browser": {
+      "type": "ArchitectureNode",
+      "props": {
+        "label": "Browser",
+        "kind": "external",
+        "zone": "client",
+        "description": "User opens a page on Shop or Professional.",
+        "transitions": [
+          {
+            "to": "cdn",
+            "label": "Page request",
+            "kind": "default",
+            "protocol": "HTTPS",
+            "transport": "sync",
+            "criticality": "high"
+          }
+        ]
+      },
+      "children": ["cdn"]
+    },
+
+    "cdn": {
+      "type": "ArchitectureNode",
+      "props": {
+        "label": "Netlify CDN",
+        "kind": "cache",
+        "zone": "netlify",
+        "technology": "Edge cache + Durable cache",
+        "description": "Cache hit returns directly to the browser.",
+        "capabilities": [
+          "Edge cache per region",
+          "Durable cache across regions"
+        ],
+        "transitions": [
+          {
+            "to": "browser",
+            "label": "Cached response",
+            "description": "Cache hit: returned without touching runtime.",
+            "kind": "success",
+            "transport": "sync",
+            "criticality": "high"
+          },
+          {
+            "to": "backend",
+            "label": "Cache miss",
+            "description": "No valid cache: regenerate at runtime.",
+            "kind": "warning",
+            "transport": "sync",
+            "criticality": "medium"
+          }
+        ]
+      },
+      "children": ["backend"]
+    },
+
+    "backend": {
+      "type": "ArchitectureNode",
+      "props": {
+        "label": "Backend Nuxt",
+        "kind": "service",
+        "zone": "netlify",
+        "technology": "Nuxt server",
+        "description": "Composes response from pre-built payload and real-time data.",
+        "responsibilities": [
+          "Read view-model from blobs",
+          "Merge live price & stock"
+        ],
+        "transitions": [
+          {
+            "to": "blobs",
+            "label": "Read view-model",
+            "kind": "success",
+            "transport": "sync",
+            "criticality": "high"
+          },
+          {
+            "to": "commerce",
+            "label": "Price & stock",
+            "kind": "async",
+            "transport": "sync",
+            "criticality": "high"
+          }
+        ]
+      },
+      "children": ["blobs", "commerce"]
+    },
+
+    "blobs": {
+      "type": "ArchitectureNode",
+      "props": {
+        "label": "Netlify Blobs",
+        "kind": "cache",
+        "zone": "netlify",
+        "technology": "Netlify Blobs (K/V)",
+        "description": "Pre-composed view-models for every page."
+      }
+    },
+
+    "commerce": {
+      "type": "ArchitectureNode",
+      "props": {
+        "label": "Commerce Layer",
+        "kind": "external",
+        "zone": "sources",
+        "description": "Source of truth for price and availability."
+      }
+    }
+  }
+}
