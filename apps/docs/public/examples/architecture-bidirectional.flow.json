@@ -55,10 +55,7 @@
         "zone": "netlify",
         "technology": "Edge cache + Durable cache",
         "description": "Cache hit returns directly to the browser.",
-        "capabilities": [
-          "Edge cache per region",
-          "Durable cache across regions"
-        ],
+        "capabilities": ["Edge cache per region", "Durable cache across regions"],
         "transitions": [
           {
             "to": "browser",
@@ -89,10 +86,7 @@
         "zone": "netlify",
         "technology": "Nuxt server",
         "description": "Composes response from pre-built payload and real-time data.",
-        "responsibilities": [
-          "Read view-model from blobs",
-          "Merge live price & stock"
-        ],
+        "responsibilities": ["Read view-model from blobs", "Merge live price & stock"],
         "transitions": [
           {
             "to": "blobs",
