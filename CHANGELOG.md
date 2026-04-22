@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.2.6
+
+[compare changes](https://github.com/WeAreRetex/flaier/compare/v0.2.5...v0.2.6)
+
+### 🩹 Fixes
+
+- Flow connection ([8671545](https://github.com/WeAreRetex/flaier/commit/8671545))
+
+### ❤️ Contributors
+
+- Rigo-m ([@Rigo-m](https://github.com/Rigo-m))
+
 ## v0.2.5
 
 [compare changes](https://github.com/WeAreRetex/flaier/compare/v0.2.4...v0.2.5)
