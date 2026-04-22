@@ -11,16 +11,10 @@
         "title": "Boundary to Database Sequence",
         "description": "A tiny sequence example showing Mermaid-style participant kinds, aliases, and explicit arrow types.",
         "mode": "sequence",
-        "participants": [
-          "api",
-          "db"
-        ],
+        "participants": ["api", "db"],
         "minHeight": 420
       },
-      "children": [
-        "msg-query",
-        "msg-result"
-      ]
+      "children": ["msg-query", "msg-result"]
     },
     "api": {
       "type": "SequenceParticipant",

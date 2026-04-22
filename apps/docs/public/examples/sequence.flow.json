@@ -11,22 +11,11 @@
         "title": "Auth Login Sequence",
         "description": "Client login, auth branching, silent refresh, and optional audit fan-out.",
         "mode": "sequence",
-        "participants": [
-          "client",
-          "gateway",
-          "auth",
-          "db"
-        ],
+        "participants": ["client", "gateway", "auth", "db"],
         "showSequenceNumbers": true,
         "minHeight": 620
       },
-      "children": [
-        "msg-login",
-        "group-auth-result",
-        "note-session",
-        "group-refresh",
-        "group-audit"
-      ]
+      "children": ["msg-login", "group-auth-result", "note-session", "group-refresh", "group-audit"]
     },
     "client": {
       "type": "SequenceParticipant",
@@ -72,9 +61,7 @@
         "label": "POST /login",
         "description": "Client submits email + password to the public auth endpoint.",
         "kind": "sync",
-        "activate": [
-          "gateway"
-        ],
+        "activate": ["gateway"],
         "sourceAnchor": "src/client/login.ts:18"
       }
     },
@@ -86,10 +73,7 @@
         "description": "Split the flow based on password verification.",
         "sourceAnchor": "src/services/auth.ts:22"
       },
-      "children": [
-        "branch-valid",
-        "branch-invalid"
-      ]
+      "children": ["branch-valid", "branch-invalid"]
     },
     "branch-valid": {
       "type": "SequenceBranch",
@@ -111,10 +95,7 @@
         "label": "Invalid",
         "description": "Return a rejected login response."
       },
-      "children": [
-        "note-invalid",
-        "msg-failure"
-      ]
+      "children": ["note-invalid", "msg-failure"]
     },
     "msg-validate": {
       "type": "SequenceMessage",
@@ -124,9 +105,7 @@
         "label": "Validate credentials",
         "description": "Gateway forwards the request to the internal auth service.",
         "kind": "sync",
-        "activate": [
-          "auth"
-        ],
+        "activate": ["auth"],
         "sourceAnchor": "src/server/routes/login.post.ts:8"
       }
     },
@@ -138,9 +117,7 @@
         "label": "SELECT user by email",
         "description": "Auth service fetches the user record and password hash.",
         "kind": "sync",
-        "activate": [
-          "db"
-        ],
+        "activate": ["db"],
         "sourceAnchor": "src/services/auth.ts:27"
       }
     },
@@ -152,9 +129,7 @@
         "label": "User row + password hash",
         "description": "Database returns the stored credentials for verification.",
         "kind": "return",
-        "deactivate": [
-          "db"
-        ],
+        "deactivate": ["db"],
         "sourceAnchor": "src/db/users.ts:14"
       }
     },
@@ -166,9 +141,7 @@
         "label": "Issue session cookie",
         "description": "Auth service signs the session and hands the cookie payload back to the edge.",
         "kind": "return",
-        "deactivate": [
-          "auth"
-        ],
+        "deactivate": ["auth"],
         "sourceAnchor": "src/services/auth.ts:44"
       }
     },
@@ -180,9 +153,7 @@
         "label": "200 Set-Cookie",
         "description": "Gateway returns a successful response and closes the login transaction.",
         "kind": "return",
-        "deactivate": [
-          "gateway"
-        ],
+        "deactivate": ["gateway"],
         "sourceAnchor": "src/server/routes/login.post.ts:21"
       }
     },
@@ -192,9 +163,7 @@
         "label": "Rejected login",
         "body": "Do not reveal whether the email exists. Return a generic auth error and increment fraud signals.",
         "placement": "right-of",
-        "participants": [
-          "gateway"
-        ],
+        "participants": ["gateway"],
         "sourceAnchor": "docs/auth/runbook.md:42"
       }
     },
@@ -206,9 +175,7 @@
         "label": "401 Invalid credentials",
         "description": "Public error response for invalid password or unknown user.",
         "kind": "return",
-        "deactivate": [
-          "gateway"
-        ],
+        "deactivate": ["gateway"],
         "sourceAnchor": "src/server/routes/login.post.ts:25"
       }
     },
@@ -218,10 +185,7 @@
         "label": "Session contract",
         "body": "The cookie stores a signed session id. Server-side state still lives in the primary store.",
         "placement": "over",
-        "participants": [
-          "gateway",
-          "auth"
-        ],
+        "participants": ["gateway", "auth"],
         "sourceAnchor": "docs/auth/session-contract.md:7"
       }
     },
@@ -233,19 +197,14 @@
         "description": "Silent refresh repeats on every protected page view.",
         "sourceAnchor": "src/client/session.ts:12"
       },
-      "children": [
-        "branch-refresh"
-      ]
+      "children": ["branch-refresh"]
     },
     "branch-refresh": {
       "type": "SequenceBranch",
       "props": {
         "label": "Each refresh window"
       },
-      "children": [
-        "msg-refresh",
-        "msg-refresh-result"
-      ]
+      "children": ["msg-refresh", "msg-refresh-result"]
     },
     "msg-refresh": {
       "type": "SequenceMessage",
@@ -255,9 +214,7 @@
         "label": "POST /session/refresh",
         "description": "Client silently refreshes before the session expires.",
         "kind": "async",
-        "activate": [
-          "gateway"
-        ],
+        "activate": ["gateway"],
         "sourceAnchor": "src/client/session.ts:28"
       }
     },
@@ -269,9 +226,7 @@
         "label": "204 refreshed cookie",
         "description": "Gateway rotates the cookie and returns without reloading the page.",
         "kind": "return",
-        "deactivate": [
-          "gateway"
-        ],
+        "deactivate": ["gateway"],
         "sourceAnchor": "src/server/routes/session-refresh.post.ts:17"
       }
     },
@@ -283,19 +238,14 @@
         "description": "Only emit the audit event when the risk engine flags the request.",
         "sourceAnchor": "src/services/audit.ts:5"
       },
-      "children": [
-        "branch-audit"
-      ]
+      "children": ["branch-audit"]
     },
     "branch-audit": {
       "type": "SequenceBranch",
       "props": {
         "label": "Risk score high"
       },
-      "children": [
-        "msg-audit",
-        "note-audit"
-      ]
+      "children": ["msg-audit", "note-audit"]
     },
     "msg-audit": {
       "type": "SequenceMessage",
@@ -305,12 +255,8 @@
         "label": "Emit suspicious-login audit event",
         "description": "Optional audit path that preserves the main login contract.",
         "kind": "async",
-        "activate": [
-          "auth"
-        ],
-        "deactivate": [
-          "auth"
-        ],
+        "activate": ["auth"],
+        "deactivate": ["auth"],
         "sourceAnchor": "src/services/audit.ts:18"
       }
     },
@@ -320,9 +266,7 @@
         "label": "Audit fan-out",
         "body": "This optional step can later expand into a richer fraud-review sequence without changing the core login happy path.",
         "placement": "left-of",
-        "participants": [
-          "auth"
-        ],
+        "participants": ["auth"],
         "sourceAnchor": "docs/security/fraud-signals.md:15"
       }
     }

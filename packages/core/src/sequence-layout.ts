@@ -377,8 +377,6 @@ function layoutStatements(
       }
 
       const message = layoutMessage(key, element, cursorY, ctx);
-      const fromIndex = ctx.participantIndexByKey[from] ?? 0;
-      const toIndex = ctx.participantIndexByKey[to] ?? 0;
 
       messages.push(message);
       steps.push({

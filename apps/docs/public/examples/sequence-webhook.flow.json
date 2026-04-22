@@ -11,31 +11,17 @@
         "title": "Webhook Delivery Sequence",
         "description": "Inbound webhook intake, queue handoff, retry handling, and optional escalation.",
         "mode": "sequence",
-        "participants": [
-          "provider",
-          "edge",
-          "queue",
-          "worker",
-          "ops"
-        ],
+        "participants": ["provider", "edge", "queue", "worker", "ops"],
         "showSequenceNumbers": true,
         "minHeight": 640
       },
-      "children": [
-        "box-platform",
-        "msg-webhook",
-        "group-verify"
-      ]
+      "children": ["box-platform", "msg-webhook", "group-verify"]
     },
     "box-platform": {
       "type": "SequenceParticipantBox",
       "props": {
         "label": "Delivery Platform",
-        "participants": [
-          "edge",
-          "queue",
-          "worker"
-        ],
+        "participants": ["edge", "queue", "worker"],
         "color": "#60a5fa"
       }
     },
@@ -92,9 +78,7 @@
         "label": "POST /webhooks",
         "description": "Third-party provider sends a signed webhook event to the public endpoint.",
         "kind": "sync",
-        "activate": [
-          "edge"
-        ],
+        "activate": ["edge"],
         "sourceAnchor": "src/server/routes/webhooks.post.ts:14"
       }
     },
@@ -106,10 +90,7 @@
         "description": "Edge service either accepts the event for async delivery or rejects it immediately.",
         "sourceAnchor": "src/server/routes/webhooks.post.ts:20"
       },
-      "children": [
-        "branch-valid",
-        "branch-invalid"
-      ]
+      "children": ["branch-valid", "branch-invalid"]
     },
     "branch-valid": {
       "type": "SequenceBranch",
@@ -131,10 +112,7 @@
         "label": "Invalid",
         "description": "Reject the request without touching the queue."
       },
-      "children": [
-        "note-rejected",
-        "msg-rejected"
-      ]
+      "children": ["note-rejected", "msg-rejected"]
     },
     "msg-enqueue": {
       "type": "SequenceMessage",
@@ -144,9 +122,7 @@
         "label": "Enqueue delivery job",
         "description": "The verified payload is written to the delivery queue with an idempotency key.",
         "kind": "async",
-        "activate": [
-          "queue"
-        ],
+        "activate": ["queue"],
         "sourceAnchor": "src/server/routes/webhooks.post.ts:34"
       }
     },
@@ -158,9 +134,7 @@
         "label": "202 Accepted",
         "description": "The provider gets an immediate acknowledgement while delivery continues in the background.",
         "kind": "return",
-        "deactivate": [
-          "edge"
-        ],
+        "deactivate": ["edge"],
         "sourceAnchor": "src/server/routes/webhooks.post.ts:41"
       }
     },
@@ -170,10 +144,7 @@
         "label": "Async handoff",
         "body": "After the 202 response, the external provider is done. Remaining steps model internal retry and escalation behavior.",
         "placement": "over",
-        "participants": [
-          "queue",
-          "worker"
-        ],
+        "participants": ["queue", "worker"],
         "sourceAnchor": "docs/architecture/webhook-delivery.md:18"
       }
     },
@@ -185,19 +156,14 @@
         "description": "Each queued attempt either succeeds or schedules the next retry window.",
         "sourceAnchor": "src/workers/delivery.ts:16"
       },
-      "children": [
-        "branch-retry"
-      ]
+      "children": ["branch-retry"]
     },
     "branch-retry": {
       "type": "SequenceBranch",
       "props": {
         "label": "Each delivery attempt"
       },
-      "children": [
-        "msg-dispatch",
-        "group-delivery-result"
-      ]
+      "children": ["msg-dispatch", "group-delivery-result"]
     },
     "msg-dispatch": {
       "type": "SequenceMessage",
@@ -207,12 +173,8 @@
         "label": "Dispatch queued job",
         "description": "Queue hands the next delivery attempt to the worker.",
         "kind": "return",
-        "activate": [
-          "worker"
-        ],
-        "deactivate": [
-          "queue"
-        ],
+        "activate": ["worker"],
+        "deactivate": ["queue"],
         "sourceAnchor": "src/workers/delivery.ts:22"
       }
     },
@@ -224,31 +186,21 @@
         "description": "Successful attempts finish the worker. Retryable failures compute the next delay.",
         "sourceAnchor": "src/workers/delivery.ts:29"
       },
-      "children": [
-        "branch-delivered",
-        "branch-retryable"
-      ]
+      "children": ["branch-delivered", "branch-retryable"]
     },
     "branch-delivered": {
       "type": "SequenceBranch",
       "props": {
         "label": "Delivered"
       },
-      "children": [
-        "msg-deliver",
-        "msg-ok"
-      ]
+      "children": ["msg-deliver", "msg-ok"]
     },
     "branch-retryable": {
       "type": "SequenceBranch",
       "props": {
         "label": "Retryable failure"
       },
-      "children": [
-        "msg-deliver-failed",
-        "msg-backoff",
-        "note-backoff"
-      ]
+      "children": ["msg-deliver-failed", "msg-backoff", "note-backoff"]
     },
     "msg-deliver": {
       "type": "SequenceMessage",
@@ -269,9 +221,7 @@
         "label": "200 OK",
         "description": "Remote endpoint accepts the event and the worker finishes the job.",
         "kind": "return",
-        "deactivate": [
-          "worker"
-        ],
+        "deactivate": ["worker"],
         "sourceAnchor": "src/workers/delivery.ts:42"
       }
     },
@@ -294,9 +244,7 @@
         "label": "Compute exponential backoff",
         "description": "Self-message showing retry window calculation before the next attempt is scheduled.",
         "kind": "sync",
-        "deactivate": [
-          "worker"
-        ],
+        "deactivate": ["worker"],
         "sourceAnchor": "src/workers/delivery.ts:48"
       }
     },
@@ -306,9 +254,7 @@
         "label": "Retry metadata",
         "body": "Delivery attempts record the error class, next scheduled timestamp, and cumulative failure count.",
         "placement": "left-of",
-        "participants": [
-          "worker"
-        ],
+        "participants": ["worker"],
         "sourceAnchor": "docs/runbooks/webhooks.md:14"
       }
     },
@@ -320,19 +266,14 @@
         "description": "Only page the on-call if retries are exhausted or the destination stays unhealthy.",
         "sourceAnchor": "src/workers/delivery.ts:58"
       },
-      "children": [
-        "branch-escalate"
-      ]
+      "children": ["branch-escalate"]
     },
     "branch-escalate": {
       "type": "SequenceBranch",
       "props": {
         "label": "Escalate"
       },
-      "children": [
-        "msg-alert",
-        "note-alert"
-      ]
+      "children": ["msg-alert", "note-alert"]
     },
     "msg-alert": {
       "type": "SequenceMessage",
@@ -342,12 +283,8 @@
         "label": "Send on-call alert",
         "description": "Worker opens an incident with the latest failure payload and retry history.",
         "kind": "async",
-        "activate": [
-          "ops"
-        ],
-        "deactivate": [
-          "ops"
-        ],
+        "activate": ["ops"],
+        "deactivate": ["ops"],
         "sourceAnchor": "src/workers/delivery.ts:61"
       }
     },
@@ -357,9 +294,7 @@
         "label": "Escalation payload",
         "body": "The alert links the destination runbook, last response body, and a replay token for manual recovery.",
         "placement": "right-of",
-        "participants": [
-          "ops"
-        ],
+        "participants": ["ops"],
         "sourceAnchor": "docs/runbooks/webhooks.md:41"
       }
     },
@@ -369,9 +304,7 @@
         "label": "Rejected request",
         "body": "Reject invalid signatures before enqueueing any work, and include enough audit metadata for forensic review.",
         "placement": "right-of",
-        "participants": [
-          "edge"
-        ],
+        "participants": ["edge"],
         "sourceAnchor": "docs/security/webhook-signatures.md:22"
       }
     },
@@ -383,9 +316,7 @@
         "label": "401 Invalid signature",
         "description": "Ingress rejects the event without writing anything to the queue.",
         "kind": "return",
-        "deactivate": [
-          "edge"
-        ],
+        "deactivate": ["edge"],
         "sourceAnchor": "src/server/routes/webhooks.post.ts:27"
       }
     }
