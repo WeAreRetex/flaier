@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.2.7
+
+[compare changes](https://github.com/WeAreRetex/flaier/compare/v0.2.6...v0.2.7)
+
+### 🏡 Chore
+
+- Forma ([7f522a1](https://github.com/WeAreRetex/flaier/commit/7f522a1))
+
+### ❤️ Contributors
+
+- Rigo-m ([@Rigo-m](https://github.com/Rigo-m))
+
 ## v0.2.6
 
 [compare changes](https://github.com/WeAreRetex/flaier/compare/v0.2.5...v0.2.6)
