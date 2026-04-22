@@ -1,6 +1,6 @@
 {
   "name": "@flaier/core",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Vue components and registry helpers for rendering Flaier flow specs.",
   "keywords": [
     "diagram",
