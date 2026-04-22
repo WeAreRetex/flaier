@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.2.2
+
+[compare changes](https://github.com/WeAreRetex/flaier/compare/v0.2.1...v0.2.2)
+
+### 🚀 Enhancements
+
+- Lives ([84bd2b3](https://github.com/WeAreRetex/flaier/commit/84bd2b3))
+
+### ❤️ Contributors
+
+- Rigo-m ([@Rigo-m](https://github.com/Rigo-m))
+
 ## v0.2.1
 
 [compare changes](https://github.com/WeAreRetex/flaier/compare/v0.2.0...v0.2.1)
