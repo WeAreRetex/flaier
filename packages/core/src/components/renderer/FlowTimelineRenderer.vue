@@ -54,6 +54,7 @@ import type {
   ArchitectureOperations,
   ArchitectureSecurity,
   ArchitectureZone,
+  EdgeShape,
   EdgeTransitionKind,
   FlowEdge,
   FlowNode,
@@ -64,7 +65,7 @@ import type {
   TwoslashHtml,
 } from "../../types";
 import TimelineControls from "../controls/TimelineControls.vue";
-import ArchitectureSmoothEdge from "../edges/ArchitectureSmoothEdge.vue";
+import ArchitectureEdge from "../edges/ArchitectureEdge.vue";
 import ArchitectureNodeVue from "../nodes/ArchitectureNode.vue";
 import CodeNodeVue from "../nodes/CodeNode.vue";
 import DecisionNodeVue from "../nodes/DecisionNode.vue";
@@ -90,6 +91,7 @@ const props = withDefaults(
     layoutRankSep?: number;
     layoutNodeSep?: number;
     layoutEdgeSep?: number;
+    edgeShape?: "smoothstep" | "straight" | "bezier";
     themeMode?: "local" | "document";
     showHeaderOverlay?: boolean;
     showExportControls?: boolean;
@@ -182,6 +184,8 @@ const EDGE_TRANSITION_KINDS: EdgeTransitionKind[] = [
 const EDGE_TRANSITION_KIND_SET = new Set(EDGE_TRANSITION_KINDS);
 const EDGE_TRANSITION_TRANSPORT_SET = new Set(["sync", "async"]);
 const EDGE_TRANSITION_CRITICALITY_SET = new Set(["low", "medium", "high"]);
+const EDGE_SHAPES: EdgeShape[] = ["smoothstep", "straight", "bezier"];
+const EDGE_SHAPE_SET = new Set<EdgeShape>(EDGE_SHAPES);
 const ARCHITECTURE_NODE_KINDS: Array<NonNullable<ArchitectureNodeProps["kind"]>> = [
   "service",
   "database",
@@ -259,6 +263,7 @@ interface ParsedTransition {
   label?: string;
   description?: string;
   kind?: EdgeTransitionKind;
+  shape?: EdgeShape;
   protocol?: string;
   transport?: "sync" | "async";
   auth?: string;
@@ -1557,6 +1562,11 @@ function toTransitionKind(value: unknown): EdgeTransitionKind | undefined {
     : undefined;
 }
 
+function toEdgeShape(value: unknown): EdgeShape | undefined {
+  if (typeof value !== "string") return undefined;
+  return EDGE_SHAPE_SET.has(value as EdgeShape) ? (value as EdgeShape) : undefined;
+}
+
 function toTransitionTransport(value: unknown): "sync" | "async" | undefined {
   if (typeof value !== "string") return undefined;
   return EDGE_TRANSITION_TRANSPORT_SET.has(value) ? (value as "sync" | "async") : undefined;
@@ -1580,6 +1590,7 @@ function toTransitions(value: unknown): ParsedTransition[] {
       const label = item.label;
       const description = item.description;
       const kind = item.kind;
+      const shape = item.shape;
       const protocol = item.protocol;
       const transport = item.transport;
       const auth = item.auth;
@@ -1589,6 +1600,7 @@ function toTransitions(value: unknown): ParsedTransition[] {
       if (label !== undefined && typeof label !== "string") return false;
       if (description !== undefined && typeof description !== "string") return false;
       if (kind !== undefined && !toTransitionKind(kind)) return false;
+      if (shape !== undefined && !toEdgeShape(shape)) return false;
       if (protocol !== undefined && typeof protocol !== "string") return false;
       if (transport !== undefined && !toTransitionTransport(transport)) return false;
       if (auth !== undefined && typeof auth !== "string") return false;
@@ -1602,6 +1614,7 @@ function toTransitions(value: unknown): ParsedTransition[] {
       label: toOptionalString(item.label),
       description: toOptionalString(item.description),
       kind: toTransitionKind(item.kind),
+      shape: toEdgeShape(item.shape),
       protocol: toOptionalString(item.protocol),
       transport: toTransitionTransport(item.transport),
       auth: toOptionalString(item.auth),
@@ -2986,6 +2999,10 @@ const edges = computed<FlowEdge[]>(() => {
       const edgeLabel = resolveTransitionEdgeLabel(transition);
       const hasLabel = Boolean(edgeLabel);
 
+      const resolvedShape = isArchitectureMode.value
+        ? (transition?.shape ?? props.edgeShape ?? "smoothstep")
+        : undefined;
+
       result.push({
         id: `e-${node.key}-${target}`,
         source: node.key,
@@ -2993,6 +3010,7 @@ const edges = computed<FlowEdge[]>(() => {
         type: isArchitectureMode.value ? "architecture" : "smoothstep",
         animated: !isArchitectureMode.value,
         class: edgeClasses.length > 0 ? edgeClasses.join(" ") : undefined,
+        data: resolvedShape ? { shape: resolvedShape } : undefined,
         label: edgeLabel,
         labelShowBg: hasLabel && !isArchitectureMode.value,
         labelBgPadding: hasLabel && !isArchitectureMode.value ? [6, 3] : undefined,
@@ -4857,7 +4875,7 @@ onUnmounted(() => {
         </template>
 
         <template #edge-architecture="edgeProps">
-          <ArchitectureSmoothEdge v-bind="edgeProps" />
+          <ArchitectureEdge v-bind="edgeProps" />
         </template>
 
         <template #node-trigger="{ data }">

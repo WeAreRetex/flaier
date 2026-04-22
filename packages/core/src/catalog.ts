@@ -28,11 +28,14 @@ export const edgeTransitionKindSchema = z.enum([
   "async",
 ]);
 
+export const edgeShapeSchema = z.enum(["smoothstep", "straight", "bezier"]);
+
 export const edgeTransitionSchema = z.object({
   to: z.string(),
   label: z.string().optional(),
   description: z.string().optional(),
   kind: edgeTransitionKindSchema.optional(),
+  shape: edgeShapeSchema.optional(),
   protocol: z.string().optional(),
   transport: z.enum(["sync", "async"]).optional(),
   auth: z.string().optional(),
@@ -141,6 +144,7 @@ export const flaierCatalogComponents = {
         layoutRankSep: z.number().positive().optional(),
         layoutNodeSep: z.number().positive().optional(),
         layoutEdgeSep: z.number().positive().optional(),
+        edgeShape: edgeShapeSchema.optional(),
         themeMode: z.enum(["local", "document"]).optional(),
         showHeaderOverlay: z.boolean().optional(),
         showExportControls: z.boolean().optional(),

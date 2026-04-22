@@ -19,12 +19,16 @@ export interface TwoslashHtml {
 /** Optional metadata for traversal edges between nodes */
 export type EdgeTransitionKind = "default" | "success" | "error" | "warning" | "retry" | "async";
 
+/** Path geometry used when rendering an architecture edge */
+export type EdgeShape = "smoothstep" | "straight" | "bezier";
+
 /** Declarative edge metadata for branch labels and styling */
 export interface EdgeTransition {
   to: string;
   label?: string;
   description?: string;
   kind?: EdgeTransitionKind;
+  shape?: EdgeShape;
   protocol?: string;
   transport?: "sync" | "async";
   auth?: string;
@@ -136,6 +140,7 @@ export interface FlowTimelineProps {
   layoutRankSep?: number;
   layoutNodeSep?: number;
   layoutEdgeSep?: number;
+  edgeShape?: EdgeShape;
   themeMode?: "local" | "document";
   showHeaderOverlay?: boolean;
   showExportControls?: boolean;

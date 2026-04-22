@@ -33,6 +33,7 @@ const TWOSLASH_AMBIENT_GLOBAL_CANDIDATES = [
   "SuppressedError",
 ] as const;
 const EDGE_TRANSITION_KINDS = new Set(["default", "success", "error", "warning", "retry", "async"]);
+const EDGE_SHAPES = ["smoothstep", "straight", "bezier"];
 const ARCHITECTURE_NODE_KINDS = [
   "service",
   "database",
@@ -71,6 +72,7 @@ interface NormalizedTransition {
   label?: string;
   description?: string;
   kind?: string;
+  shape?: string;
   protocol?: string;
   transport?: string;
   auth?: string;
@@ -256,6 +258,7 @@ function validateElementProps(
       expectOptionalPositiveNumber(props, "layoutRankSep", key, errors, 1);
       expectOptionalPositiveNumber(props, "layoutNodeSep", key, errors, 1);
       expectOptionalPositiveNumber(props, "layoutEdgeSep", key, errors, 1);
+      expectOptionalEnum(props, "edgeShape", EDGE_SHAPES, key, errors);
       break;
     }
 
@@ -645,6 +648,16 @@ function normalizeTransitions(
       }
     }
 
+    const shape = transition.shape;
+    if (shape !== undefined) {
+      if (typeof shape !== "string" || !EDGE_SHAPES.includes(shape)) {
+        errors.push(
+          `Element "${key}" transitions[${index}].shape must be one of: ${EDGE_SHAPES.join(", ")}.`,
+        );
+        continue;
+      }
+    }
+
     const protocol = transition.protocol;
     if (protocol !== undefined && typeof protocol !== "string") {
       errors.push(
@@ -693,6 +706,7 @@ function normalizeTransitions(
       label: typeof label === "string" ? label : undefined,
       description: typeof description === "string" ? description : undefined,
       kind: typeof kind === "string" ? kind : undefined,
+      shape: typeof shape === "string" ? shape : undefined,
       protocol: typeof protocol === "string" ? protocol : undefined,
       transport: typeof transport === "string" ? transport : undefined,
       auth: typeof auth === "string" ? auth : undefined,

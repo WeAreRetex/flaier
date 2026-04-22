@@ -51,7 +51,7 @@ The `root` value does not have to be literally `"timeline"`; it just needs to po
 
 - `FlowTimeline`:
   - required: `title` (string)
-  - optional: `description`, `mode` (`narrative` | `sequence` | `architecture`), `participants`, `showSequenceNumbers`, `zones`, `direction`, `minHeight`, `layoutEngine`, `layoutRankSep`, `layoutNodeSep`, `layoutEdgeSep`, `themeMode` (`local` | `document`), `showHeaderOverlay`, `showExportControls`, `showThemeToggle`, `showArchitectureInspector`, `defaultArchitectureInspectorOpen`, `showArchitectureInspectorToggleText`
+  - optional: `description`, `mode` (`narrative` | `sequence` | `architecture`), `participants`, `showSequenceNumbers`, `zones`, `direction`, `minHeight`, `layoutEngine`, `layoutRankSep`, `layoutNodeSep`, `layoutEdgeSep`, `edgeShape` (`smoothstep` | `straight` | `bezier`, default `smoothstep`, architecture mode only), `themeMode` (`local` | `document`), `showHeaderOverlay`, `showExportControls`, `showThemeToggle`, `showArchitectureInspector`, `defaultArchitectureInspectorOpen`, `showArchitectureInspectorToggleText`
 - `ArchitectureNode`:
   - required: `label`
   - optional: `kind` (`service` | `database` | `queue` | `cache` | `gateway` | `external` | `compute`), `zone`, `status`, `tier`, `technology`, `runtime`, `owner`, `description`, `tags`, `responsibilities`, `capabilities`, `interfaces`, `data`, `security`, `operations`, `links`, `sourceAnchor`, `transitions`
@@ -148,6 +148,7 @@ Use `props.transitions` on any non-root node to attach edge metadata:
 
 - `to` is required and must reference an existing element key.
 - optional `kind`: `default` | `success` | `error` | `warning` | `retry` | `async`
+- optional `shape`: `smoothstep` | `straight` | `bezier` — overrides `FlowTimeline.props.edgeShape` for this single edge (architecture mode only)
 - optional architecture metadata: `protocol`, `transport` (`sync` | `async`), `auth`, `contract`, `criticality` (`low` | `medium` | `high`)
 
 ## Branching Rules
