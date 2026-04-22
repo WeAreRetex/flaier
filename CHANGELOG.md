@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.2.4
+
+[compare changes](https://github.com/WeAreRetex/flaier/compare/v0.2.3...v0.2.4)
+
+### 🩹 Fixes
+
+- Arrows ([499cfdf](https://github.com/WeAreRetex/flaier/commit/499cfdf))
+
+### ❤️ Contributors
+
+- Rigo-m ([@Rigo-m](https://github.com/Rigo-m))
+
 ## v0.2.3
 
 [compare changes](https://github.com/WeAreRetex/flaier/compare/v0.2.2...v0.2.3)
