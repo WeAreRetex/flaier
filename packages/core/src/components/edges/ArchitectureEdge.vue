@@ -12,19 +12,46 @@ import type { EdgeShape } from "../../types";
 
 interface ArchitectureEdgeData {
   shape?: EdgeShape;
+  parallelOffset?: number;
 }
 
 const props = withDefaults(defineProps<EdgeProps<ArchitectureEdgeData>>(), {
   interactionWidth: 28,
 });
 
+const PARALLEL_OFFSET_DISTANCE = 18;
+
 const shape = computed<EdgeShape>(() => props.data?.shape ?? "smoothstep");
 
+const offsetEndpoints = computed(() => {
+  const parallel = props.data?.parallelOffset;
+  const dx = props.targetX - props.sourceX;
+  const dy = props.targetY - props.sourceY;
+  const length = Math.hypot(dx, dy);
+
+  if (!parallel || length === 0) {
+    return {
+      sourceX: props.sourceX,
+      sourceY: props.sourceY,
+      targetX: props.targetX,
+      targetY: props.targetY,
+    };
+  }
+
+  const offset = parallel * PARALLEL_OFFSET_DISTANCE;
+  const perpX = -dy / length;
+  const perpY = dx / length;
+
+  return {
+    sourceX: props.sourceX + perpX * offset,
+    sourceY: props.sourceY + perpY * offset,
+    targetX: props.targetX + perpX * offset,
+    targetY: props.targetY + perpY * offset,
+  };
+});
+
 const pathDefinition = computed<[string, number, number]>(() => {
-  const sourceX = props.sourceX;
-  const sourceY = props.sourceY;
-  const targetX = props.targetX;
-  const targetY = props.targetY;
+  const { sourceX, sourceY, targetX, targetY } = offsetEndpoints.value;
   const sourcePosition = props.sourcePosition;
   const targetPosition = props.targetPosition;
 

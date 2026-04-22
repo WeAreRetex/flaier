@@ -2980,6 +2980,15 @@ const nodes = computed<FlowNode[]>(() => {
 const edges = computed<FlowEdge[]>(() => {
   const result: FlowEdge[] = [];
 
+  const directedPairs = new Set<string>();
+  for (const node of orderedNodeElements.value) {
+    for (const target of outgoingNodeKeys.value[node.key] ?? []) {
+      if (orderedNodeByKey.value[target]) {
+        directedPairs.add(`${node.key}->${target}`);
+      }
+    }
+  }
+
   for (const node of orderedNodeElements.value) {
     const targets = outgoingNodeKeys.value[node.key] ?? [];
 
@@ -3003,6 +3012,18 @@ const edges = computed<FlowEdge[]>(() => {
         ? (transition?.shape ?? props.edgeShape ?? "smoothstep")
         : undefined;
 
+      const hasReverse = directedPairs.has(`${target}->${node.key}`);
+      const parallelOffset =
+        isArchitectureMode.value && hasReverse ? (node.key < target ? 1 : -1) : undefined;
+
+      const edgeData =
+        resolvedShape || parallelOffset !== undefined
+          ? {
+              ...(resolvedShape ? { shape: resolvedShape } : {}),
+              ...(parallelOffset !== undefined ? { parallelOffset } : {}),
+            }
+          : undefined;
+
       result.push({
         id: `e-${node.key}-${target}`,
         source: node.key,
@@ -3010,7 +3031,7 @@ const edges = computed<FlowEdge[]>(() => {
         type: isArchitectureMode.value ? "architecture" : "smoothstep",
         animated: !isArchitectureMode.value,
         class: edgeClasses.length > 0 ? edgeClasses.join(" ") : undefined,
-        data: resolvedShape ? { shape: resolvedShape } : undefined,
+        data: edgeData,
         label: edgeLabel,
         labelShowBg: hasLabel && !isArchitectureMode.value,
         labelBgPadding: hasLabel && !isArchitectureMode.value ? [6, 3] : undefined,
