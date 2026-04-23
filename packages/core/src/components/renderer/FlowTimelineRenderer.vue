@@ -141,11 +141,11 @@ function getCustomNodeDefinition(elementType: string): FlaierCustomNodeDefinitio
 
 const DEFAULT_LAYOUT_ENGINE = "dagre";
 const DEFAULT_FALLBACK_GAP = 420;
-const DEFAULT_DAGRE_RANK_SEP_HORIZONTAL = 260;
-const DEFAULT_DAGRE_NODE_SEP_HORIZONTAL = 120;
-const DEFAULT_DAGRE_RANK_SEP_VERTICAL = 220;
-const DEFAULT_DAGRE_NODE_SEP_VERTICAL = 120;
-const DEFAULT_DAGRE_EDGE_SEP = 30;
+const DEFAULT_DAGRE_RANK_SEP_HORIZONTAL = 280;
+const DEFAULT_DAGRE_NODE_SEP_HORIZONTAL = 140;
+const DEFAULT_DAGRE_RANK_SEP_VERTICAL = 240;
+const DEFAULT_DAGRE_NODE_SEP_VERTICAL = 160;
+const DEFAULT_DAGRE_EDGE_SEP = 36;
 const OVERVIEW_ENTER_ZOOM = 0.52;
 const OVERVIEW_EXIT_ZOOM = 0.62;
 const NARRATIVE_FOCUS_HORIZONTAL_CONTEXT = 420;
@@ -2959,8 +2959,146 @@ const layoutPositions = computed<Record<string, { x: number; y: number }>>(() =>
     return fallback;
   }
 
+  if (isArchitectureMode.value) {
+    enforceArchitectureZoneSeparation(positions);
+  }
+
   return normalizePositions(positions);
 });
+
+function enforceArchitectureZoneSeparation(positions: Record<string, { x: number; y: number }>) {
+  const orderedNodes = orderedNodeElements.value;
+  if (orderedNodes.length === 0) return;
+
+  const zoneByKey = architectureNodeZoneByKey.value;
+  const zoneDefs = architectureZoneDefinitions.value;
+  if (zoneDefs.length < 2) return;
+
+  const zoneById = new Map(zoneDefs.map((zone) => [zone.id, zone]));
+  const isVertical = props.direction === "vertical";
+
+  type ZoneBounds = {
+    id: string;
+    minP: number;
+    maxP: number;
+    minS: number;
+    maxS: number;
+    keys: string[];
+  };
+
+  const zoneBoundsById = new Map<string, ZoneBounds>();
+
+  for (const node of orderedNodes) {
+    const zoneId = zoneByKey[node.key];
+    if (!zoneId) continue;
+
+    const position = positions[node.key];
+    if (!position) continue;
+
+    const size = nodeSizes.value[node.key] ?? { width: 240, height: 120 };
+    const coordP = isVertical ? position.y : position.x;
+    const coordS = isVertical ? position.x : position.y;
+    const extentP = isVertical ? size.height : size.width;
+    const extentS = isVertical ? size.width : size.height;
+
+    const bounds = zoneBoundsById.get(zoneId) ?? {
+      id: zoneId,
+      minP: Number.POSITIVE_INFINITY,
+      maxP: Number.NEGATIVE_INFINITY,
+      minS: Number.POSITIVE_INFINITY,
+      maxS: Number.NEGATIVE_INFINITY,
+      keys: [],
+    };
+
+    bounds.minP = Math.min(bounds.minP, coordP);
+    bounds.maxP = Math.max(bounds.maxP, coordP + extentP);
+    bounds.minS = Math.min(bounds.minS, coordS);
+    bounds.maxS = Math.max(bounds.maxS, coordS + extentS);
+    bounds.keys.push(node.key);
+
+    zoneBoundsById.set(zoneId, bounds);
+  }
+
+  if (zoneBoundsById.size < 2) return;
+
+  const computeZoneOverhead = (zoneId: string, side: "leading" | "trailing") => {
+    const zone = zoneById.get(zoneId);
+    const padding = zone?.padding ?? 62;
+    const baseSidePadding = Math.max(padding, ARCHITECTURE_ZONE_MIN_CONTENT_PADDING);
+
+    if (isVertical) {
+      if (side === "trailing") {
+        return Math.max(baseSidePadding, ARCHITECTURE_ZONE_MIN_BOTTOM_PADDING);
+      }
+
+      const hasDescription = Boolean(zone?.description);
+      const descriptionReserve = hasDescription
+        ? ARCHITECTURE_ZONE_DESCRIPTION_HEIGHT + ARCHITECTURE_ZONE_LABEL_TO_CONTENT_GAP
+        : 0;
+
+      return (
+        baseSidePadding +
+        ARCHITECTURE_ZONE_LABEL_HEIGHT +
+        ARCHITECTURE_ZONE_LABEL_TO_CONTENT_GAP +
+        descriptionReserve
+      );
+    }
+
+    return baseSidePadding;
+  };
+
+  const CROSS_ZONE_BREATHING_ROOM = 16;
+
+  const sortedBounds = [...zoneBoundsById.values()].sort((a, b) => a.minP - b.minP);
+
+  for (let i = 1; i < sortedBounds.length; i += 1) {
+    const current = sortedBounds[i];
+    if (!current) continue;
+
+    let requiredMinP = current.minP;
+
+    for (let j = 0; j < i; j += 1) {
+      const previous = sortedBounds[j];
+      if (!previous) continue;
+
+      const overlapsSecondary = previous.minS < current.maxS && previous.maxS > current.minS;
+      if (!overlapsSecondary) continue;
+
+      const gap =
+        computeZoneOverhead(previous.id, "trailing") +
+        computeZoneOverhead(current.id, "leading") +
+        CROSS_ZONE_BREATHING_ROOM;
+
+      requiredMinP = Math.max(requiredMinP, previous.maxP + gap);
+    }
+
+    const delta = requiredMinP - current.minP;
+    if (delta <= 0) continue;
+
+    const threshold = current.minP;
+
+    for (const node of orderedNodes) {
+      const pos = positions[node.key];
+      if (!pos) continue;
+
+      const coordP = isVertical ? pos.y : pos.x;
+      if (coordP < threshold) continue;
+
+      if (isVertical) {
+        positions[node.key] = { x: pos.x, y: pos.y + delta };
+      } else {
+        positions[node.key] = { x: pos.x + delta, y: pos.y };
+      }
+    }
+
+    for (const bounds of zoneBoundsById.values()) {
+      if (bounds.minP >= threshold) {
+        bounds.minP += delta;
+        bounds.maxP += delta;
+      }
+    }
+  }
+}
 
 const nodes = computed<FlowNode[]>(() => {
   const fallbackPositions = createFallbackLayoutPositions(
