@@ -55,6 +55,7 @@
         "zone": "netlify",
         "technology": "Edge cache + Durable cache",
         "description": "Cache hit returns directly to the browser.",
+        "narrative": "Think of the CDN as a shelf of pre-baked pages placed close to every visitor. When someone asks for a page we've already served recently, the CDN hands it back immediately without waking up the rest of the system. Only when the shelf is empty do we go ask the backend to cook a fresh one.",
         "capabilities": ["Edge cache per region", "Durable cache across regions"],
         "transitions": [
           {

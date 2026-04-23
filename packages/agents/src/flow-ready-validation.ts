@@ -265,6 +265,7 @@ function validateElementProps(
     case "ArchitectureNode": {
       expectRequiredString(props, "label", key, errors);
       expectOptionalString(props, "description", key, errors);
+      expectOptionalString(props, "narrative", key, errors);
       expectOptionalString(props, "technology", key, errors);
       expectOptionalString(props, "runtime", key, errors);
       expectOptionalString(props, "owner", key, errors);

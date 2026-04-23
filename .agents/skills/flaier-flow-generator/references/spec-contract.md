@@ -54,7 +54,7 @@ The `root` value does not have to be literally `"timeline"`; it just needs to po
   - optional: `description`, `mode` (`narrative` | `sequence` | `architecture`), `participants`, `showSequenceNumbers`, `zones`, `direction`, `minHeight`, `layoutEngine`, `layoutRankSep`, `layoutNodeSep`, `layoutEdgeSep`, `edgeShape` (`smoothstep` | `straight` | `bezier`, default `smoothstep`, architecture mode only), `themeMode` (`local` | `document`), `showHeaderOverlay`, `showExportControls`, `showThemeToggle`, `showArchitectureInspector`, `defaultArchitectureInspectorOpen`, `showArchitectureInspectorToggleText`
 - `ArchitectureNode`:
   - required: `label`
-  - optional: `kind` (`service` | `database` | `queue` | `cache` | `gateway` | `external` | `compute`), `zone`, `status`, `tier`, `technology`, `runtime`, `owner`, `description`, `tags`, `responsibilities`, `capabilities`, `interfaces`, `data`, `security`, `operations`, `links`, `sourceAnchor`, `transitions`
+  - optional: `kind` (`service` | `database` | `queue` | `cache` | `gateway` | `external` | `compute`), `zone`, `status`, `tier`, `technology`, `runtime`, `owner`, `description` (technical one-liner shown in header), `narrative` (plain-language paragraph shown as "Overview" block at the top of the inspector panel; use to explain what happens in/from/for this node to non-technical readers), `tags`, `responsibilities`, `capabilities`, `interfaces`, `data`, `security`, `operations`, `links`, `sourceAnchor`, `transitions`
 - `TriggerNode`:
   - required: `label`
   - optional: `description`, `color`, `sourceAnchor`, `transitions`

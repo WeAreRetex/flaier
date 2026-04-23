@@ -161,6 +161,7 @@ export interface ArchitectureNodeProps {
   status?: "planned" | "active" | "degraded" | "retired";
   zone?: string;
   description?: string;
+  narrative?: string;
   tags?: string[];
   responsibilities?: string[];
   capabilities?: string[];

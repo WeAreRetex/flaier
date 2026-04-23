@@ -171,6 +171,7 @@ export const flaierCatalogComponents = {
         status: z.enum(["planned", "active", "degraded", "retired"]).optional(),
         zone: z.string().optional(),
         description: z.string().optional(),
+        narrative: z.string().optional(),
         tags: z.array(z.string()).optional(),
         responsibilities: z.array(z.string()).optional(),
         capabilities: z.array(z.string()).optional(),

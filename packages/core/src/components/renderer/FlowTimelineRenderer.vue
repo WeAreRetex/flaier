@@ -2,6 +2,7 @@
 import dagre from "@dagrejs/dagre";
 import { useStateStore, useStateValue } from "@json-render/vue";
 import {
+  MarkerType,
   PanOnScrollMode,
   Position,
   VueFlow,
@@ -323,6 +324,7 @@ interface ArchitectureInspectorArchitectureView {
   owner?: string;
   zoneLabel?: string;
   summary: string;
+  narrative?: string;
   tags: string[];
   responsibilities: string[];
   capabilities: string[];
@@ -3021,19 +3023,19 @@ const edges = computed<FlowEdge[]>(() => {
       if (isArchitectureMode.value) {
         const isVertical = props.direction === "vertical";
         if (hasReverse) {
-          // Bidirectional pair: route each direction on opposite sides of the layout axis
-          // so the two edges flow parallel without overlapping. Endpoint separation comes
-          // from the handles themselves, so we don't need an extra perpendicular offset.
+          // Bidirectional pair: route each direction through distributed top/bottom
+          // handles (25% / 75%) so the two edges run as parallel vertical lines near
+          // the center of the column, with clear source/target arrows.
           const primary = node.key < target;
           if (isVertical) {
-            sourceHandle = primary ? "s-right" : "s-left";
-            targetHandle = primary ? "t-right" : "t-left";
+            sourceHandle = primary ? "s-bottom-l" : "s-top-r";
+            targetHandle = primary ? "t-top-l" : "t-bottom-r";
           } else {
-            sourceHandle = primary ? "s-bottom" : "s-top";
-            targetHandle = primary ? "t-bottom" : "t-top";
+            sourceHandle = primary ? "s-right" : "s-left";
+            targetHandle = primary ? "t-left" : "t-right";
           }
-          // Position each label close to its own source node so the two labels end up
-          // on opposite ends of the pair instead of stacking at the midpoint.
+          // Position each label close to its own source so the pair is separated
+          // both vertically (via bias) and horizontally (via distributed handles).
           labelBias = 0.3;
         } else {
           sourceHandle = isVertical ? "s-bottom" : "s-right";
@@ -3086,6 +3088,9 @@ const edges = computed<FlowEdge[]>(() => {
         class: edgeClasses.length > 0 ? edgeClasses.join(" ") : undefined,
         data: edgeData,
         label: edgeLabel,
+        markerEnd: isArchitectureMode.value
+          ? { type: MarkerType.ArrowClosed, width: 18, height: 18 }
+          : undefined,
         labelShowBg: hasLabel && !isArchitectureMode.value,
         labelBgPadding: hasLabel && !isArchitectureMode.value ? [6, 3] : undefined,
         labelBgBorderRadius: hasLabel && !isArchitectureMode.value ? 6 : undefined,
@@ -3416,6 +3421,7 @@ const architectureInspector = computed<ArchitectureInspectorView | null>(() => {
     owner: toTrimmedNonEmptyString(node.element.props.owner),
     zoneLabel,
     summary: toTrimmedNonEmptyString(node.element.props.description) ?? "",
+    narrative: toTrimmedNonEmptyString(node.element.props.narrative),
     tags: toStringArray(node.element.props.tags),
     responsibilities: toStringArray(node.element.props.responsibilities),
     capabilities: toStringArray(node.element.props.capabilities),
@@ -5379,6 +5385,20 @@ onUnmounted(() => {
 
             <div class="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-2.5">
               <template v-if="architectureInspectorNode">
+                <div
+                  v-if="architectureInspectorNodeSafe.narrative"
+                  class="rounded-lg border border-primary/45 border-l-4 bg-primary/5 px-2.5 py-2"
+                >
+                  <p class="text-[9px] font-semibold uppercase tracking-wider text-primary">
+                    Overview
+                  </p>
+                  <p
+                    class="mt-1 text-[11px] leading-relaxed whitespace-pre-wrap break-words text-foreground"
+                  >
+                    {{ architectureInspectorNodeSafe.narrative }}
+                  </p>
+                </div>
+
                 <div class="rounded-lg border border-border/60 bg-muted/20 px-2 py-1.5">
                   <p
                     class="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground"
