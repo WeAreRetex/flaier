@@ -1,6 +1,6 @@
 {
   "name": "@flaier/nuxt",
-  "version": "0.2.9",
+  "version": "0.2.10",
   "description": "Nuxt module and wrapper components for Flaier flows in Nuxt and Docus.",
   "keywords": [
     "diagram",

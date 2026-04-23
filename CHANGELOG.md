@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.2.10
+
+[compare changes](https://github.com/WeAreRetex/flaier/compare/v0.2.9...v0.2.10)
+
+### 🩹 Fixes
+
+- Timelinerenderer distance pass ([1393caa](https://github.com/WeAreRetex/flaier/commit/1393caa))
+
+### ❤️ Contributors
+
+- Rigo-m ([@Rigo-m](https://github.com/Rigo-m))
+
 ## v0.2.9
 
 [compare changes](https://github.com/WeAreRetex/flaier/compare/v0.2.8...v0.2.9)
