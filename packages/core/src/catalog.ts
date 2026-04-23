@@ -30,12 +30,15 @@ export const edgeTransitionKindSchema = z.enum([
 
 export const edgeShapeSchema = z.enum(["smoothstep", "straight", "bezier"]);
 
+export const edgeArrowsSchema = z.enum(["end", "start", "both", "none"]);
+
 export const edgeTransitionSchema = z.object({
   to: z.string(),
   label: z.string().optional(),
   description: z.string().optional(),
   kind: edgeTransitionKindSchema.optional(),
   shape: edgeShapeSchema.optional(),
+  arrows: edgeArrowsSchema.optional(),
   protocol: z.string().optional(),
   transport: z.enum(["sync", "async"]).optional(),
   auth: z.string().optional(),

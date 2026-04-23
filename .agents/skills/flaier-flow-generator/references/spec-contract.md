@@ -149,6 +149,7 @@ Use `props.transitions` on any non-root node to attach edge metadata:
 - `to` is required and must reference an existing element key.
 - optional `kind`: `default` | `success` | `error` | `warning` | `retry` | `async`
 - optional `shape`: `smoothstep` | `straight` | `bezier` — overrides `FlowTimeline.props.edgeShape` for this single edge (architecture mode only)
+- optional `arrows`: `end` (default) | `start` | `both` | `none` — which endpoint(s) render an arrow. Use `both` when the information flows in both directions over the same edge (bidirectional sync, request/response on a single wire) so one transition declaration communicates both directions. Architecture mode only.
 - optional architecture metadata: `protocol`, `transport` (`sync` | `async`), `auth`, `contract`, `criticality` (`low` | `medium` | `high`)
 
 ## Branching Rules

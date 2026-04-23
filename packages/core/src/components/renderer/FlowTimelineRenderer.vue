@@ -55,6 +55,7 @@ import type {
   ArchitectureOperations,
   ArchitectureSecurity,
   ArchitectureZone,
+  EdgeArrows,
   EdgeShape,
   EdgeTransitionKind,
   FlowEdge,
@@ -187,6 +188,8 @@ const EDGE_TRANSITION_TRANSPORT_SET = new Set(["sync", "async"]);
 const EDGE_TRANSITION_CRITICALITY_SET = new Set(["low", "medium", "high"]);
 const EDGE_SHAPES: EdgeShape[] = ["smoothstep", "straight", "bezier"];
 const EDGE_SHAPE_SET = new Set<EdgeShape>(EDGE_SHAPES);
+const EDGE_ARROWS_VALUES: EdgeArrows[] = ["end", "start", "both", "none"];
+const EDGE_ARROWS_SET = new Set<EdgeArrows>(EDGE_ARROWS_VALUES);
 const ARCHITECTURE_NODE_KINDS: Array<NonNullable<ArchitectureNodeProps["kind"]>> = [
   "service",
   "database",
@@ -265,6 +268,7 @@ interface ParsedTransition {
   description?: string;
   kind?: EdgeTransitionKind;
   shape?: EdgeShape;
+  arrows?: EdgeArrows;
   protocol?: string;
   transport?: "sync" | "async";
   auth?: string;
@@ -1569,6 +1573,11 @@ function toEdgeShape(value: unknown): EdgeShape | undefined {
   return EDGE_SHAPE_SET.has(value as EdgeShape) ? (value as EdgeShape) : undefined;
 }
 
+function toEdgeArrows(value: unknown): EdgeArrows | undefined {
+  if (typeof value !== "string") return undefined;
+  return EDGE_ARROWS_SET.has(value as EdgeArrows) ? (value as EdgeArrows) : undefined;
+}
+
 function toTransitionTransport(value: unknown): "sync" | "async" | undefined {
   if (typeof value !== "string") return undefined;
   return EDGE_TRANSITION_TRANSPORT_SET.has(value) ? (value as "sync" | "async") : undefined;
@@ -1593,6 +1602,7 @@ function toTransitions(value: unknown): ParsedTransition[] {
       const description = item.description;
       const kind = item.kind;
       const shape = item.shape;
+      const arrows = item.arrows;
       const protocol = item.protocol;
       const transport = item.transport;
       const auth = item.auth;
@@ -1603,6 +1613,7 @@ function toTransitions(value: unknown): ParsedTransition[] {
       if (description !== undefined && typeof description !== "string") return false;
       if (kind !== undefined && !toTransitionKind(kind)) return false;
       if (shape !== undefined && !toEdgeShape(shape)) return false;
+      if (arrows !== undefined && !toEdgeArrows(arrows)) return false;
       if (protocol !== undefined && typeof protocol !== "string") return false;
       if (transport !== undefined && !toTransitionTransport(transport)) return false;
       if (auth !== undefined && typeof auth !== "string") return false;
@@ -1617,6 +1628,7 @@ function toTransitions(value: unknown): ParsedTransition[] {
       description: toOptionalString(item.description),
       kind: toTransitionKind(item.kind),
       shape: toEdgeShape(item.shape),
+      arrows: toEdgeArrows(item.arrows),
       protocol: toOptionalString(item.protocol),
       transport: toTransitionTransport(item.transport),
       auth: toOptionalString(item.auth),
@@ -3088,9 +3100,17 @@ const edges = computed<FlowEdge[]>(() => {
         class: edgeClasses.length > 0 ? edgeClasses.join(" ") : undefined,
         data: edgeData,
         label: edgeLabel,
-        markerEnd: isArchitectureMode.value
-          ? { type: MarkerType.ArrowClosed, width: 18, height: 18 }
-          : undefined,
+        markerStart:
+          isArchitectureMode.value &&
+          (transition?.arrows === "start" || transition?.arrows === "both")
+            ? { type: MarkerType.ArrowClosed, width: 18, height: 18 }
+            : undefined,
+        markerEnd:
+          isArchitectureMode.value &&
+          (transition?.arrows ?? "end") !== "none" &&
+          transition?.arrows !== "start"
+            ? { type: MarkerType.ArrowClosed, width: 18, height: 18 }
+            : undefined,
         labelShowBg: hasLabel && !isArchitectureMode.value,
         labelBgPadding: hasLabel && !isArchitectureMode.value ? [6, 3] : undefined,
         labelBgBorderRadius: hasLabel && !isArchitectureMode.value ? 6 : undefined,

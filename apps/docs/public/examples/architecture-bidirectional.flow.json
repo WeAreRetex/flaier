@@ -100,6 +100,7 @@
             "to": "commerce",
             "label": "Price & stock",
             "kind": "async",
+            "arrows": "both",
             "transport": "sync",
             "criticality": "high"
           }

@@ -80,6 +80,7 @@ export type {
   ArchitectureLink,
   SourceAnchor,
   SourceAnchorInput,
+  EdgeArrows,
   EdgeShape,
   EdgeTransition,
   EdgeTransitionKind,

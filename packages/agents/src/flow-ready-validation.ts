@@ -34,6 +34,7 @@ const TWOSLASH_AMBIENT_GLOBAL_CANDIDATES = [
 ] as const;
 const EDGE_TRANSITION_KINDS = new Set(["default", "success", "error", "warning", "retry", "async"]);
 const EDGE_SHAPES = ["smoothstep", "straight", "bezier"];
+const EDGE_ARROWS = ["end", "start", "both", "none"];
 const ARCHITECTURE_NODE_KINDS = [
   "service",
   "database",
@@ -73,6 +74,7 @@ interface NormalizedTransition {
   description?: string;
   kind?: string;
   shape?: string;
+  arrows?: string;
   protocol?: string;
   transport?: string;
   auth?: string;
@@ -659,6 +661,16 @@ function normalizeTransitions(
       }
     }
 
+    const arrows = transition.arrows;
+    if (arrows !== undefined) {
+      if (typeof arrows !== "string" || !EDGE_ARROWS.includes(arrows)) {
+        errors.push(
+          `Element "${key}" transitions[${index}].arrows must be one of: ${EDGE_ARROWS.join(", ")}.`,
+        );
+        continue;
+      }
+    }
+
     const protocol = transition.protocol;
     if (protocol !== undefined && typeof protocol !== "string") {
       errors.push(
@@ -708,6 +720,7 @@ function normalizeTransitions(
       description: typeof description === "string" ? description : undefined,
       kind: typeof kind === "string" ? kind : undefined,
       shape: typeof shape === "string" ? shape : undefined,
+      arrows: typeof arrows === "string" ? arrows : undefined,
       protocol: typeof protocol === "string" ? protocol : undefined,
       transport: typeof transport === "string" ? transport : undefined,
       auth: typeof auth === "string" ? auth : undefined,

@@ -22,6 +22,9 @@ export type EdgeTransitionKind = "default" | "success" | "error" | "warning" | "
 /** Path geometry used when rendering an architecture edge */
 export type EdgeShape = "smoothstep" | "straight" | "bezier";
 
+/** Arrow decoration on a single edge */
+export type EdgeArrows = "end" | "start" | "both" | "none";
+
 /** Declarative edge metadata for branch labels and styling */
 export interface EdgeTransition {
   to: string;
@@ -29,6 +32,7 @@ export interface EdgeTransition {
   description?: string;
   kind?: EdgeTransitionKind;
   shape?: EdgeShape;
+  arrows?: EdgeArrows;
   protocol?: string;
   transport?: "sync" | "async";
   auth?: string;
