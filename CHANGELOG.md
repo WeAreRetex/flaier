@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.2.11
+
+[compare changes](https://github.com/WeAreRetex/flaier/compare/v0.2.10...v0.2.11)
+
+### 🚀 Enhancements
+
+- Spec-first editor mode ([a892766](https://github.com/WeAreRetex/flaier/commit/a892766))
+
+### ❤️ Contributors
+
+- Rigo-m ([@Rigo-m](https://github.com/Rigo-m))
+
 ## v0.2.10
 
 [compare changes](https://github.com/WeAreRetex/flaier/compare/v0.2.9...v0.2.10)
