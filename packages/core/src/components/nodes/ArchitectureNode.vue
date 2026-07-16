@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import { Handle, Position } from "@vue-flow/core";
 import NodeSourceAnchor from "./NodeSourceAnchor.vue";
+import { resolveIconUrl } from "../../icon-url";
 
 type ArchitectureKind =
   | "service"
@@ -18,6 +19,7 @@ const props = withDefaults(
   defineProps<{
     label: string;
     kind?: ArchitectureKind;
+    icon?: string;
     technology?: string;
     runtime?: string;
     owner?: string;
@@ -135,6 +137,18 @@ const tierLabel = computed(() => {
 
 const compactCapabilities = computed(() => (props.capabilities ?? []).slice(0, 2));
 const compactTags = computed(() => (props.tags ?? []).slice(0, 3));
+
+const iconUrl = computed(() => (props.icon ? resolveIconUrl(props.icon) : undefined));
+const iconFailed = ref(false);
+
+watch(
+  () => props.icon,
+  () => {
+    iconFailed.value = false;
+  },
+);
+
+const showIcon = computed(() => Boolean(iconUrl.value) && !iconFailed.value);
 </script>
 
 <template>
@@ -158,9 +172,18 @@ const compactTags = computed(() => (props.tags ?? []).slice(0, 3));
     <div class="flex items-start gap-2.5">
       <div
         class="inline-flex h-8 min-w-8 items-center justify-center rounded-md border px-1 text-[10px] font-semibold uppercase tracking-wide"
-        :class="kindMeta.iconClass"
+        :class="showIcon ? 'border-border/60 bg-muted/15' : kindMeta.iconClass"
       >
-        {{ kindMeta.short }}
+        <img
+          v-if="showIcon"
+          :src="iconUrl"
+          alt=""
+          class="h-5 w-5 object-contain"
+          loading="lazy"
+          draggable="false"
+          @error="iconFailed = true"
+        />
+        <template v-else>{{ kindMeta.short }}</template>
       </div>
 
       <div class="min-w-0 flex-1">

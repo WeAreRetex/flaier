@@ -8,7 +8,10 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   pack: {
-    entry: resolve(__dirname, "src/index.ts"),
+    entry: {
+      index: resolve(__dirname, "src/index.ts"),
+      validation: resolve(__dirname, "src/validation/index.ts"),
+    },
     format: ["esm"],
     platform: "browser",
     sourcemap: true,

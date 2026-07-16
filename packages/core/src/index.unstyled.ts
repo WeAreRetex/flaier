@@ -12,6 +12,7 @@ export {
   createFlaierCatalog,
   edgeTransitionKindSchema,
   edgeTransitionSchema,
+  flowLayoutSchema,
   magicMoveStepSchema,
   sequenceGroupKindSchema,
   sequenceMessageArrowSchema,
@@ -23,6 +24,41 @@ export {
 } from "./catalog";
 export { createFlaierRegistry, createFlaierRendererRegistry, registry } from "./registry";
 export { mergeFlaierCustomNodes, normalizeFlaierCustomNodes } from "./custom-nodes";
+export {
+  addEdge,
+  addNode,
+  addZone,
+  deleteNode,
+  ensureReachability,
+  generateNodeKey,
+  getLayoutPositions,
+  materializeImplicitTransitions,
+  pruneOrphanPositions,
+  removeEdge,
+  setNodePosition,
+  snapshotAllPositions,
+  updateEdgeMeta,
+  updateNodeProps,
+  updateZone,
+  removeZone,
+} from "./spec-edit";
+export type {
+  AddEdgeMeta,
+  AddNodeInput,
+  AddZoneInput,
+  FlowLayoutPosition,
+  FlowLayoutPositions,
+} from "./spec-edit";
+export { flaierEditorKey, useFlaierEditor } from "./editor-context";
+export type { FlaierEditorContext } from "./editor-context";
+export { resolveIconUrl } from "./icon-url";
+export { validateFlaierReadiness } from "./validation/flow-ready-validation";
+export type { FlowReadinessResult } from "./validation/flow-ready-validation";
+export {
+  isFlowSpecPayload,
+  sanitizeSpecForPersistence,
+  serializeSpecToDisk,
+} from "./validation/persistence";
 
 export { useShiki } from "./composables/useShiki";
 export { useTimeline } from "./composables/useTimeline";
@@ -44,6 +80,8 @@ export type {
   FlaierSource,
   FlaierProps,
   FlaierPanelProps,
+  FlaierSaveRequest,
+  FlaierSaveResult,
   FlaierCatalogOptions,
   FlaierCustomNodeComponentProps,
   FlaierCustomNodeContext,
@@ -51,6 +89,7 @@ export type {
   FlaierCustomNodeDefinitions,
   FlaierCustomNodeSize,
   FlaierResolvedSourceAnchor,
+  FlowTimelineLayout,
   FlowTimelineProps,
   ArchitectureNodeProps,
   TriggerNodeProps,

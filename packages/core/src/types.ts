@@ -130,6 +130,11 @@ export type SequenceNotePlacement = "left-of" | "right-of" | "over";
 
 export type SequenceGroupKind = "alt" | "loop" | "opt";
 
+/** Persisted manual layout data owned by the root FlowTimeline element */
+export interface FlowTimelineLayout {
+  positions?: Record<string, { x: number; y: number }>;
+}
+
 /** Props for the FlowTimeline root element */
 export interface FlowTimelineProps {
   title: string;
@@ -144,6 +149,7 @@ export interface FlowTimelineProps {
   layoutRankSep?: number;
   layoutNodeSep?: number;
   layoutEdgeSep?: number;
+  layout?: FlowTimelineLayout;
   edgeShape?: EdgeShape;
   themeMode?: "local" | "document";
   showHeaderOverlay?: boolean;
@@ -158,6 +164,8 @@ export interface FlowTimelineProps {
 export interface ArchitectureNodeProps {
   label: string;
   kind?: "service" | "database" | "queue" | "cache" | "gateway" | "external" | "compute";
+  /** Iconify icon name (e.g. "logos:aws-lambda"), image URL, or data URI shown instead of the kind badge */
+  icon?: string;
   technology?: string;
   runtime?: string;
   owner?: string;
@@ -438,6 +446,20 @@ export interface FlaierFlowOption {
 /** Spec object, manifest object, or remote/local JSON source */
 export type FlaierSource = FlaierSpec | FlaierManifest | string;
 
+/** Outcome reported back to the editor after a host handles a save request */
+export interface FlaierSaveResult {
+  ok: boolean;
+  errors?: string[];
+  warnings?: string[];
+  message?: string;
+}
+
+/** Payload emitted with the `save` event when the editor requests persistence */
+export interface FlaierSaveRequest {
+  spec: FlaierSpec;
+  complete: (result: FlaierSaveResult) => void;
+}
+
 /** Public component props */
 export interface FlaierProps {
   src: FlaierSource;
@@ -446,6 +468,8 @@ export interface FlaierProps {
   themeMode?: "local" | "document";
   nodes?: FlaierCustomNodeDefinitions;
   viewportResetToken?: number;
+  /** Enables the interactive spec editor (dev-only in Docus/Nuxt hosts). */
+  editable?: boolean;
 }
 
 export interface FlaierPanelProps extends FlaierProps {

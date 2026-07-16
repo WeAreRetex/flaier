@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "nuxt dev --extends docus",
     "prebuild": "pnpm --dir ../../packages/core build && pnpm --dir ../../packages/nuxt build",
-    "build": "NODE_OPTIONS=--max-old-space-size=4096 nuxt build --extends docus",
+    "build": "NODE_OPTIONS=--max-old-space-size=8192 nuxt build --extends docus",
     "pregenerate": "pnpm --dir ../../packages/core build && pnpm --dir ../../packages/nuxt build",
     "generate": "NUXT_CONTENT_LOCAL_DB=.data/content/generate.sqlite nuxt generate --extends docus",
     "preview": "NUXT_CONTENT_LOCAL_DB=.data/content/preview.sqlite nuxt preview --extends docus"

@@ -1,6 +1,5 @@
 {
   "root": "timeline",
-  "state": { "currentStep": 0, "playing": false },
   "elements": {
     "timeline": {
       "type": "FlowTimeline",
@@ -13,13 +12,63 @@
         "layoutRankSep": 240,
         "layoutNodeSep": 160,
         "zones": [
-          { "id": "edge", "label": "Edge", "color": "#6366f1", "padding": 56 },
-          { "id": "core", "label": "Core Services", "color": "#0ea5e9", "padding": 60 },
-          { "id": "async", "label": "Async", "color": "#f59e0b", "padding": 56 },
-          { "id": "data", "label": "Data Plane", "color": "#22c55e", "padding": 56 }
-        ]
+          {
+            "id": "edge",
+            "label": "Edge",
+            "color": "#6366f1",
+            "padding": 56
+          },
+          {
+            "id": "core",
+            "label": "Core Services",
+            "color": "#0ea5e9",
+            "padding": 60
+          },
+          {
+            "id": "async",
+            "label": "Async",
+            "color": "#f59e0b",
+            "padding": 56
+          },
+          {
+            "id": "data",
+            "label": "Data Plane",
+            "color": "#22c55e",
+            "padding": 56
+          }
+        ],
+        "layout": {
+          "positions": {
+            "gateway": {
+              "x": 0,
+              "y": 0
+            },
+            "api-service": {
+              "x": 510,
+              "y": 9
+            },
+            "event-queue": {
+              "x": 976,
+              "y": 575
+            },
+            "database": {
+              "x": 1530,
+              "y": 35
+            },
+            "worker": {
+              "x": 1561,
+              "y": 572
+            },
+            "cache": {
+              "x": 2040,
+              "y": 27
+            }
+          }
+        }
       },
-      "children": ["gateway"]
+      "children": [
+        "gateway"
+      ]
     },
     "gateway": {
       "type": "ArchitectureNode",
@@ -32,10 +81,24 @@
         "technology": "Bun.serve",
         "owner": "Platform Team",
         "description": "Public ingress. Terminates TLS, enforces auth, rate-limits, and routes to internal services.",
-        "capabilities": ["jwt-validation", "rate-limit", "request-routing"],
-        "security": { "auth": "JWT", "encryption": "TLS 1.3", "pii": false },
-        "operations": { "slo": "99.95% availability", "alert": "5xx-rate > 1%" },
-        "sourceAnchor": { "path": "src/server/index.ts", "line": 1 },
+        "capabilities": [
+          "jwt-validation",
+          "rate-limit",
+          "request-routing"
+        ],
+        "security": {
+          "auth": "JWT",
+          "encryption": "TLS 1.3",
+          "pii": false
+        },
+        "operations": {
+          "slo": "99.95% availability",
+          "alert": "5xx-rate > 1%"
+        },
+        "sourceAnchor": {
+          "path": "src/server/index.ts",
+          "line": 1
+        },
         "transitions": [
           {
             "to": "api-service",
@@ -45,9 +108,12 @@
             "transport": "sync",
             "criticality": "high"
           }
-        ]
+        ],
+        "icon": "logos:aws"
       },
-      "children": ["api-service"]
+      "children": [
+        "api-service"
+      ]
     },
     "api-service": {
       "type": "ArchitectureNode",
@@ -60,9 +126,18 @@
         "technology": "TypeScript",
         "owner": "Core Team",
         "description": "Validates commands, enforces domain invariants, persists state, and publishes domain events.",
-        "capabilities": ["idempotent-upsert", "domain-events"],
-        "operations": { "slo": "p95 < 200ms", "alert": "latency-p95 > 250ms" },
-        "sourceAnchor": { "path": "src/services/api.ts", "line": 1 },
+        "capabilities": [
+          "idempotent-upsert",
+          "domain-events"
+        ],
+        "operations": {
+          "slo": "p95 < 200ms",
+          "alert": "latency-p95 > 250ms"
+        },
+        "sourceAnchor": {
+          "path": "src/services/api.ts",
+          "line": 1
+        },
         "transitions": [
           {
             "to": "event-queue",
@@ -81,7 +156,10 @@
           }
         ]
       },
-      "children": ["event-queue", "database"]
+      "children": [
+        "event-queue",
+        "database"
+      ]
     },
     "event-queue": {
       "type": "ArchitectureNode",
@@ -94,8 +172,14 @@
         "technology": "Kafka",
         "owner": "Messaging Team",
         "description": "Buffers async jobs. Protects core services from burst traffic.",
-        "capabilities": ["backpressure", "dead-letter-routing"],
-        "operations": { "slo": "99.9% durability", "alert": "consumer-lag > 2m" },
+        "capabilities": [
+          "backpressure",
+          "dead-letter-routing"
+        ],
+        "operations": {
+          "slo": "99.9% durability",
+          "alert": "consumer-lag > 2m"
+        },
         "transitions": [
           {
             "to": "worker",
@@ -106,7 +190,9 @@
           }
         ]
       },
-      "children": ["worker"]
+      "children": [
+        "worker"
+      ]
     },
     "worker": {
       "type": "ArchitectureNode",
@@ -119,13 +205,26 @@
         "technology": "Bun workers",
         "owner": "Automation Team",
         "description": "Executes side effects, retries transient failures, warms the read cache.",
-        "capabilities": ["retry-orchestration", "idempotency-keys"],
-        "operations": { "slo": "Retry success > 98% in 10m", "alert": "error-rate > 2%" },
+        "capabilities": [
+          "retry-orchestration",
+          "idempotency-keys"
+        ],
+        "operations": {
+          "slo": "Retry success > 98% in 10m",
+          "alert": "error-rate > 2%"
+        },
         "transitions": [
-          { "to": "cache", "label": "Warm cache", "kind": "retry", "protocol": "Redis" }
+          {
+            "to": "cache",
+            "label": "Warm cache",
+            "kind": "retry",
+            "protocol": "Redis"
+          }
         ]
       },
-      "children": ["cache"]
+      "children": [
+        "cache"
+      ]
     },
     "database": {
       "type": "ArchitectureNode",
@@ -146,13 +245,27 @@
             "retention": "7 years"
           }
         ],
-        "security": { "auth": "IAM roles", "encryption": "at rest + in transit", "pii": true },
-        "operations": { "slo": "RPO < 5m", "alert": "replication-lag > 60s" },
+        "security": {
+          "auth": "IAM roles",
+          "encryption": "at rest + in transit",
+          "pii": true
+        },
+        "operations": {
+          "slo": "RPO < 5m",
+          "alert": "replication-lag > 60s"
+        },
         "transitions": [
-          { "to": "cache", "label": "Project reads", "kind": "success", "protocol": "Redis" }
+          {
+            "to": "cache",
+            "label": "Project reads",
+            "kind": "success",
+            "protocol": "Redis"
+          }
         ]
       },
-      "children": ["cache"]
+      "children": [
+        "cache"
+      ]
     },
     "cache": {
       "type": "ArchitectureNode",
@@ -175,5 +288,9 @@
         ]
       }
     }
+  },
+  "state": {
+    "currentStep": 0,
+    "playing": false
   }
 }

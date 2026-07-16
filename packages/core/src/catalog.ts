@@ -57,6 +57,18 @@ export const sourceAnchorSchema = z.union([
   }),
 ]);
 
+export const flowLayoutSchema = z.object({
+  positions: z
+    .record(
+      z.string(),
+      z.object({
+        x: z.number(),
+        y: z.number(),
+      }),
+    )
+    .optional(),
+});
+
 export const architectureZoneSchema = z.object({
   id: z.string(),
   label: z.string(),
@@ -147,6 +159,7 @@ export const flaierCatalogComponents = {
         layoutRankSep: z.number().positive().optional(),
         layoutNodeSep: z.number().positive().optional(),
         layoutEdgeSep: z.number().positive().optional(),
+        layout: flowLayoutSchema.optional(),
         edgeShape: edgeShapeSchema.optional(),
         themeMode: z.enum(["local", "document"]).optional(),
         showHeaderOverlay: z.boolean().optional(),
@@ -165,6 +178,7 @@ export const flaierCatalogComponents = {
         kind: z
           .enum(["service", "database", "queue", "cache", "gateway", "external", "compute"])
           .default("service"),
+        icon: z.string().optional(),
         technology: z.string().optional(),
         runtime: z.string().optional(),
         owner: z.string().optional(),

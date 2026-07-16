@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, getCurrentInstance, ref, watch } from "vue";
 import Flaier from "./Flaier.vue";
 import { useFlaierFullscreen } from "../composables/useFlaierFullscreen";
-import type { FlaierPanelProps } from "../types";
+import type { FlaierPanelProps, FlaierSaveRequest } from "../types";
 
 defineOptions({
   inheritAttrs: false,
@@ -15,11 +15,29 @@ const props = withDefaults(defineProps<FlaierPanelProps>(), {
   minHeight: 420,
   zIndex: 1400,
   fullscreenEnabled: true,
+  editable: false,
 });
 
-const { fullscreen, closeFullscreen, toggleFullscreen } = useFlaierFullscreen();
+const emit = defineEmits<{
+  save: [request: FlaierSaveRequest];
+}>();
+
+// Forward the save listener only when the host actually attached one, so the
+// editor can tell "no save handler" apart from "handler forwarded by panel".
+const panelInstance = getCurrentInstance();
+const saveListener = computed(() => {
+  if (!panelInstance?.vnode.props?.onSave) return {};
+  return { onSave: (request: FlaierSaveRequest) => emit("save", request) };
+});
+
+const surfaceRef = ref<HTMLElement | null>(null);
+const { fullscreen, fallbackActive, closeFullscreen, toggleFullscreen } =
+  useFlaierFullscreen(surfaceRef);
 
 const fullscreenActive = computed(() => props.fullscreenEnabled && fullscreen.value);
+// The teleported fixed overlay is only needed when the native Fullscreen API
+// is unavailable; natively fullscreened elements stay in place in the DOM.
+const overlayActive = computed(() => fullscreenActive.value && fallbackActive.value);
 const viewportResetToken = ref(0);
 
 const containerStyle = computed<Record<string, string>>(() => {
@@ -56,22 +74,22 @@ watch(
 </script>
 
 <template>
-  <Teleport to="body" :disabled="!fullscreenActive">
+  <Teleport to="body" :disabled="!overlayActive">
     <div
       class="fn-panel"
-      :class="{ 'fn-panel--fullscreen': fullscreenActive }"
+      :class="{ 'fn-panel--fullscreen': overlayActive }"
       :style="containerStyle"
       v-bind="$attrs"
     >
       <button
-        v-if="fullscreenActive"
+        v-if="overlayActive"
         type="button"
         class="fn-panel__backdrop"
         aria-label="Exit fullscreen"
         @click="closeFullscreen"
       />
 
-      <div class="fn-panel__surface">
+      <div ref="surfaceRef" class="fn-panel__surface">
         <Flaier
           class="fn-panel__viewer"
           :src="src"
@@ -80,6 +98,8 @@ watch(
           :theme-mode="themeMode"
           :nodes="nodes"
           :viewport-reset-token="viewportResetToken"
+          :editable="editable"
+          v-bind="saveListener"
         />
 
         <button
@@ -194,9 +214,6 @@ watch(
   position: fixed;
   inset: 0;
   z-index: var(--fn-panel-z-index);
-  display: grid;
-  place-items: center;
-  padding: 1rem;
 }
 
 .fn-panel__backdrop {
@@ -208,20 +225,17 @@ watch(
 }
 
 .fn-panel--fullscreen .fn-panel__surface {
-  width: min(1480px, 100%);
-  height: min(94vh, 1020px);
-  max-height: 100%;
+  width: 100%;
+  height: 100%;
+  max-height: none;
   z-index: 1;
 }
 
-@media (max-width: 900px) {
-  .fn-panel--fullscreen {
-    padding: 0.55rem;
-  }
-
-  .fn-panel--fullscreen .fn-panel__surface {
-    width: 100%;
-    height: 100%;
-  }
+/* Natively fullscreened surface (Fullscreen API) */
+.fn-panel__surface:fullscreen {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  background: var(--color-background, #0b1120);
 }
 </style>

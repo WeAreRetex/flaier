@@ -299,3 +299,38 @@
   stroke: var(--fn-edge-overview) !important;
   stroke-width: 1.8px !important;
 }
+
+/* ── Editor mode ───────────────────────────────────────────── */
+
+.vue-flow__node.fn-editor-selected {
+  outline: 2px solid rgb(56 189 248 / 0.9);
+  outline-offset: 3px;
+  border-radius: 0.75rem;
+}
+
+.flaier[data-editing="true"] .vue-flow__handle {
+  width: 12px;
+  height: 12px;
+  min-width: 12px;
+  min-height: 12px;
+  border-radius: 9999px;
+  opacity: 0.35;
+  background: rgb(56 189 248);
+  border: 1px solid rgb(14 116 144);
+  transition: opacity 0.15s ease;
+}
+
+.flaier[data-editing="true"] .vue-flow__node:hover .vue-flow__handle,
+.flaier[data-editing="true"] .vue-flow__handle.connecting,
+.flaier[data-editing="true"] .vue-flow__handle.vue-flow__handle-connecting {
+  opacity: 0.9;
+}
+
+.flaier[data-editing="true"] .vue-flow__edge.fn-editor-selected-edge .vue-flow__edge-path {
+  stroke: rgb(56 189 248 / 0.95) !important;
+  stroke-width: 2.6px !important;
+}
+
+.flaier[data-editing="true"] .vue-flow__edge {
+  cursor: pointer;
+}

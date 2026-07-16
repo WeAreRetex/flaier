@@ -2,6 +2,7 @@
 import { FlaierPanel } from "@flaier/core";
 import type { FlaierCustomNodeDefinitions, FlaierSource } from "@flaier/core";
 import { toRef } from "vue";
+import { useFlaierDevEditor } from "../composables/useFlaierDevEditor";
 import { useMergedFlaierNodes } from "../composables/useFlaierNodes";
 import { usePreparedFlaierSource } from "../composables/usePreparedFlaierSource";
 
@@ -16,23 +17,26 @@ const props = withDefaults(
     interval?: number;
     height?: number | string;
     nodes?: FlaierCustomNodeDefinitions;
+    editable?: boolean;
   }>(),
   {
     autoPlay: false,
     interval: 3000,
     height: 480,
+    editable: true,
   },
 );
 
 const preparedSource = await usePreparedFlaierSource(toRef(props, "src"));
 const mergedNodes = useMergedFlaierNodes(toRef(props, "nodes"));
+const { editorBindings } = useFlaierDevEditor(toRef(props, "src"), toRef(props, "editable"));
 </script>
 
 <template>
   <ClientOnly>
     <FlaierPanel
       class="fn-demo"
-      v-bind="$attrs"
+      v-bind="{ ...$attrs, ...editorBindings }"
       :src="preparedSource"
       :auto-play="autoPlay"
       :interval="interval"

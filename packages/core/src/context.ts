@@ -2,7 +2,7 @@ import type { InjectionKey, Ref } from "vue";
 import type { FlaierCustomNodeDefinitions, FlaierFlowOption, FlaierSpec } from "./types";
 
 export interface FlaierRuntimeContext {
-  spec: Ref<FlaierSpec | null>;
+  spec: Readonly<Ref<FlaierSpec | null>>;
   interval: Ref<number>;
   nodes: Ref<FlaierCustomNodeDefinitions>;
   flowOptions: Ref<FlaierFlowOption[]>;

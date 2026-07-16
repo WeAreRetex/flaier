@@ -31,6 +31,7 @@ import {
 } from "../../code-node-sizing";
 import { exportFlowDiagram, type DiagramExportFormat } from "../../composables/useDiagramExport";
 import { useFlaierRuntime } from "../../composables/useFlaierRuntime";
+import { useFlowEditor } from "../../composables/useFlowEditor";
 import {
   buildSequenceLayout,
   type SequenceLayoutMessage,
@@ -62,10 +63,13 @@ import type {
   FlowNode,
   FlowNodeData,
   FlowNodeType,
+  FlowTimelineLayout,
   MagicMoveStep,
   SpecElement,
   TwoslashHtml,
 } from "../../types";
+import EditorInspector from "../controls/EditorInspector.vue";
+import EditorToolbar from "../controls/EditorToolbar.vue";
 import TimelineControls from "../controls/TimelineControls.vue";
 import ArchitectureEdge from "../edges/ArchitectureEdge.vue";
 import ArchitectureNodeVue from "../nodes/ArchitectureNode.vue";
@@ -93,6 +97,7 @@ const props = withDefaults(
     layoutRankSep?: number;
     layoutNodeSep?: number;
     layoutEdgeSep?: number;
+    layout?: FlowTimelineLayout;
     edgeShape?: "smoothstep" | "straight" | "bezier";
     themeMode?: "local" | "document";
     showHeaderOverlay?: boolean;
@@ -2133,6 +2138,95 @@ const playing = computed<boolean>({
   },
 });
 
+const instance = getCurrentInstance();
+const flowId = `flaier-${instance?.uid ?? 0}`;
+
+const {
+  editorAvailable,
+  editorActive,
+  selectedNodeKeys,
+  selectedZoneId,
+  selectedEdge: editorSelectedEdgeRef,
+  deleteSelectedEdge,
+  sectionsListOpen,
+  addableNodeTypes,
+  addNodeOfType,
+  addZoneAction,
+  clearSelection: clearEditorSelection,
+  selectZone,
+  toggleSectionsList,
+  backToSectionsList,
+  handleEditNodeClick,
+  requestSave: requestEditorSave,
+} = useFlowEditor({
+  flowId,
+  isSequenceMode,
+  isArchitectureMode,
+  playing,
+  containerWidth,
+  containerHeight,
+  getRenderedPositions: () => ({ ...layoutPositions.value }),
+});
+
+const editorSelectedNodeKey = computed(() => {
+  return selectedNodeKeys.value.length === 1 ? (selectedNodeKeys.value[0] ?? null) : null;
+});
+
+const editorSelectedElement = computed(() => {
+  const key = editorSelectedNodeKey.value;
+  if (!key) return null;
+  return spec.value?.elements[key] ?? null;
+});
+
+const editorZones = computed(() => props.zones ?? []);
+
+const editorSelectedEdge = computed(() => {
+  const edge = editorSelectedEdgeRef.value;
+  const activeSpec = spec.value;
+  if (!edge || !activeSpec) return null;
+
+  const source = activeSpec.elements[edge.source];
+  const target = activeSpec.elements[edge.target];
+  if (!source || !target) return null;
+
+  const transitions = Array.isArray(source.props.transitions)
+    ? (source.props.transitions as Array<Record<string, unknown>>)
+    : [];
+  const meta = transitions.find((transition) => transition?.to === edge.target);
+
+  return {
+    source: edge.source,
+    target: edge.target,
+    sourceLabel: typeof source.props.label === "string" ? source.props.label : edge.source,
+    targetLabel: typeof target.props.label === "string" ? target.props.label : edge.target,
+    label: typeof meta?.label === "string" ? meta.label : undefined,
+    kind: typeof meta?.kind === "string" ? meta.kind : undefined,
+    description: typeof meta?.description === "string" ? meta.description : undefined,
+  };
+});
+
+const editorZoneNodeCounts = computed<Record<string, number>>(() => {
+  const counts: Record<string, number> = {};
+
+  for (const node of orderedNodeElements.value) {
+    const zone = node.element.props.zone;
+    if (typeof zone !== "string" || zone.length === 0) continue;
+    counts[zone] = (counts[zone] ?? 0) + 1;
+  }
+
+  return counts;
+});
+
+// The read-only architecture inspector overlaps (and pointer-blocks) the
+// canvas; the editor panel replaces it while a session is active.
+watch(editorActive, (active) => {
+  if (!isArchitectureMode.value) return;
+
+  architectureInspectorOpen.value = active
+    ? false
+    : props.defaultArchitectureInspectorOpen !== false;
+});
+
 watch(
   [startNodeKey, orderedNodeElements, isArchitectureMode, isSequenceMode, sequenceSteps],
   ([start, , architectureMode, sequenceMode, steps]) => {
@@ -2215,10 +2309,11 @@ function next(manual = true) {
 }
 
 watch(
-  [playing, totalSteps, intervalMs],
-  ([isPlaying, steps, interval]) => {
+  [playing, totalSteps, intervalMs, editorActive],
+  ([isPlaying, steps, interval, isEditing]) => {
     clearTimer();
 
+    if (isEditing) return;
     if (!isPlaying || steps <= 1) return;
 
     timer = setInterval(() => {
@@ -2877,11 +2972,49 @@ function architectureZoneLabelStyle(zone: ArchitectureZoneOverlay) {
   };
 }
 
+// Edit-mode zone pills live in a layer above the canvas (the base zone layer
+// sits behind it and cannot receive clicks), so they carry absolute coords.
+// Right-aligned so they never overlap the read-only label on the left.
+function architectureZoneEditLabelStyle(zone: ArchitectureZoneOverlay) {
+  return {
+    left: `${zone.x + zone.width - 16}px`,
+    top: `${zone.y + zone.labelOffsetY}px`,
+    transform: "translateX(-100%)",
+    borderColor: withAlpha(zone.color, 0.75),
+    background: withAlpha(zone.color, 0.3),
+    color: zone.color,
+  };
+}
+
 function architectureZoneDescriptionStyle(zone: ArchitectureZoneOverlay) {
   return {
     top: `${zone.descriptionOffsetY}px`,
   };
 }
+
+const pinnedPositions = computed<Record<string, { x: number; y: number }>>(() => {
+  const stored = props.layout?.positions;
+  if (!stored) return {};
+
+  const result: Record<string, { x: number; y: number }> = {};
+
+  for (const [key, position] of Object.entries(stored)) {
+    if (!orderedNodeByKey.value[key]) continue;
+    if (
+      !position ||
+      typeof position.x !== "number" ||
+      !Number.isFinite(position.x) ||
+      typeof position.y !== "number" ||
+      !Number.isFinite(position.y)
+    ) {
+      continue;
+    }
+
+    result[key] = { x: position.x, y: position.y };
+  }
+
+  return result;
+});
 
 const layoutPositions = computed<Record<string, { x: number; y: number }>>(() => {
   const orderedNodes = orderedNodeElements.value;
@@ -2890,10 +3023,23 @@ const layoutPositions = computed<Record<string, { x: number; y: number }>>(() =>
   const rankGap = resolvedLayoutRankSep.value;
   const nodeGap = resolvedLayoutNodeSep.value;
   const edgeGap = resolvedLayoutEdgeSep.value;
-  const fallback = createFallbackLayoutPositions(orderedNodes, rankGap);
+  const pinned = pinnedPositions.value;
+
+  // Fully pinned graphs render exactly their stored coordinates — no dagre,
+  // no zone separation, no normalization.
+  if (orderedNodes.every((node) => pinned[node.key])) {
+    const result: Record<string, { x: number; y: number }> = {};
+    for (const node of orderedNodes) {
+      const position = pinned[node.key];
+      if (position) result[node.key] = { ...position };
+    }
+    return result;
+  }
+
+  const fallback = { ...createFallbackLayoutPositions(orderedNodes, rankGap), ...pinned };
 
   if (resolvedLayoutEngine.value === "manual") {
-    return createManualLayoutPositions(orderedNodes, rankGap, nodeGap);
+    return { ...createManualLayoutPositions(orderedNodes, rankGap, nodeGap), ...pinned };
   }
 
   const graph = new dagre.graphlib.Graph();
@@ -2959,11 +3105,20 @@ const layoutPositions = computed<Record<string, { x: number; y: number }>>(() =>
     return fallback;
   }
 
+  // The unpinned nodes go through the exact same pipeline (zone separation +
+  // normalization over the FULL dagre layout) regardless of what is pinned, so
+  // pinning one node never shifts the others. Stored positions override last.
   if (isArchitectureMode.value) {
     enforceArchitectureZoneSeparation(positions);
   }
 
-  return normalizePositions(positions);
+  normalizePositions(positions);
+
+  for (const [key, position] of Object.entries(pinned)) {
+    positions[key] = { ...position };
+  }
+
+  return positions;
 });
 
 function enforceArchitectureZoneSeparation(positions: Record<string, { x: number; y: number }>) {
@@ -3109,6 +3264,7 @@ const nodes = computed<FlowNode[]>(() => {
   return orderedNodeElements.value.map(({ key, nodeType, element, index }) => ({
     id: key,
     type: nodeType,
+    class: selectedNodeKeys.value.includes(key) ? "fn-editor-selected" : undefined,
     targetPosition: Position.Left,
     sourcePosition: Position.Right,
     position:
@@ -3152,9 +3308,13 @@ const edges = computed<FlowEdge[]>(() => {
         activeFrame.value?.nodeKey === node.key &&
         nextPlannedNodeKey.value === target;
       const transition = transitionMetaBySource.value[node.key]?.[target];
+      const isSelectedEdge =
+        editorSelectedEdgeRef.value?.source === node.key &&
+        editorSelectedEdgeRef.value?.target === target;
       const edgeClasses = [
         isActiveEdge ? "active-edge" : null,
         transition?.kind ? `edge-kind-${transition.kind}` : null,
+        isSelectedEdge ? "fn-editor-selected-edge" : null,
       ].filter((value): value is string => Boolean(value));
 
       const edgeLabel = resolveTransitionEdgeLabel(transition);
@@ -3188,20 +3348,30 @@ const edges = computed<FlowEdge[]>(() => {
           // both vertically (via bias) and horizontally (via distributed handles).
           labelBias = 0.3;
         } else {
-          sourceHandle = isVertical ? "s-bottom" : "s-right";
-          targetHandle = isVertical ? "t-top" : "t-left";
+          // Geometry-aware anchoring: leave from the side of the source that
+          // faces the target and arrive on the facing side. Manually placed
+          // nodes keep sensible arrows, and a dropped connection ends on the
+          // side it was aimed at.
+          const sourcePos = layoutPositions.value[node.key];
+          const targetPos = layoutPositions.value[target];
+          const sourceSize = nodeSizes.value[node.key] ?? { width: 270, height: 120 };
+          const targetSize = nodeSizes.value[target] ?? { width: 270, height: 120 };
 
-          // Fan-out: when a node has multiple non-reverse targets in the same rank
-          // direction, distribute source handles so straight lines stay shorter.
-          if (isVertical && targets.length > 1) {
-            const sourcePos = layoutPositions.value[node.key];
-            const targetPos = layoutPositions.value[target];
-            if (sourcePos && targetPos) {
-              const sourceSize = nodeSizes.value[node.key] ?? { width: 270, height: 120 };
-              const sourceCenterX = sourcePos.x + sourceSize.width / 2;
-              const targetSize = nodeSizes.value[target] ?? { width: 270, height: 120 };
-              const targetCenterX = targetPos.x + targetSize.width / 2;
-              const dx = targetCenterX - sourceCenterX;
+          if (sourcePos && targetPos) {
+            const dx = targetPos.x + targetSize.width / 2 - (sourcePos.x + sourceSize.width / 2);
+            const dy = targetPos.y + targetSize.height / 2 - (sourcePos.y + sourceSize.height / 2);
+
+            if (Math.abs(dx) >= Math.abs(dy)) {
+              sourceHandle = dx >= 0 ? "s-right" : "s-left";
+              targetHandle = dx >= 0 ? "t-left" : "t-right";
+            } else {
+              sourceHandle = dy >= 0 ? "s-bottom" : "s-top";
+              targetHandle = dy >= 0 ? "t-top" : "t-bottom";
+            }
+
+            // Fan-out: when a node has multiple downward targets, distribute
+            // the bottom handles so straight lines stay shorter.
+            if (sourceHandle === "s-bottom" && targets.length > 1) {
               const threshold = sourceSize.width * 0.2;
               if (dx < -threshold) {
                 sourceHandle = "s-bottom-l";
@@ -3211,6 +3381,9 @@ const edges = computed<FlowEdge[]>(() => {
                 targetHandle = "t-top-l";
               }
             }
+          } else {
+            sourceHandle = isVertical ? "s-bottom" : "s-right";
+            targetHandle = isVertical ? "t-top" : "t-left";
           }
         }
       } else if (hasReverse) {
@@ -3757,8 +3930,6 @@ const containerMinHeight = computed(() => {
   return Math.min(880, Math.max(560, codeViewportHeight + storyViewportHeight + 300));
 });
 
-const instance = getCurrentInstance();
-const flowId = `flaier-${instance?.uid ?? 0}`;
 const { fitView, onNodeClick, onViewportChange, setCenter, setViewport, viewport } =
   useVueFlow(flowId);
 const nodesInitialized = useNodesInitialized();
@@ -3904,7 +4075,12 @@ onViewportChange((transform) => {
   syncOverviewModeFromZoom(transform.zoom);
 });
 
-onNodeClick(({ node }) => {
+onNodeClick(({ event, node }) => {
+  if (editorActive.value) {
+    handleEditNodeClick(node.id, event instanceof MouseEvent ? event : undefined);
+    return;
+  }
+
   if (isArchitectureMode.value) {
     architectureSelectedNodeKey.value = node.id;
     architectureInspectorOpen.value = true;
@@ -4772,6 +4948,13 @@ watch(
       return;
     }
 
+    // Manual edits must never yank the viewport around; record the signature
+    // so exiting edit mode does not trigger a deferred re-fit either.
+    if (editorActive.value) {
+      narrativeFitSignature.value = signature;
+      return;
+    }
+
     if (suppressNarrativeResizeFit.value && narrativeFocusTarget.value) {
       narrativeFitSignature.value = signature;
       return;
@@ -4823,6 +5006,11 @@ watch(
     }
 
     architectureFitSignature.value = signature;
+
+    // Dragging, adding, or deleting nodes in edit mode must not re-fit.
+    if (editorActive.value) {
+      return;
+    }
 
     nextTick(() => {
       void fitView({
@@ -4925,6 +5113,7 @@ onUnmounted(() => {
     :data-mode="isArchitectureMode ? 'architecture' : isSequenceMode ? 'sequence' : 'narrative'"
     :data-focus-mode="overviewMode ? 'overview' : 'focus'"
     :data-theme="uiTheme"
+    :data-editing="editorActive ? 'true' : undefined"
   >
     <div ref="sceneRef" class="relative w-full overflow-hidden" :style="sceneStyle">
       <div
@@ -5067,10 +5256,10 @@ onUnmounted(() => {
         :edges="edges"
         :node-types="customNodeTypes"
         :fit-view-on-init="false"
-        :elements-selectable="false"
-        :nodes-focusable="false"
-        :nodes-draggable="false"
-        :nodes-connectable="false"
+        :elements-selectable="editorActive"
+        :nodes-focusable="editorActive"
+        :nodes-draggable="editorActive"
+        :nodes-connectable="editorActive"
         :zoom-on-scroll="!isSequenceMode"
         :zoom-on-pinch="!isSequenceMode"
         :zoom-on-double-click="!isSequenceMode"
@@ -5099,6 +5288,7 @@ onUnmounted(() => {
           <ArchitectureNodeVue
             :label="toRequiredString(data.props.label)"
             :kind="toArchitectureKind(data.props.kind)"
+            :icon="toOptionalString(data.props.icon)"
             :technology="toOptionalString(data.props.technology)"
             :runtime="toOptionalString(data.props.runtime)"
             :owner="toOptionalString(data.props.owner)"
@@ -5201,6 +5391,26 @@ onUnmounted(() => {
       </VueFlow>
 
       <div v-else class="h-full w-full" />
+
+      <div
+        v-if="editorActive && isArchitectureMode && architectureZoneOverlays.length > 0"
+        class="pointer-events-none absolute inset-0 z-20"
+      >
+        <div class="absolute inset-0" :style="architectureZoneLayerStyle">
+          <button
+            v-for="zone in architectureZoneOverlays"
+            :key="`zone-edit-${zone.id}`"
+            type="button"
+            class="pointer-events-auto absolute inline-flex cursor-pointer items-center gap-2 rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-wider transition-shadow hover:ring-2 hover:ring-sky-400/70"
+            :class="selectedZoneId === zone.id ? 'ring-2 ring-sky-400/90' : ''"
+            :style="architectureZoneEditLabelStyle(zone)"
+            :title="`Edit section: ${zone.label}`"
+            @click="selectZone(zone.id)"
+          >
+            <span>{{ zone.label }}</span>
+          </button>
+        </div>
+      </div>
     </div>
 
     <div
@@ -5291,6 +5501,36 @@ onUnmounted(() => {
         </div>
       </div>
     </div>
+
+    <EditorToolbar
+      v-if="editorAvailable"
+      :addable-node-types="addableNodeTypes"
+      :can-add-zone="isArchitectureMode"
+      @add-node="addNodeOfType"
+      @add-zone="addZoneAction"
+      @toggle-sections="toggleSectionsList"
+      @save="requestEditorSave"
+    />
+
+    <EditorInspector
+      v-if="
+        editorActive &&
+        (editorSelectedElement || selectedZoneId || editorSelectedEdge || sectionsListOpen)
+      "
+      :node-key="editorSelectedNodeKey"
+      :element="editorSelectedElement"
+      :zone-id="selectedZoneId"
+      :edge="editorSelectedEdge"
+      :zones="editorZones"
+      :zone-node-counts="editorZoneNodeCounts"
+      :show-sections-list="sectionsListOpen"
+      :is-architecture-mode="isArchitectureMode"
+      @close="clearEditorSelection"
+      @select-zone="selectZone"
+      @add-zone="addZoneAction"
+      @back-to-list="backToSectionsList"
+      @delete-edge="deleteSelectedEdge"
+    />
 
     <div
       v-if="showTopRightControls"

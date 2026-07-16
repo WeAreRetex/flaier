@@ -1,5 +1,11 @@
-import type { FlowElement, FlowSpec } from "./shared";
-import { isObject } from "./shared";
+import type { FlaierSpec, SpecElement } from "../types";
+
+type FlowSpec = FlaierSpec;
+type FlowElement = SpecElement;
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
 
 export interface FlowReadinessResult {
   errors: string[];
@@ -261,11 +267,13 @@ function validateElementProps(
       expectOptionalPositiveNumber(props, "layoutNodeSep", key, errors, 1);
       expectOptionalPositiveNumber(props, "layoutEdgeSep", key, errors, 1);
       expectOptionalEnum(props, "edgeShape", EDGE_SHAPES, key, errors);
+      validateLayoutProp(key, props.layout, errors);
       break;
     }
 
     case "ArchitectureNode": {
       expectRequiredString(props, "label", key, errors);
+      expectOptionalString(props, "icon", key, errors);
       expectOptionalString(props, "description", key, errors);
       expectOptionalString(props, "narrative", key, errors);
       expectOptionalString(props, "technology", key, errors);
@@ -1227,6 +1235,41 @@ function collectReferencedArchitectureZones(entries: Array<[string, unknown]>) {
   }
 
   return zones;
+}
+
+function validateLayoutProp(elementKey: string, layout: unknown, errors: string[]) {
+  if (layout === undefined) {
+    return;
+  }
+
+  if (!isObject(layout)) {
+    errors.push(`Element "${elementKey}" prop "layout" must be an object when provided.`);
+    return;
+  }
+
+  const positions = layout.positions;
+  if (positions === undefined) {
+    return;
+  }
+
+  if (!isObject(positions)) {
+    errors.push(`Element "${elementKey}" layout.positions must be an object when provided.`);
+    return;
+  }
+
+  for (const [nodeKey, position] of Object.entries(positions)) {
+    if (
+      !isObject(position) ||
+      typeof position.x !== "number" ||
+      !Number.isFinite(position.x) ||
+      typeof position.y !== "number" ||
+      !Number.isFinite(position.y)
+    ) {
+      errors.push(
+        `Element "${elementKey}" layout.positions["${nodeKey}"] must be an object with finite x and y numbers.`,
+      );
+    }
+  }
 }
 
 function validateArchitectureZonesProp(elementKey: string, zones: unknown, errors: string[]) {

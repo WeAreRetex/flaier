@@ -20,6 +20,7 @@ const FlowTimelineComponent: ComponentFn<typeof catalog, "FlowTimeline"> = ({ pr
     layoutRankSep: props.layoutRankSep,
     layoutNodeSep: props.layoutNodeSep,
     layoutEdgeSep: props.layoutEdgeSep,
+    layout: props.layout,
     edgeShape: props.edgeShape,
     themeMode: props.themeMode,
     showHeaderOverlay: props.showHeaderOverlay,

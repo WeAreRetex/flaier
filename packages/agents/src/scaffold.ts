@@ -1,7 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { type Spec, validateSpec } from "@json-render/core";
-import { validateFlaierReadiness } from "./flow-ready-validation";
+import { validateFlaierReadiness } from "../../core/src/validation/flow-ready-validation";
 import {
   getInvocationCwd,
   hasFlag,

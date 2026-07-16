@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ActionProvider, Renderer, StateProvider, VisibilityProvider } from "@json-render/vue";
 import { autoFixSpec, formatSpecIssues, type Spec, validateSpec } from "@json-render/core";
-import { computed, provide, ref, toRef, watch } from "vue";
+import { computed, getCurrentInstance, provide, ref, toRef, watch } from "vue";
 import { flaierRuntimeKey } from "../context";
+import { flaierEditorKey } from "../editor-context";
 import { normalizeFlaierCustomNodes } from "../custom-nodes";
 import { createFlaierRendererRegistry } from "../registry";
 import type {
@@ -10,6 +11,8 @@ import type {
   FlaierManifest,
   FlaierManifestFlow,
   FlaierProps,
+  FlaierSaveRequest,
+  FlaierSaveResult,
   FlaierSource,
   FlaierSpec,
 } from "../types";
@@ -17,12 +20,14 @@ import type {
 const props = withDefaults(defineProps<FlaierProps>(), {
   autoPlay: false,
   interval: 3000,
+  editable: false,
 });
 
 const emit = defineEmits<{
   loaded: [spec: FlaierSpec];
   "load-error": [message: string];
   "state-change": [changes: Array<{ path: string; value: unknown }>];
+  save: [request: FlaierSaveRequest];
 }>();
 
 interface ResolvedFlowDocument {
@@ -53,8 +58,133 @@ const viewportResetToken = computed(() => {
 });
 const rendererRegistry = computed(() => createFlaierRendererRegistry({ nodes: customNodes.value }));
 
+// ---- Editor session (spec-first draft; renderer re-derives everything) ----
+
+const EDITOR_HISTORY_LIMIT = 100;
+
+const instance = getCurrentInstance();
+const editorEnabled = computed(() => props.editable === true);
+const editing = ref(false);
+const draftSpec = ref<FlaierSpec | null>(null);
+const dirty = ref(false);
+const saving = ref(false);
+const saveError = ref<string | null>(null);
+const undoStack = ref<FlaierSpec[]>([]);
+const redoStack = ref<FlaierSpec[]>([]);
+const frozenProviderKey = ref<string | null>(null);
+
+const canUndo = computed(() => undoStack.value.length > 0);
+const canRedo = computed(() => redoStack.value.length > 0);
+const canSave = computed(() => Boolean(instance?.vnode.props?.onSave));
+
+const effectiveSpec = computed(() => draftSpec.value ?? resolvedSpec.value);
+
+function beginEdit() {
+  if (!editorEnabled.value || !resolvedSpec.value) return;
+
+  draftSpec.value = cloneSpec(resolvedSpec.value);
+  editing.value = true;
+  dirty.value = false;
+  saveError.value = null;
+  undoStack.value = [];
+  redoStack.value = [];
+  frozenProviderKey.value = providerKey.value;
+}
+
+function discard() {
+  editing.value = false;
+  draftSpec.value = null;
+  dirty.value = false;
+  saveError.value = null;
+  undoStack.value = [];
+  redoStack.value = [];
+}
+
+function applyEdit(mutate: (spec: FlaierSpec) => FlaierSpec) {
+  const current = draftSpec.value;
+  if (!editing.value || !current) return;
+
+  const next = mutate(current);
+  if (next === current) return;
+
+  undoStack.value = [...undoStack.value.slice(-(EDITOR_HISTORY_LIMIT - 1)), current];
+  redoStack.value = [];
+  draftSpec.value = next;
+  dirty.value = true;
+}
+
+function undo() {
+  const previous = undoStack.value[undoStack.value.length - 1];
+  const current = draftSpec.value;
+  if (!previous || !current) return;
+
+  undoStack.value = undoStack.value.slice(0, -1);
+  redoStack.value = [...redoStack.value, current];
+  draftSpec.value = previous;
+  dirty.value = true;
+}
+
+function redo() {
+  const next = redoStack.value[redoStack.value.length - 1];
+  const current = draftSpec.value;
+  if (!next || !current) return;
+
+  redoStack.value = redoStack.value.slice(0, -1);
+  undoStack.value = [...undoStack.value, current];
+  draftSpec.value = next;
+  dirty.value = true;
+}
+
+function requestSave() {
+  const draft = draftSpec.value;
+  if (!draft || saving.value) return;
+
+  if (!canSave.value) {
+    saveError.value = "No save handler is attached to this viewer.";
+    return;
+  }
+
+  saving.value = true;
+  saveError.value = null;
+
+  emit("save", {
+    spec: cloneSpec(draft),
+    complete: (result: FlaierSaveResult) => {
+      saving.value = false;
+
+      if (result.ok) {
+        resolvedSpec.value = cloneSpec(draft);
+        dirty.value = false;
+        return;
+      }
+
+      const details = [...(result.errors ?? [])];
+      saveError.value =
+        result.message ?? (details.length > 0 ? details.join("\n") : "Save failed.");
+    },
+  });
+}
+
+provide(flaierEditorKey, {
+  enabled: editorEnabled,
+  editing,
+  draftSpec,
+  dirty,
+  saving,
+  saveError,
+  canUndo,
+  canRedo,
+  canSave,
+  beginEdit,
+  discard,
+  applyEdit,
+  undo,
+  redo,
+  requestSave,
+});
+
 provide(flaierRuntimeKey, {
-  spec: resolvedSpec,
+  spec: effectiveSpec,
   interval: toRef(props, "interval"),
   nodes: customNodes,
   flowOptions,
@@ -90,8 +220,24 @@ const providerKey = computed(() => {
   return `${specVersion.value}-${spec.root}-${Object.keys(spec.elements).length}-${props.autoPlay ? "auto" : "manual"}-${props.themeMode ?? "spec"}`;
 });
 
+// While an edit session is active the provider key is frozen: node add/delete
+// changes the element count, and a key change would remount StateProvider and
+// reset the viewport mid-edit.
+const effectiveProviderKey = computed(() => {
+  if (editing.value && frozenProviderKey.value) {
+    return frozenProviderKey.value;
+  }
+
+  return providerKey.value;
+});
+
 async function loadSourceCollection() {
   const requestId = ++sourceRequestId;
+
+  // A genuine source switch ends any edit session; the draft belongs to the
+  // previous source.
+  discard();
+  frozenProviderKey.value = null;
 
   loading.value = true;
   loadError.value = null;
@@ -151,6 +297,9 @@ function pickActiveFlowId(defaultFlowId?: string) {
 function setActiveFlow(flowId: string) {
   if (flowId === activeFlowId.value) return;
   if (!flowDocuments.value.some((flow) => flow.id === flowId)) return;
+
+  discard();
+  frozenProviderKey.value = null;
 
   activeFlowId.value = flowId;
   void activateFlow(flowId);
@@ -554,13 +703,13 @@ function handleStateChange(changes: Array<{ path: string; value: unknown }>) {
 
     <StateProvider
       v-else-if="resolvedSpec"
-      :key="providerKey"
+      :key="effectiveProviderKey"
       :initial-state="initialState"
       :on-state-change="handleStateChange"
     >
       <ActionProvider>
         <VisibilityProvider>
-          <Renderer :spec="resolvedSpec" :registry="rendererRegistry" />
+          <Renderer :spec="effectiveSpec ?? resolvedSpec" :registry="rendererRegistry" />
         </VisibilityProvider>
       </ActionProvider>
     </StateProvider>

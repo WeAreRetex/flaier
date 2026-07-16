@@ -1,7 +1,7 @@
 import { mkdir, readdir } from "node:fs/promises";
 import { dirname, join, relative } from "node:path";
 import { autoFixSpec, formatSpecIssues, type Spec, validateSpec } from "@json-render/core";
-import { validateFlaierReadiness } from "./flow-ready-validation";
+import { validateFlaierReadiness } from "../../core/src/validation/flow-ready-validation";
 import {
   asNonEmptyString,
   ensureUniqueId,
