@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.2.12
+
+[compare changes](https://github.com/WeAreRetex/flaier/compare/v0.2.11...v0.2.12)
+
+### 🩹 Fixes
+
+- Exclude .flow.json specs from oxfmt ([4c58840](https://github.com/WeAreRetex/flaier/commit/4c58840))
+
+### ❤️ Contributors
+
+- Rigo-m ([@Rigo-m](https://github.com/Rigo-m))
+
 ## v0.2.11
 
 [compare changes](https://github.com/WeAreRetex/flaier/compare/v0.2.10...v0.2.11)
